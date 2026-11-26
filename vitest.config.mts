@@ -12,10 +12,29 @@ export default defineConfig({
   plugins: [react()],
   resolve: { tsconfigPaths: true },
   test: {
-    environment: "jsdom",
-    include: ["src/**/*.test.{ts,tsx}"],
-    // Lets Testing Library register its own afterEach(cleanup), so no setup
-    // file is needed. Tests still import test and expect from "vitest".
-    globals: true,
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: "unit",
+          environment: "jsdom",
+          include: ["src/**/*.test.{ts,tsx}"],
+          // Lets Testing Library register its own afterEach(cleanup), so no
+          // setup file is needed. Tests still import test and expect from
+          // "vitest".
+          globals: true,
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: "db",
+          environment: "node",
+          include: ["supabase/tests/**/*.test.ts"],
+          globalSetup: ["./supabase/tests/global-setup.ts"],
+          fileParallelism: false,
+        },
+      },
+    ],
   },
 });

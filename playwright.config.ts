@@ -1,8 +1,36 @@
+import { execSync } from "node:child_process";
 import { defineConfig, devices } from "@playwright/test";
 
 // Runs against a production build, as the Next.js docs recommend.
 // Port 3100 so a dev server on 3000 is never mistaken for this one.
 const PORT = 3100;
+
+// The app under test talks to local Supabase (`npx supabase start`). Its URL and
+// publishable key come from the CLI, so no .env.local is needed for e2e.
+function localSupabase(): { url: string; publishableKey: string } {
+  let output: string;
+  try {
+    output = execSync("npx supabase status -o env", {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+  } catch {
+    throw new Error("Local Supabase isn't running. Start Docker, then run: npx supabase start");
+  }
+  const env: Record<string, string> = {};
+  for (const line of output.split(/\r?\n/)) {
+    const match = line.match(/^([A-Z0-9_]+)="?(.*?)"?$/);
+    if (match) env[match[1]] = match[2];
+  }
+  const url = env.API_URL;
+  const publishableKey = env.PUBLISHABLE_KEY ?? env.ANON_KEY;
+  if (!url || !publishableKey) {
+    throw new Error("Couldn't read the local Supabase URL and key from `npx supabase status -o env`.");
+  }
+  return { url, publishableKey };
+}
+
+const supabase = localSupabase();
 
 export default defineConfig({
   testDir: "./e2e",
@@ -20,5 +48,14 @@ export default defineConfig({
     url: `http://localhost:${PORT}`,
     reuseExistingServer: false,
     timeout: 180_000,
+    env: {
+      NEXT_PUBLIC_SUPABASE_URL: supabase.url,
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: supabase.publishableKey,
+      // Fake server secrets that e2e/secrets.spec.ts hunts for in the build output (INV-005).
+      SUPABASE_SERVICE_ROLE_KEY: "SENTINEL_SERVICE_ROLE_7f3a",
+      TMDB_API_READ_ACCESS_TOKEN: "SENTINEL_TMDB_7f3a",
+      IGDB_CLIENT_ID: "SENTINEL_IGDB_ID_7f3a",
+      IGDB_CLIENT_SECRET: "SENTINEL_IGDB_SECRET_7f3a",
+    },
   },
 });
