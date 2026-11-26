@@ -142,15 +142,28 @@ test("a non-numeric id is rejected before any request", async () => {
   expect(fn).not.toHaveBeenCalled();
 });
 
+test("the token request sends the client credentials as a form body, never in the URL", async () => {
+  const fn = stubFetch({ "/games": [] });
+  await searchIgdb("a");
+  const [input, init] = tokenCalls(fn)[0] as [RequestInfo | URL, RequestInit];
+  const url = new URL(String(input));
+  expect(url.href).toBe(TOKEN_URL);
+  expect(url.search).toBe("");
+  expect(init.method).toBe("POST");
+  expect(new Headers(init.headers).get("content-type")).toBe("application/x-www-form-urlencoded");
+  expect(Object.fromEntries(new URLSearchParams(String(init.body)))).toEqual({
+    client_id: "cid",
+    client_secret: "csecret",
+    grant_type: "client_credentials",
+  });
+});
+
 test("the token is fetched once for two calls and refetched after expiry", async () => {
   vi.useFakeTimers();
   const fn = stubFetch({ "/games": [] }, 600);
   await searchIgdb("a");
   await searchIgdb("b");
   expect(tokenCalls(fn)).toHaveLength(1);
-  const u = new URL(String(tokenCalls(fn)[0][0]));
-  expect(u.searchParams.get("grant_type")).toBe("client_credentials");
-  expect(u.searchParams.get("client_id")).toBe("cid");
   await vi.advanceTimersByTimeAsync(539_000); // before the 60 s margin
   await searchIgdb("c");
   expect(tokenCalls(fn)).toHaveLength(1);

@@ -23,14 +23,22 @@ export function resetIgdbTokenForTests(): void {
 }
 
 async function fetchToken(): Promise<string> {
-  const url = new URL(process.env.TWITCH_TOKEN_URL || DEFAULT_TOKEN_URL);
-  url.searchParams.set("client_id", process.env.IGDB_CLIENT_ID ?? "");
-  url.searchParams.set("client_secret", process.env.IGDB_CLIENT_SECRET ?? "");
-  url.searchParams.set("grant_type", "client_credentials");
+  const url = process.env.TWITCH_TOKEN_URL || DEFAULT_TOKEN_URL;
+  // In the body, not the URL: URLs end up in proxy and server logs (INV-005).
+  const form = new URLSearchParams({
+    client_id: process.env.IGDB_CLIENT_ID ?? "",
+    client_secret: process.env.IGDB_CLIENT_SECRET ?? "",
+    grant_type: "client_credentials",
+  });
 
   let res: Response;
   try {
-    res = await fetch(url, { method: "POST", cache: "no-store" });
+    res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: form,
+      cache: "no-store",
+    });
   } catch {
     throw new ProviderError("igdb", null, "igdb token request failed (network)");
   }

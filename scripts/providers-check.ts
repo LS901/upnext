@@ -30,11 +30,16 @@ async function checkTmdb(): Promise<string> {
 }
 
 async function checkIgdb(): Promise<string> {
-  const tokenUrl = new URL(env("TWITCH_TOKEN_URL") || "https://id.twitch.tv/oauth2/token");
-  tokenUrl.searchParams.set("client_id", env("IGDB_CLIENT_ID"));
-  tokenUrl.searchParams.set("client_secret", env("IGDB_CLIENT_SECRET"));
-  tokenUrl.searchParams.set("grant_type", "client_credentials");
-  const tokenRes = await fetch(tokenUrl, { method: "POST" });
+  // The secret goes in a form body, never the URL (URLs end up in logs).
+  const tokenRes = await fetch(env("TWITCH_TOKEN_URL") || "https://id.twitch.tv/oauth2/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: env("IGDB_CLIENT_ID"),
+      client_secret: env("IGDB_CLIENT_SECRET"),
+      grant_type: "client_credentials",
+    }),
+  });
   if (!tokenRes.ok) return failed(tokenRes);
   let token: unknown;
   try {

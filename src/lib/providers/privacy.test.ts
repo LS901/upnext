@@ -102,12 +102,13 @@ const IGDB_BODIES = new Set([
   "fields hastily,normally,completely,count; where game_id = 5001;",
 ]);
 
+/** The token request's only allowed form body. The secret never goes in the URL. */
+const TWITCH_BODY = { client_id: "igdb-cid", client_secret: "igdb-csecret", grant_type: "client_credentials" };
+
 /** The only query parameters each endpoint may carry, with their only allowed values. */
 function allowedQuery(url: URL): Record<string, string> | null {
   const path = url.href.startsWith(TWITCH) ? "twitch" : url.pathname;
-  if (path === "twitch") {
-    return { client_id: "igdb-cid", client_secret: "igdb-csecret", grant_type: "client_credentials" };
-  }
+  if (path === "twitch") return {};
   if (path === "/3/search/multi") return { query: "lantern", include_adult: "false" };
   if (/^\/3\/(movie\/9001|tv\/9002|tv\/9002\/season\/[0-2])$/.test(path)) return {};
   if (path === "/v4/games" || path === "/v4/game_time_to_beats") return {};
@@ -139,6 +140,10 @@ test("INV-006: provider requests carry only the endpoint, search text and provid
 
     if (req.url.href.startsWith(IGDB)) {
       expect(IGDB_BODIES.has(req.body ?? ""), `IGDB body on ${where}: ${req.body}`).toBe(true);
+    } else if (req.url.href.startsWith(TWITCH)) {
+      expect(req.method, where).toBe("POST");
+      expect(req.headers.get("content-type"), where).toBe("application/x-www-form-urlencoded");
+      expect(Object.fromEntries(new URLSearchParams(req.body ?? "")), where).toEqual(TWITCH_BODY);
     } else {
       expect(req.body, where).toBeNull();
     }
