@@ -258,7 +258,10 @@
       // addresses. If disabled, only the new email is required to confirm.
       "double_confirm_changes": true,
       // If enabled, users need to confirm their email address before signing in.
-      "enable_confirmations": false,
+      // upnext is email sign-in only: confirmations stay on so a password sign-up (which the
+      // Auth API still accepts) never gets a session for an address it doesn't own. The
+      // refuse_passwords migration strips and refuses passwords on auth.users.
+      "enable_confirmations": true,
       // If enabled, users will need to reauthenticate or have logged in recently to change their password.
       "secure_password_change": false,
       // If enabled, users will need to provide their current password to change their password, unless
