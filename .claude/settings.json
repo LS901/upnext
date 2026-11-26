@@ -2,5 +2,8 @@
   "extraKnownMarketplaces": {
     "agent-workflow": { "source": { "source": "github", "repo": "LS901/agent-workflow" } }
   },
-  "enabledPlugins": { "team-workflow@agent-workflow": true }
+  "enabledPlugins": {
+    "team-workflow@agent-workflow": true,
+    "superpowers@agent-workflow": true
+  }
 }
