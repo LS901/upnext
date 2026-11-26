@@ -1,0 +1,2 @@
+-- Seed data for local development, applied by `npx supabase db reset` after migrations.
+-- Invented data only: never real users, emails or libraries.

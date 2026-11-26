@@ -1,6 +1,6 @@
 Last reviewed: 2026-11-26
 
-Sources: owner interview, 2026-11-26 (Lewis): picked "library leaks", "silent data loss", "spoilers" and "secrets or data exposed" as must-never-happen. Owner confirmed all seven rules below on 2026-11-26, after setting the visibility model: libraries are public by default and readable by others, owners can opt out to private, notes always stay private, and others never write. API research, 2026-11-26, for INV-007. No code yet: the `upnext` repo is not scaffolded, so every "Code today" is a gap.
+Sources: owner interview, 2026-11-26 (Lewis): picked "library leaks", "silent data loss", "spoilers" and "secrets or data exposed" as must-never-happen. Owner confirmed all seven rules below on 2026-11-26, after setting the visibility model: libraries are public by default and readable by others, owners can opt out to private, notes always stay private, and others never write. Owner follow-up, 2026-11-26: no user ratings, so ratings dropped from INV-001 and INV-003 and play counts added; single lists can be private (INV-002); "more plays on one entry, no duplicates" (INV-008). API research, 2026-11-26, for INV-007. The app is scaffolded; only INV-007 has code so far.
 
 # Invariants: what must never happen
 
@@ -22,27 +22,27 @@ Rules for this file (the team-workflow session-start check enforces them):
 ## Confirmed
 
 ### INV-001 — No user ever changes another user's library
-- **Never:** a user creates, changes or deletes another user's library entries, statuses, season progress, ratings, notes or lists. Others may only read, and only what INV-002 allows.
+- **Never:** a user creates, changes or deletes another user's library entries, statuses, season progress, play counts, notes or lists. Others may only read, and only what INV-002 allows.
 - **Why:** trust. A library is a personal record, and only its owner may shape it.
 - **Enforced by:** upnext (Supabase row-level security on every user-owned table, allowing writes only where `user_id = auth.uid()`, plus server-side checks in route handlers).
 - **Code today:** Gap: no code yet.
-- **Test at the boundary:** against local Supabase, sign in as invented user B and insert, update and delete user A's entries, ratings and lists through the real client (anon key with B's session). Expect every write rejected and A's rows unchanged.
+- **Test at the boundary:** against local Supabase, sign in as invented user B and insert, update and delete user A's entries, season statuses and lists through the real client (anon key with B's session). Expect every write rejected and A's rows unchanged.
 - **Status:** Confirmed
 
-### INV-002 — Private libraries and all notes are never shown to anyone but their owner
-- **Never:** another person, signed in or not, sees a library its owner made private, or sees any user's notes. Libraries are public by default. Notes are always private.
-- **Why:** privacy. Opting out must really hide the library, and notes are personal.
+### INV-002 — Private libraries, private lists and all notes are never shown to anyone but their owner
+- **Never:** another person, signed in or not, sees a library its owner made private, a list its owner made private, or any user's notes. Libraries and lists are public by default. Notes are always private.
+- **Why:** privacy. Opting out must really hide the library or list, and notes are personal.
 - **Enforced by:** upnext (RLS select policies, profile and library pages, any API that returns entries).
 - **Code today:** Gap: no code yet.
-- **Test at the boundary:** for invented user A with a note on one entry, render A's library page signed out and as user B. Expect the entries and no note text. Then set A's library to private and render again. Expect not-found or empty, and a direct select of A's rows as B returns zero rows.
+- **Test at the boundary:** for invented user A with a note on one entry, render A's library page signed out and as user B. Expect the entries and no note text. Make one of A's lists private and render A's profile and that list's URL as B. Expect the list absent and its URL not-found. Then set A's library to private and render again. Expect not-found or empty, and a direct select of A's rows as B returns zero rows.
 - **Status:** Confirmed
 
 ### INV-003 — User data is never silently lost or overwritten
-- **Never:** a user's status, season progress, rating, notes or dates are deleted or overwritten by a metadata refresh, import, sync or conflict, or anything other than that user's explicit action.
+- **Never:** a user's status, season progress, play count, notes or dates are deleted or overwritten by a metadata refresh, import, sync or conflict, or anything other than that user's explicit action.
 - **Why:** the history is the product. Losing it destroys the user's record and their trust.
 - **Enforced by:** upnext (metadata refresh jobs, imports, write handlers).
 - **Code today:** Gap: no code yet.
-- **Test at the boundary:** seed an invented entry with a rating, notes and season progress. Run the real refresh against stubbed provider responses that change the title, runtime and season count. Expect the item fields updated and every user field unchanged.
+- **Test at the boundary:** seed an invented entry with a play count, notes and season statuses. Run the real refresh against stubbed provider responses that change the title, runtime and season count. Expect the item fields updated and every user field unchanged.
 - **Status:** Confirmed
 
 ### INV-004 — No spoilers past the user's progress
@@ -73,8 +73,16 @@ Rules for this file (the team-workflow session-start check enforces them):
 - **Never:** TMDB or IGDB data is shown without the attribution each requires, or is used commercially (paid tiers, ads) without the agreement each requires. upnext is personal, non-commercial use for now (owner said, 2026-11-26).
 - **Why:** breaking the terms can get the API keys revoked, which takes away the catalogue, and brings legal risk.
 - **Enforced by:** upnext (About/Credits page, and the decision to go commercial).
-- **Code today:** Gap: no code yet.
+- **Code today:** `src/app/credits/page.tsx` shows the TMDB notice and links IGDB.com; `src/app/layout.tsx` links Credits from every page. Covered by `src/app/credits/page.test.tsx` and `e2e/smoke.spec.ts`. Gap: no TMDB logo yet (check whether TMDB's terms require one before showing TMDB data).
 - **Test at the boundary:** render the About/Credits page and expect the exact TMDB notice text and an IGDB attribution. The commercial part is a release check: recheck both providers' terms before any paid tier or ads.
+- **Status:** Confirmed
+
+### INV-008 — A user never has two library entries for the same item
+- **Never:** a user's library holds two entries for one item. A rewatch or replay adds to the existing entry's play count instead.
+- **Why:** duplicates split one item's history across entries, so play counts, statuses and lists stop agreeing.
+- **Enforced by:** upnext (a unique constraint on the user and item columns of the library entry table, and add or import handlers that update the existing entry rather than insert).
+- **Code today:** Gap: no code yet.
+- **Test at the boundary:** as an invented user, add the same item twice through the real add handler, then import a file listing it again. Expect one entry, and a direct insert of a duplicate row rejected by the database.
 - **Status:** Confirmed
 
 ## Unconfirmed

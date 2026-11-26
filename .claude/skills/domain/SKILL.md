@@ -18,8 +18,8 @@ from this table.
 | Topic | File |
 |---|---|
 | What a term means | `reference/glossary.md` |
-| Media types, statuses, up next, TV season progress, ratings and dates | `reference/library-and-status.md` |
-| Where item data comes from (TMDB, IGDB), time to finish/beat, refreshes, attribution | `reference/metadata.md` |
+| Media types, statuses (per season for TV), up next, play counts and dates | `reference/library-and-status.md` |
+| Where item data comes from (TMDB, IGDB), time to finish/beat, review scores, refreshes, attribution | `reference/metadata.md` |
 | Public profiles and lists, what is visible to whom, spoilers | `reference/sharing-and-spoilers.md` |
 | What must never happen (anti-goals, review checks, test ideas) | `reference/invariants.md` |
 
