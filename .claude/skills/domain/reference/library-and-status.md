@@ -50,7 +50,8 @@ Books become a **fourth media type**, planned for after the TMDB and IGDB import
 
 ## Unconfirmed
 
-- **Leaving up next**: an entry drops off the shortlist when it moves to any status other than Backlog. If it later returns to Backlog, it does not get its old place back (owner said, 2026-11-26). `setEntryStatus` in `src/lib/library/queries.ts` clears `up_next_position`, which the schema check also requires.
+- **Leaving up next**: an entry drops off the shortlist when it moves to any status other than Backlog. `setEntryStatus` in `src/lib/library/queries.ts` clears `up_next_position`, which the schema check also requires. No old position is stored (owner said, 2026-11-26).
+- **Putting something back, and reordering**: an entry put back into Up next goes to the bottom of the list. The user can move any Up next entry to any position, at any time, as often as they like; nothing is fixed in place (owner said, 2026-11-26). `up_next_position` is a `double precision`, so a move can land between two neighbours without renumbering the rest.
 - **Transitions**: probably any status can move to any other. Is there anything that should be blocked, for example Backlog straight to Finished? Owner to confirm.
 - **Print and audiobook of one book**: whether one user can track both versions of the same book at once, and how that squares with one entry per item (INV-008). Left to the books task.
 - **Audiobook data**: where audiobook editions, narrators and lengths come from. Left to the books task.
