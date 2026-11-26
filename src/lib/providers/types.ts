@@ -21,6 +21,11 @@ export type SeasonDetails = {
   runtimeUnavailable: boolean;
 };
 
+/** A season as the show summary lists it: enough for the season picker. */
+export type SeasonSummary = Pick<SeasonDetails, "number" | "episodeCount" | "airDate">;
+
+export type ShowSeasons = { title: string; seasons: SeasonSummary[] };
+
 export type TimeToBeat = {
   hastilyS: number | null;
   normallyS: number | null;

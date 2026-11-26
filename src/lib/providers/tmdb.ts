@@ -4,6 +4,8 @@ import {
   type ItemDetails,
   type SearchResult,
   type SeasonDetails,
+  type SeasonSummary,
+  type ShowSeasons,
 } from "./types";
 
 const DEFAULT_BASE_URL = "https://api.themoviedb.org/3";
@@ -88,14 +90,14 @@ export async function searchTmdb(query: string): Promise<SearchResult[]> {
 
 const MAX_SEASON_REQUESTS = 5;
 
+/** The fields read from an entry in a show's `seasons` list; never its overview. */
+function seasonSummary(s: Json): SeasonSummary {
+  return { number: int(s.season_number) ?? 0, episodeCount: int(s.episode_count), airDate: str(s.air_date) };
+}
+
 async function getSeason(tvId: string, s: Json): Promise<SeasonDetails> {
-  const number = int(s.season_number) ?? 0;
-  const season = {
-    number,
-    title: str(s.name),
-    episodeCount: int(s.episode_count),
-    airDate: str(s.air_date),
-  };
+  const { number, episodeCount, airDate } = seasonSummary(s);
+  const season = { number, title: str(s.name), episodeCount, airDate };
   // Only episode runtimes are read; overviews and episode titles are ignored.
   // A failed season request (404, 429, 5xx) costs that season its runtime,
   // not the whole show.
@@ -127,6 +129,18 @@ async function mapLimited<T, R>(items: T[], limit: number, fn: (item: T) => Prom
   };
   await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
   return out;
+}
+
+/**
+ * A show's title and season list from its summary alone: one request, no
+ * season details, so no runtimes (and no overviews, INV-004).
+ */
+export async function getTmdbShowSeasons(id: string): Promise<ShowSeasons> {
+  const d = await tmdbGet(`/tv/${encodeURIComponent(id)}`);
+  const title = str(d.name);
+  if (title === null) throw new ProviderError("tmdb", null, "tmdb details had no title");
+  const list = Array.isArray(d.seasons) ? (d.seasons as Json[]) : [];
+  return { title, seasons: list.map(seasonSummary) };
 }
 
 export async function getTmdbDetails(

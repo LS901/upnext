@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { getTmdbDetails, searchTmdb, tmdbImageUrl } from "./tmdb";
+import { getTmdbDetails, getTmdbShowSeasons, searchTmdb, tmdbImageUrl } from "./tmdb";
 import { ProviderError } from "./types";
 import search from "./__fixtures__/tmdb-search.json";
 import movie from "./__fixtures__/tmdb-movie.json";
@@ -173,6 +173,29 @@ test("at most 5 season requests are in flight at once", async () => {
 test("no season overview or episode title reaches the result", async () => {
   stubFetch(SHOW_ROUTES);
   expect(JSON.stringify(await getTmdbDetails("show", "9002"))).not.toContain("SECRET");
+});
+
+test("show seasons come from one summary request: number, episode count and air date only", async () => {
+  const fn = stubFetch(SHOW_ROUTES);
+  const show = await getTmdbShowSeasons("9002");
+  expect(show).toEqual({
+    title: "Harbour of Echoes",
+    seasons: [
+      { number: 0, episodeCount: 2, airDate: null },
+      { number: 1, episodeCount: 3, airDate: "2021-03-02" },
+      { number: 2, episodeCount: 2, airDate: "2022-04-05" },
+    ],
+  });
+  expect(fn).toHaveBeenCalledTimes(1);
+  expect(new URL(String(fn.mock.calls[0][0])).pathname).toBe("/3/tv/9002");
+  expect(JSON.stringify(show)).not.toContain("SECRET");
+});
+
+test("show seasons: none listed is an empty list; a missing show or title throws", async () => {
+  stubFetch({ "/tv/9003": { id: 9003, name: "No Seasons Yet" }, "/tv/9004": { id: 9004, seasons: [] } });
+  expect(await getTmdbShowSeasons("9003")).toEqual({ title: "No Seasons Yet", seasons: [] });
+  await expect(getTmdbShowSeasons("9004")).rejects.toBeInstanceOf(ProviderError);
+  await expect(getTmdbShowSeasons("9999")).rejects.toMatchObject({ provider: "tmdb", status: 404 });
 });
 
 test("a 429 throws ProviderError with status 429", async () => {

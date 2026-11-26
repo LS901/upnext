@@ -84,12 +84,37 @@ test("any other insert error throws", async () => {
   expect(redirect).not.toHaveBeenCalled();
 });
 
-test("a provider failure goes back to the search with the provider named", async () => {
+test("a provider failure goes back to the search with the provider named, and logs only provider and status", async () => {
+  const log = vi.spyOn(console, "error").mockImplementation(() => {});
   vi.mocked(importItem).mockRejectedValue(new ProviderError("igdb", 429));
   await expect(
     addItem(form({ provider: "igdb", mediaType: "game", providerId: "7001", q: "Clockwork" })),
   ).rejects.toThrow("redirect:/search?q=Clockwork&failed=igdb");
   expect(insert).not.toHaveBeenCalled();
+
+  expect(log).toHaveBeenCalledOnce();
+  const logged = JSON.stringify(log.mock.calls[0]);
+  expect(logged).toContain("IGDB");
+  expect(logged).toContain("429");
+  for (const userData of ["Clockwork", "7001", USER.id, USER.username]) expect(logged).not.toContain(userData);
+  log.mockRestore();
+});
+
+test("form fields that aren't text are ignored, never cast", async () => {
+  const data = movie();
+  data.delete("q");
+  data.append("q", new Blob(["Kestrel"]), "q.txt");
+  data.append("exclude", new Blob(["game"]), "exclude.txt");
+  await expect(addItem(data)).rejects.toThrow("redirect:/search?added=1");
+
+  const file = form({ provider: "tmdb", mediaType: "movie" });
+  file.append("providerId", new Blob(["9001"]), "9001");
+  await expect(addItem(file)).rejects.toThrow("Not a movie or game");
+
+  const seasons = form({ tmdbId: "9101" });
+  seasons.append("season", new Blob(["1"]), "1");
+  await expect(addSeasons(seasons)).rejects.toThrow("redirect:/search/show/9101");
+  expect(importItem).toHaveBeenCalledTimes(1); // only the first, valid add imported
 });
 
 test("addItem refuses anything but a TMDB movie or an IGDB game with a numeric id", async () => {

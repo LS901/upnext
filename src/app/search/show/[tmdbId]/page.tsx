@@ -1,14 +1,31 @@
+import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
-import { Suspense } from "react";
+import { cache, Suspense } from "react";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { seasonsInLibrary } from "@/lib/library/in-library";
-import { getDetails } from "@/lib/providers";
-import { ProviderError, type ItemDetails } from "@/lib/providers/types";
+import { getTmdbShowSeasons } from "@/lib/providers/tmdb";
+import { ProviderError, type ShowSeasons } from "@/lib/providers/types";
+import { createClient } from "@/lib/supabase/server";
 import { addSeasons } from "../../actions";
 import { seasonLabel } from "../../season-label";
+import { logProviderFailure, primaryButton, PROVIDER_ID, PROVIDER_NAMES } from "../../shared";
 
-const button =
-  "rounded-md bg-zinc-900 px-4 py-2 font-medium text-white dark:bg-zinc-100 dark:text-zinc-900";
+// The metadata and the page share one session check and one TMDB request per render.
+const currentUser = cache(getCurrentUser);
+const loadShow = cache(getTmdbShowSeasons);
+
+// The tab shows the show's title. Signed-out visitors and bad ids get the
+// default title, so they cause no provider request.
+export async function generateMetadata({ params }: PageProps<"/search/show/[tmdbId]">): Promise<Metadata> {
+  const { tmdbId } = await params;
+  if (!PROVIDER_ID.test(tmdbId) || !(await currentUser())) return {};
+  try {
+    return { title: (await loadShow(tmdbId)).title };
+  } catch (err) {
+    if (err instanceof ProviderError) return {}; // the page reports it
+    throw err;
+  }
+}
 
 export default function SeasonPickerPage({ params, searchParams }: PageProps<"/search/show/[tmdbId]">) {
   return (
@@ -22,25 +39,43 @@ export default function SeasonPickerPage({ params, searchParams }: PageProps<"/s
 }
 
 async function SeasonPicker({ params, searchParams }: PageProps<"/search/show/[tmdbId]">) {
-  const user = await getCurrentUser();
+  const user = await currentUser();
   if (!user) redirect("/login");
 
   const { tmdbId } = await params;
-  if (!/^\d{1,12}$/.test(tmdbId)) notFound();
+  if (!PROVIDER_ID.test(tmdbId)) notFound();
   const addFailed = [(await searchParams).failed].flat()[0] === "tmdb";
 
-  // The provider client reads season numbers, episode counts, air dates and
-  // runtimes only: no synopses or episode titles reach this page (INV-004).
-  let show: ItemDetails;
+  // One summary request: season numbers, episode counts and air dates only,
+  // no synopses or episode titles (INV-004).
+  let show: ShowSeasons;
   try {
-    show = await getDetails("tmdb", "show", tmdbId);
+    show = await loadShow(tmdbId);
   } catch (err) {
     if (!(err instanceof ProviderError)) throw err;
     if (err.status === 404) notFound();
+    logProviderFailure(err);
     return <Unreachable />;
   }
-  const seasons = [...(show.seasons ?? [])].sort((a, b) => a.number - b.number);
-  const owned = await seasonsInLibrary(user.id, tmdbId);
+  const seasons = [...show.seasons].sort((a, b) => a.number - b.number);
+  const owned = await seasonsInLibrary(await createClient(), user.id, tmdbId);
+  const addable = seasons.some((s) => !owned.has(s.number));
+
+  const list = (
+    <ul className="flex flex-col gap-2">
+      {seasons.map((season) => {
+        const have = owned.has(season.number);
+        return (
+          <li key={season.number}>
+            <label className="flex items-center gap-3">
+              <input type="checkbox" name="season" value={season.number} defaultChecked={have} disabled={have} />
+              {seasonLabel(season)}
+            </label>
+          </li>
+        );
+      })}
+    </ul>
+  );
 
   return (
     <>
@@ -48,32 +83,17 @@ async function SeasonPicker({ params, searchParams }: PageProps<"/search/show/[t
       {addFailed && <Unreachable />}
       {seasons.length === 0 ? (
         <p className="mt-6 text-zinc-600 dark:text-zinc-400">No seasons yet.</p>
-      ) : (
+      ) : addable ? (
         <form action={addSeasons} className="mt-6 flex flex-col gap-6">
           <input type="hidden" name="tmdbId" value={tmdbId} />
-          <ul className="flex flex-col gap-2">
-            {seasons.map((season) => {
-              const have = owned.has(season.number);
-              return (
-                <li key={season.number}>
-                  <label className="flex items-center gap-3">
-                    <input
-                      type="checkbox"
-                      name="season"
-                      value={season.number}
-                      defaultChecked={have}
-                      disabled={have}
-                    />
-                    {seasonLabel(season)}
-                  </label>
-                </li>
-              );
-            })}
-          </ul>
-          <button type="submit" className={`${button} self-start`}>
+          {list}
+          <button type="submit" className={`${primaryButton} self-start`}>
             Add seasons
           </button>
         </form>
+      ) : (
+        // Every season is already in the library: nothing to add.
+        <div className="mt-6">{list}</div>
       )}
     </>
   );
@@ -82,7 +102,7 @@ async function SeasonPicker({ params, searchParams }: PageProps<"/search/show/[t
 function Unreachable() {
   return (
     <p role="alert" className="mt-6 text-red-700 dark:text-red-400">
-      Couldn&apos;t reach TMDB right now.
+      Couldn&apos;t reach {PROVIDER_NAMES.tmdb} right now.
     </p>
   );
 }

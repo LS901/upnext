@@ -8,19 +8,19 @@ import { inLibrary, itemKey, type ItemKey } from "@/lib/library/in-library";
 import { searchIgdb } from "@/lib/providers/igdb";
 import { searchTmdb } from "@/lib/providers/tmdb";
 import { ProviderError, type MediaType, type Provider, type SearchResult } from "@/lib/providers/types";
+import { createClient } from "@/lib/supabase/server";
 import { addItem } from "./actions";
+import { summarise, type Answer, type Outcome } from "./outcome";
 import { MAX_QUERY_LENGTH, parseSearch, type SearchState } from "./params";
+import { logProviderFailure, primaryButton, PROVIDER_NAMES } from "./shared";
 
 export const metadata: Metadata = { title: "Search" };
 
-const PROVIDER_NAMES: Record<Provider, string> = { tmdb: "TMDB", igdb: "IGDB" };
 const TYPE_LABELS: Record<MediaType, string> = { movie: "Movie", show: "TV", game: "Game" };
 const HIDE_LABELS: Record<MediaType, string> = { movie: "Movies", show: "TV", game: "Games" };
 
 const input =
   "mt-1 block w-full rounded-md border border-black/20 bg-transparent px-3 py-2 dark:border-white/20";
-const button =
-  "rounded-md bg-zinc-900 px-4 py-2 font-medium text-white dark:bg-zinc-100 dark:text-zinc-900";
 const quiet = "rounded-md border border-black/20 px-3 py-1.5 text-sm dark:border-white/20";
 
 export default function SearchPage({ searchParams }: PageProps<"/search">) {
@@ -35,30 +35,27 @@ export default function SearchPage({ searchParams }: PageProps<"/search">) {
   );
 }
 
-type Outcome = { results: SearchResult[]; failed: Provider[]; answered: boolean };
-
 // Queries only the providers whose types aren't hidden, in parallel. A
 // provider that fails (down, rate-limited) is reported, not fatal.
 async function runSearch({ q, exclude }: SearchState): Promise<Outcome> {
   const hidden = new Set(exclude);
-  const ask = (provider: Provider, types: MediaType[], search: (q: string) => Promise<SearchResult[]>) =>
-    types.every((t) => hidden.has(t))
-      ? Promise.resolve({ provider, results: [] as SearchResult[], failed: false })
-      : search(q).then(
-          (results) => ({ provider, results, failed: false }),
-          (err: unknown) => {
-            if (err instanceof ProviderError) return { provider, results: [] as SearchResult[], failed: true };
-            throw err;
-          },
-        );
+  const ask = async (
+    provider: Provider,
+    types: MediaType[],
+    search: (q: string) => Promise<SearchResult[]>,
+  ): Promise<Answer> => {
+    if (types.every((t) => hidden.has(t))) return { provider, status: "skipped" };
+    try {
+      return { provider, status: "answered", results: await search(q) };
+    } catch (err) {
+      if (!(err instanceof ProviderError)) throw err;
+      logProviderFailure(err);
+      return { provider, status: "failed" };
+    }
+  };
 
   const answers = await Promise.all([ask("tmdb", ["movie", "show"], searchTmdb), ask("igdb", ["game"], searchIgdb)]);
-  return {
-    results: answers.flatMap((a) => a.results).filter((r) => !hidden.has(r.mediaType)),
-    failed: answers.filter((a) => a.failed).map((a) => a.provider),
-    // At least one provider answered (or was skipped), so "nothing" is true.
-    answered: answers.some((a) => !a.failed),
-  };
+  return summarise(answers, exclude);
 }
 
 async function SearchContent({ searchParams }: Pick<PageProps<"/search">, "searchParams">) {
@@ -70,7 +67,9 @@ async function SearchContent({ searchParams }: Pick<PageProps<"/search">, "searc
   // Nothing is sent to a provider for an empty query.
   const outcome = state.q ? await runSearch(state) : null;
   const keyOf = (r: SearchResult) => itemKey(r.provider, r.mediaType, r.providerId);
-  const owned = outcome ? await inLibrary(user.id, outcome.results.map(keyOf)) : new Set<ItemKey>();
+  const owned = outcome
+    ? await inLibrary(await createClient(), user.id, outcome.results.map(keyOf))
+    : new Set<ItemKey>();
 
   // A provider that failed this search, or while adding from the last one.
   const failed = new Set<Provider>(outcome?.failed);
@@ -85,7 +84,7 @@ async function SearchContent({ searchParams }: Pick<PageProps<"/search">, "searc
             Search movies, TV and games
             <input name="q" type="search" defaultValue={state.q} maxLength={MAX_QUERY_LENGTH} className={input} />
           </label>
-          <button type="submit" className={button}>
+          <button type="submit" className={primaryButton}>
             Search
           </button>
         </form>
@@ -97,7 +96,7 @@ async function SearchContent({ searchParams }: Pick<PageProps<"/search">, "searc
         ))}
 
         {!outcome && <p className="text-zinc-600 dark:text-zinc-400">Type a title to search.</p>}
-        {outcome && outcome.results.length === 0 && outcome.answered && (
+        {outcome?.nothingFound && (
           <p className="text-zinc-600 dark:text-zinc-400">Nothing found.</p>
         )}
         {outcome && outcome.results.length > 0 && (

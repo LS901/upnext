@@ -216,6 +216,7 @@ test("INV-004: the season picker shows no synopses", async ({ page }) => {
 
   await expect(page).toHaveURL("/search/show/9101");
   await expect(page.getByRole("heading", { level: 1, name: "Harbour of Glass" })).toBeVisible();
+  await expect(page).toHaveTitle("Harbour of Glass · upnext");
   for (const label of [
     "Specials · 2 episodes · 2022",
     "Season 1 · 8 episodes · 2021",
@@ -251,6 +252,8 @@ test("a show with only specials shows them and adds them", async ({ page, accoun
   await expect(page).toHaveURL("/search/show/9102?added=1");
   await expect(specials).toBeChecked();
   await expect(specials).toBeDisabled();
+  // Every season is in the library, so there's nothing left to add.
+  await expect(page.getByRole("button", { name: "Add seasons" })).toHaveCount(0);
 
   const admin = adminClient();
   const { data: show } = await admin

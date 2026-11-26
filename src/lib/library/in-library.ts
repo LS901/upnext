@@ -1,6 +1,9 @@
 import "server-only";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { MediaType, Provider } from "@/lib/providers/types";
-import { createClient } from "@/lib/supabase/server";
+import type { Database } from "@/lib/supabase/database.types";
+
+type Client = SupabaseClient<Database>;
 
 export type ItemKey = `${Provider}:${MediaType}:${string}`;
 
@@ -10,14 +13,14 @@ export function itemKey(provider: Provider, mediaType: MediaType, providerId: st
 
 /**
  * Which of `keys` the user already has in their library: a movie or game
- * entry, or an entry for any season of a show. Reads with the user's own
- * client, filtered to their entries (others' public libraries are readable too).
+ * entry, or an entry for any season of a show. Pass the user's own client;
+ * it can read other users' public libraries too, so every entry query is
+ * filtered to `userId`.
  */
-export async function inLibrary(userId: string, keys: ItemKey[]): Promise<Set<ItemKey>> {
+export async function inLibrary(supabase: Client, userId: string, keys: ItemKey[]): Promise<Set<ItemKey>> {
   const found = new Set<ItemKey>();
   if (!keys.length) return found;
   const wanted = new Set<string>(keys);
-  const supabase = await createClient();
 
   const { data: items, error } = await supabase
     .from("items")
@@ -54,8 +57,7 @@ export async function inLibrary(userId: string, keys: ItemKey[]): Promise<Set<It
 }
 
 /** Season numbers of a TMDB show that the user already has in their library. */
-export async function seasonsInLibrary(userId: string, tmdbId: string): Promise<Set<number>> {
-  const supabase = await createClient();
+export async function seasonsInLibrary(supabase: Client, userId: string, tmdbId: string): Promise<Set<number>> {
   const { data, error } = await supabase
     .from("library_entries")
     .select("seasons!inner(season_number, items!inner(provider, media_type, provider_id))")
