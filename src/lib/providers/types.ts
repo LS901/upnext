@@ -17,6 +17,8 @@ export type SeasonDetails = {
   runtimeMinutes: number | null;
   /** ISO date (YYYY-MM-DD) */
   airDate: string | null;
+  /** The season's own request failed, so runtimeMinutes is unknown rather than null-by-data. */
+  runtimeUnavailable: boolean;
 };
 
 export type TimeToBeat = {
@@ -37,6 +39,8 @@ export type ItemDetails = {
   score: number | null;
   scoreCount: number | null;
   timeToBeat: TimeToBeat | null;
+  /** The time-to-beat request failed, so timeToBeat is unknown rather than absent (always false for TMDB). */
+  timeToBeatUnavailable: boolean;
   seasons: SeasonDetails[] | null;
 };
 

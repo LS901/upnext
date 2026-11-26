@@ -86,19 +86,47 @@ export async function searchTmdb(query: string): Promise<SearchResult[]> {
   return out;
 }
 
+const MAX_SEASON_REQUESTS = 5;
+
 async function getSeason(tvId: string, s: Json): Promise<SeasonDetails> {
   const number = int(s.season_number) ?? 0;
-  // Only episode runtimes are read; overviews and episode titles are ignored.
-  const detail = await tmdbGet(`/tv/${encodeURIComponent(tvId)}/season/${number}`);
-  const episodes = Array.isArray(detail.episodes) ? (detail.episodes as Json[]) : [];
-  const runtimes = episodes.map((e) => minutes(e.runtime)).filter((r): r is number => r !== null);
-  return {
+  const season = {
     number,
     title: str(s.name),
     episodeCount: int(s.episode_count),
-    runtimeMinutes: runtimes.length ? runtimes.reduce((a, b) => a + b, 0) : null,
     airDate: str(s.air_date),
   };
+  // Only episode runtimes are read; overviews and episode titles are ignored.
+  // A failed season request (404, 429, 5xx) costs that season its runtime,
+  // not the whole show.
+  let detail: Json;
+  try {
+    detail = await tmdbGet(`/tv/${encodeURIComponent(tvId)}/season/${number}`);
+  } catch (err) {
+    if (!(err instanceof ProviderError)) throw err;
+    return { ...season, runtimeMinutes: null, runtimeUnavailable: true };
+  }
+  const episodes = Array.isArray(detail.episodes) ? (detail.episodes as Json[]) : [];
+  const runtimes = episodes.map((e) => minutes(e.runtime)).filter((r): r is number => r !== null);
+  return {
+    ...season,
+    runtimeMinutes: runtimes.length ? runtimes.reduce((a, b) => a + b, 0) : null,
+    runtimeUnavailable: false,
+  };
+}
+
+/** Maps every item with at most `limit` calls in flight, keeping the order. */
+async function mapLimited<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const out = new Array<R>(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const i = next++;
+      out[i] = await fn(items[i]);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return out;
 }
 
 export async function getTmdbDetails(
@@ -113,7 +141,7 @@ export async function getTmdbDetails(
   let seasons: SeasonDetails[] | null = null;
   if (!isMovie) {
     const list = Array.isArray(d.seasons) ? (d.seasons as Json[]) : [];
-    seasons = await Promise.all(list.map((s) => getSeason(id, s)));
+    seasons = await mapLimited(list, MAX_SEASON_REQUESTS, (s) => getSeason(id, s));
   }
 
   return {
@@ -127,6 +155,7 @@ export async function getTmdbDetails(
     score: normaliseScore(d.vote_average, d.vote_count),
     scoreCount: minutes(d.vote_count), // positive count, else unknown (null)
     timeToBeat: null,
+    timeToBeatUnavailable: false,
     seasons,
   };
 }

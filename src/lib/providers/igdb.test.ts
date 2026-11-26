@@ -85,6 +85,7 @@ test("details normalise the score and attach time to beat", async () => {
     score: 81.46,
     scoreCount: 120,
     timeToBeat: { hastilyS: 36000, normallyS: 54000, completelyS: null, count: 42 },
+    timeToBeatUnavailable: false,
     seasons: null,
   });
   const bodies = igdbCalls(fn).map((c) => String(c[1]?.body));
@@ -95,9 +96,44 @@ test("no time-to-beat row gives null; out-of-range score and missing fields give
   stubFetch({ "/games": gameOdd, "/game_time_to_beats": [] });
   const d = await getIgdbDetails("5002");
   expect(d.timeToBeat).toBeNull();
+  expect(d.timeToBeatUnavailable).toBe(false);
   expect(d.score).toBeNull();
   expect(d.imageRef).toBeNull();
   expect(d.releaseDate).toBeNull();
+});
+
+test("a time-to-beat row with no known values collapses to null", async () => {
+  stubFetch({
+    "/games": game,
+    "/game_time_to_beats": [{ id: 2, game_id: 5001, hastily: 0, normally: null, count: 0 }],
+  });
+  const d = await getIgdbDetails("5001");
+  expect(d.timeToBeat).toBeNull();
+  expect(d.timeToBeatUnavailable).toBe(false);
+});
+
+test("a failed time-to-beat request still returns the details", async () => {
+  for (const status of [429, 500]) {
+    resetIgdbTokenForTests();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = new URL(String(input));
+        if (url.href.startsWith(TOKEN_URL)) return json({ access_token: "tok", expires_in: 3600 });
+        return url.pathname.endsWith("/games") ? json(game) : json({}, status);
+      }),
+    );
+    const d = await getIgdbDetails("5001");
+    expect(d.title).toBe("Lantern Keep");
+    expect(d.score).toBe(81.46);
+    expect(d.timeToBeat).toBeNull();
+    expect(d.timeToBeatUnavailable).toBe(true);
+  }
+});
+
+test("a failed games request still throws", async () => {
+  stubFetch({ "/game_time_to_beats": ttb });
+  await expect(getIgdbDetails("5001")).rejects.toMatchObject({ provider: "igdb", status: 404 });
 });
 
 test("a non-numeric id is rejected before any request", async () => {

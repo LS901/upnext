@@ -185,20 +185,27 @@ export async function searchIgdb(query: string): Promise<SearchResult[]> {
 export async function getIgdbDetails(id: string): Promise<ItemDetails> {
   if (!/^\d+$/.test(id)) throw new ProviderError("igdb", null, "igdb id must be numeric");
 
+  // Only the games request is required; a failed time-to-beat request leaves
+  // the time to beat unknown instead of failing the import.
   const [games, beats] = await Promise.all([
     igdbPost(
       "/games",
       `fields name,first_release_date,cover.image_id,total_rating,total_rating_count; where id = ${id}; limit 1;`,
     ),
-    igdbPost("/game_time_to_beats", `fields hastily,normally,completely,count; where game_id = ${id};`),
+    igdbPost("/game_time_to_beats", `fields hastily,normally,completely,count; where game_id = ${id};`).catch(
+      (err: unknown) => {
+        if (err instanceof ProviderError) return null;
+        throw err;
+      },
+    ),
   ]);
 
   const g = games[0];
   const title = g ? str(g.name) : null;
   if (!g || title === null) throw new ProviderError("igdb", null, "igdb details had no title");
 
-  const row = beats[0];
-  const timeToBeat: TimeToBeat | null = row
+  const row = beats?.[0];
+  const ttb: TimeToBeat | null = row
     ? {
         hastilyS: positive(row.hastily),
         normallyS: positive(row.normally),
@@ -206,6 +213,7 @@ export async function getIgdbDetails(id: string): Promise<ItemDetails> {
         count: positive(row.count),
       }
     : null;
+  const timeToBeat = ttb && Object.values(ttb).some((v) => v !== null) ? ttb : null;
 
   return {
     provider: "igdb",
@@ -218,6 +226,7 @@ export async function getIgdbDetails(id: string): Promise<ItemDetails> {
     score: normaliseScore(g.total_rating, g.total_rating_count),
     scoreCount: positive(g.total_rating_count),
     timeToBeat,
+    timeToBeatUnavailable: beats === null,
     seasons: null,
   };
 }
