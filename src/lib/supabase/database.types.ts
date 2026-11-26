@@ -23,7 +23,27 @@ export type Database = {
           }
         },"public": {
           Tables: {
-            "items": {
+            "entry_notes": {
+                  Row: {
+                    "body": string,"entry_id": string,"updated_at": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "body": string,"entry_id": string,"updated_at"?: string,"user_id"?: string
+                  }
+                  Update: {
+                    "body"?: string,"entry_id"?: string,"updated_at"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "entry_notes_entry_id_user_id_fkey"
+      columns: ["entry_id","user_id"]
+isOneToOne: false
+      referencedRelation: "library_entries"
+      referencedColumns: ["id","user_id"]
+    }
+                  ]
+                },"items": {
                   Row: {
                     "created_at": string,"id": string,"media_type": Database["public"]['Enums']["media_type"],"provider": Database["public"]['Enums']["provider"],"provider_id": string,"title": string,"updated_at": string
                   }
@@ -76,6 +96,26 @@ isOneToOne: false
                   }
                   Relationships: [
                     
+                  ]
+                },"progress_exclusions": {
+                  Row: {
+                    "created_at": string,"season_id": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"season_id": string,"user_id"?: string
+                  }
+                  Update: {
+                    "created_at"?: string,"season_id"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "progress_exclusions_season_id_fkey"
+      columns: ["season_id"]
+isOneToOne: false
+      referencedRelation: "seasons"
+      referencedColumns: ["id"]
+    }
                   ]
                 },"seasons": {
                   Row: {
