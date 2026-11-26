@@ -1,4 +1,5 @@
-# PR checks. Branch protection on main requires every job here to pass.
+# PR checks. Branch protection on main requires every job here to pass, by its
+# `name:`. Renaming a job means updating the required checks too.
 # No real provider keys or service keys are used: e2e talks to the stub
 # providers (e2e/stub-providers.ts), and Supabase runs locally in the job.
 name: CI
@@ -14,7 +15,8 @@ permissions:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # Only PR runs cancel older runs; every commit on main keeps its result.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   # Supabase services the app and tests don't use, skipped to start faster.
@@ -22,7 +24,7 @@ env:
 
 jobs:
   check:
-    name: check (lint, types, unit + db tests)
+    name: check # lint, types, unit + db tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -39,7 +41,7 @@ jobs:
       - run: npm run check
 
   e2e:
-    name: e2e (Playwright, stub providers)
+    name: e2e # Playwright against the stub providers
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -65,7 +67,7 @@ jobs:
           retention-days: 7
 
   domain:
-    name: domain docs
+    name: domain # domain skill reference files
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -78,7 +80,7 @@ jobs:
       - run: npm run domain:check
 
   secrets:
-    name: secrets (gitleaks)
+    name: secrets # gitleaks over the whole history
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -94,7 +96,7 @@ jobs:
           git /repo --config /repo/.gitleaks.toml --redact --no-banner
 
   audit:
-    name: audit (npm, high and above)
+    name: audit # npm audit, high and above
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

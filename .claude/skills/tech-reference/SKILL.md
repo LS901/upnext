@@ -100,7 +100,7 @@ Email only: a magic link plus a 6-digit code in the same email (owner said, 2026
 
 ### CI (GitHub Actions)
 
-- **`.github/workflows/ci.yml` runs on every PR and every push to `main`.** Each job is a required check on `main`.
+- **`.github/workflows/ci.yml` runs on every PR and every push to `main`.** Each job is a required check on `main`:
   - `check`: `npm run check` against a local Supabase started in the job.
   - `e2e`: `npm run e2e` against the stub providers. Traces from failed tests are uploaded as the `playwright-test-results` artifact.
   - `domain`: `npm run domain:check`.
@@ -108,7 +108,11 @@ Email only: a magic link plus a 6-digit code in the same email (owner said, 2026
   - `audit`: `npm audit --audit-level=high`.
 - **CI holds no secrets.** No repo secrets exist and none are needed. Supabase keys come from the job's own `npx supabase start`, and the provider keys in `playwright.config.ts` are fake sentinels. Never add real provider keys to CI; `npm run providers:check` stays a manual check.
 - **The jobs skip unused Supabase services** (`SUPABASE_SKIP`: realtime, storage, imgproxy, postgres-meta, studio, edge-runtime, logflare, vector, supavisor). Auth, PostgREST, Kong and Mailpit stay. If a feature needs one of the skipped services, take it off that list.
-- **`.github/workflows/codeql.yml`** runs CodeQL on PRs, on pushes to `main` and every Monday. It covers `javascript-typescript` and `actions` (the workflows themselves). Results go to the repo's Security tab.
+- **`.github/workflows/codeql.yml`** runs CodeQL on PRs, on pushes to `main` and every Monday, as the jobs `codeql-js` (`javascript-typescript`) and `codeql-actions` (the workflows themselves). Results go to the repo's Security tab. Keep the repo's *default* code-scanning setup off: with it on, GitHub rejects this workflow's uploads.
+- **Required check names are the jobs' `name:` values:** `check`, `e2e`, `domain`, `secrets`, `audit`, `codeql-js`, `codeql-actions`, each tied to the GitHub Actions app. Renaming a job leaves the old required check pending forever, so update branch protection in the same change.
+- **Only PR runs cancel older runs** (`cancel-in-progress` on `pull_request` only), so every commit on `main` keeps its result.
+- **`audit` can go red without a code change:** a new advisory on any dependency fails every PR until it's bumped (Dependabot usually opens that PR). Admins can bypass in an emergency.
+- **Watch the first Dependabot PR:** Dependabot-triggered runs get a restricted token. If `codeql-*` fails there on the upload step, keep the analysis but skip the upload for `github.actor == 'dependabot[bot]'`.
 - **`.github/dependabot.yml`** opens weekly update PRs for npm and GitHub Actions. Minor and patch updates are grouped; each major gets its own PR.
 - **Actions are pinned to commit SHAs** with the version in a comment, and the gitleaks image is pinned by digest. Dependabot bumps the action SHAs. Bump the gitleaks image by hand.
 - **Branch protection on `main`:**

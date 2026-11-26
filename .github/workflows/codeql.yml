@@ -15,11 +15,12 @@ permissions:
 
 concurrency:
   group: codeql-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   analyze:
-    name: CodeQL (${{ matrix.language }})
+    # Short names: branch protection requires these exact strings.
+    name: ${{ matrix.check }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -29,7 +30,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: [javascript-typescript, actions]
+        include:
+          - language: javascript-typescript
+            check: codeql-js
+          - language: actions
+            check: codeql-actions
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
