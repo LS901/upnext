@@ -37,6 +37,32 @@ export type Database = {
                   Relationships: [
                     
                   ]
+                },"library_entries": {
+                  Row: {
+                    "created_at": string,"id": string,"item_id": string | null,"item_media_type": Database["public"]['Enums']["media_type"] | null,"play_count": number,"season_id": string | null,"status": Database["public"]['Enums']["entry_status"],"up_next_position": number | null,"updated_at": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"id"?: string,"item_id"?: string | null,"item_media_type"?: Database["public"]['Enums']["media_type"] | null,"play_count"?: number,"season_id"?: string | null,"status"?: Database["public"]['Enums']["entry_status"],"up_next_position"?: number | null,"updated_at"?: string,"user_id"?: string
+                  }
+                  Update: {
+                    "created_at"?: string,"id"?: string,"item_id"?: string | null,"item_media_type"?: Database["public"]['Enums']["media_type"] | null,"play_count"?: number,"season_id"?: string | null,"status"?: Database["public"]['Enums']["entry_status"],"up_next_position"?: number | null,"updated_at"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "library_entries_item_id_item_media_type_fkey"
+      columns: ["item_id","item_media_type"]
+isOneToOne: false
+      referencedRelation: "items"
+      referencedColumns: ["id","media_type"]
+    },{
+      foreignKeyName: "library_entries_season_id_fkey"
+      columns: ["season_id"]
+isOneToOne: false
+      referencedRelation: "seasons"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"profiles": {
                   Row: {
                     "created_at": string,"id": string,"library_private": boolean,"username": string
@@ -80,7 +106,7 @@ isOneToOne: false
             [_ in never]: never
           }
           Enums: {
-            "media_type": "movie"|"show"|"game","provider": "tmdb"|"igdb"
+            "entry_status": "backlog"|"in_progress"|"finished"|"paused"|"dropped","media_type": "movie"|"show"|"game","provider": "tmdb"|"igdb"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -200,7 +226,7 @@ export const Constants = {
           }
         },"public": {
           Enums: {
-            "media_type": ["movie", "show", "game"],"provider": ["tmdb", "igdb"]
+            "entry_status": ["backlog", "in_progress", "finished", "paused", "dropped"],"media_type": ["movie", "show", "game"],"provider": ["tmdb", "igdb"]
           }
         }
 } as const
