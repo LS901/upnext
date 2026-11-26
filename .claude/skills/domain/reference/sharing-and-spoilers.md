@@ -6,8 +6,9 @@ Sources: owner interview and follow-up, 2026-11-26 (Lewis). No code yet.
 
 ## Visibility (owner said, 2026-11-26)
 
-- **Public by default.** Other users, and signed-out visitors, can read a user's library: statuses, ratings, season progress and lists.
+- **Public by default.** Other users, and signed-out visitors, can read a user's library: statuses, season progress, play counts and lists.
 - **Opt out.** An owner can make their library private, and then nobody else sees it.
+- **Private lists.** Lists are public by default, and the owner can make any single list private (owner said, follow-up 2026-11-26).
 - **Notes are always private**, even in a public library.
 - **Read-only.** Nobody but the owner ever changes a library (INV-001). Visibility rules are INV-002.
 
@@ -18,6 +19,6 @@ Sources: owner interview and follow-up, 2026-11-26 (Lewis). No code yet.
 
 ## Unconfirmed
 
-- **Privacy granularity**: is private all-or-nothing for the library, or can single lists or entries be private? Owner to confirm.
+- **Library-level opt-out**: the follow-up ("everything public by default, except notes, with separate private lists") didn't mention making the whole library private. Does that opt-out stay? Assumed yes until the owner says otherwise.
 - **Spoilers on someone else's library**: when viewing another user's library, are spoilers judged against the viewer's progress or hidden entirely? Probably the viewer's. Owner to confirm.
 - **Spoiler opt-in**: per show, or one global setting? Owner to confirm.

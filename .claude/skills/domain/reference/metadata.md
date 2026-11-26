@@ -1,6 +1,6 @@
 Last reviewed: 2026-11-26
 
-Sources: owner interview, 2026-11-26 (Lewis); API research, 2026-11-26: TMDB API Terms of Use (themoviedb.org/api-terms-of-use) and FAQ (developer.themoviedb.org/docs/faq); IGDB API docs (api-docs.igdb.com) and partnership page (igdb.com/api); Letterboxd API page (letterboxd.com/api-beta); community reports on HowLongToBeat wrappers. No code yet.
+Sources: owner interview, 2026-11-26 (Lewis); API research, 2026-11-26: TMDB API Terms of Use (themoviedb.org/api-terms-of-use) and FAQ (developer.themoviedb.org/docs/faq); IGDB API docs (api-docs.igdb.com) and partnership page (igdb.com/api); Letterboxd API page (letterboxd.com/api-beta); community reports on HowLongToBeat wrappers; owner follow-up, 2026-11-26 (review scores). No provider code yet.
 
 # Metadata: where item data comes from
 
@@ -10,9 +10,21 @@ The owner asked for useful item info when items are pulled in: time to finish fo
 
 | Media type | Provider | What we take | Why |
 |---|---|---|---|
-| Movie | TMDB | title, poster, release date, runtime (time to finish), genres | The common choice for film and TV apps. Letterboxd points developers to TMDB for film data. |
-| Show | TMDB | title, poster, seasons, episode runtimes (summed per season for time to finish) | Has season and episode detail, so a per-season time can be derived. |
-| Game | IGDB (Twitch) | title, cover, platforms, release date, time to beat (`hastily`, `normally`, `completely`, `count`) | The common game database. Its official `game_time_to_beats` endpoint gives story and 100% estimates. |
+| Movie | TMDB | title, poster, release date, runtime (time to finish), genres, review score | The common choice for film and TV apps. Letterboxd points developers to TMDB for film data. |
+| Show | TMDB | title, poster, seasons, episode runtimes (summed per season for time to finish), review score | Has season and episode detail, so a per-season time can be derived. |
+| Game | IGDB (Twitch) | title, cover, platforms, release date, time to beat (`hastily`, `normally`, `completely`, `count`), review scores | The common game database. Its official `game_time_to_beats` endpoint gives story and 100% estimates. |
+
+## Review scores
+
+The owner wants review info pulled in from the providers, and upnext has no user ratings of its own (owner said, 2026-11-26). Proposed fields, **not yet checked against the API docs**: verify them when building the provider clients.
+
+| Provider | Fields | Meaning |
+|---|---|---|
+| TMDB (movie, show) | `vote_average`, `vote_count` | TMDB users' average score out of 10, and how many votes |
+| IGDB (game) | `rating`, `rating_count` | IGDB users' score out of 100 |
+| IGDB (game) | `aggregated_rating`, `aggregated_rating_count` | Critics' score out of 100, from outside reviews |
+
+Show the vote count beside a score, and "no score" rather than 0 when a score is missing or rests on very few votes.
 
 ## Rules of thumb
 
