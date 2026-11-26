@@ -1,0 +1,38 @@
+{
+  "page": 1,
+  "results": [
+    {
+      "id": 9001,
+      "media_type": "movie",
+      "title": "Kestrel Morning",
+      "release_date": "2019-04-12",
+      "poster_path": "/invented-kestrel-morning.jpg"
+    },
+    {
+      "id": 9101,
+      "media_type": "tv",
+      "name": "Harbour of Glass",
+      "first_air_date": "2021-09-03",
+      "poster_path": null
+    },
+    {
+      "id": 9102,
+      "media_type": "tv",
+      "name": "Saltmarsh Specials",
+      "first_air_date": null,
+      "poster_path": null
+    },
+    {
+      "id": 9103,
+      "media_type": "tv",
+      "name": "Unwritten Tides",
+      "first_air_date": "2027-01-01",
+      "poster_path": null
+    },
+    {
+      "id": 501,
+      "media_type": "person",
+      "name": "Invented Person"
+    }
+  ]
+}

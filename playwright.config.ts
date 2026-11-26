@@ -1,35 +1,14 @@
-import { execSync } from "node:child_process";
 import { defineConfig, devices } from "@playwright/test";
+import { localSupabase } from "./e2e/local-supabase";
 
 // Runs against a production build, as the Next.js docs recommend.
 // Port 3100 so a dev server on 3000 is never mistaken for this one.
 const PORT = 3100;
+// e2e/stub-providers.ts stands in for TMDB, IGDB and Twitch.
+const STUB = "http://127.0.0.1:3101";
 
 // The app under test talks to local Supabase (`npx supabase start`). Its URL and
-// publishable key come from the CLI, so no .env.local is needed for e2e.
-function localSupabase(): { url: string; publishableKey: string } {
-  let output: string;
-  try {
-    output = execSync("npx supabase status -o env", {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"],
-    });
-  } catch {
-    throw new Error("Local Supabase isn't running. Start Docker, then run: npx supabase start");
-  }
-  const env: Record<string, string> = {};
-  for (const line of output.split(/\r?\n/)) {
-    const match = line.match(/^([A-Z0-9_]+)="?(.*?)"?$/);
-    if (match) env[match[1]] = match[2];
-  }
-  const url = env.API_URL;
-  const publishableKey = env.PUBLISHABLE_KEY ?? env.ANON_KEY;
-  if (!url || !publishableKey) {
-    throw new Error("Couldn't read the local Supabase URL and key from `npx supabase status -o env`.");
-  }
-  return { url, publishableKey };
-}
-
+// keys come from the CLI, so no .env.local is needed for e2e.
 const supabase = localSupabase();
 
 export default defineConfig({
@@ -43,19 +22,34 @@ export default defineConfig({
     trace: "on-first-retry",
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
-  webServer: {
-    command: `npm run build && npm run start -- --port ${PORT}`,
-    url: `http://localhost:${PORT}`,
-    reuseExistingServer: false,
-    timeout: 180_000,
-    env: {
-      NEXT_PUBLIC_SUPABASE_URL: supabase.url,
-      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: supabase.publishableKey,
-      // Fake server secrets that e2e/secrets.spec.ts hunts for in the build output (INV-005).
-      SUPABASE_SERVICE_ROLE_KEY: "SENTINEL_SERVICE_ROLE_7f3a",
-      TMDB_API_READ_ACCESS_TOKEN: "SENTINEL_TMDB_7f3a",
-      IGDB_CLIENT_ID: "SENTINEL_IGDB_ID_7f3a",
-      IGDB_CLIENT_SECRET: "SENTINEL_IGDB_SECRET_7f3a",
+  webServer: [
+    {
+      command:
+        "node --experimental-strip-types --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON e2e/stub-providers.ts",
+      url: `${STUB}/__health`,
+      reuseExistingServer: false,
+      timeout: 30_000,
     },
-  },
+    {
+      command: `npm run build && npm run start -- --port ${PORT}`,
+      url: `http://localhost:${PORT}`,
+      reuseExistingServer: false,
+      timeout: 180_000,
+      // Env set here wins over .env.local, so e2e never reaches the real providers.
+      env: {
+        NEXT_PUBLIC_SUPABASE_URL: supabase.url,
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: supabase.publishableKey,
+        // The real local key: the app imports into the catalogue at runtime.
+        // e2e/secrets.spec.ts hunts for it in the build output (INV-005).
+        SUPABASE_SERVICE_ROLE_KEY: supabase.serviceRoleKey,
+        // Fake provider secrets that e2e/secrets.spec.ts hunts for too.
+        TMDB_API_READ_ACCESS_TOKEN: "SENTINEL_TMDB_7f3a",
+        IGDB_CLIENT_ID: "SENTINEL_IGDB_ID_7f3a",
+        IGDB_CLIENT_SECRET: "SENTINEL_IGDB_SECRET_7f3a",
+        TMDB_API_BASE_URL: `${STUB}/tmdb`,
+        IGDB_API_BASE_URL: `${STUB}/igdb`,
+        TWITCH_TOKEN_URL: `${STUB}/twitch/token`,
+      },
+    },
+  ],
 });
