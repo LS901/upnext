@@ -4,6 +4,7 @@ import { igdbImageUrl } from "@/lib/providers/igdb";
 import { tmdbImageUrl } from "@/lib/providers/tmdb";
 import type { Provider } from "@/lib/providers/types";
 import type { Database } from "@/lib/supabase/database.types";
+import { fetchAll, fetchAllIn } from "@/lib/supabase/fetch-all";
 import { showProgress } from "./progress";
 import { LIBRARY_ORDER, STATUS_LABELS, type EntryStatus } from "./status";
 
@@ -61,16 +62,20 @@ const storyMinutes = (seconds: number | null) => (seconds === null ? null : seco
  * users' public entries and exclusions too, so every query is filtered to `userId`.
  */
 export async function getMyLibrary(supabase: Client, userId: string): Promise<LibraryView> {
-  const { data: entries, error } = await supabase
-    .from("library_entries")
-    .select(
-      `id, status,
-       item:items(provider, media_type, title, image_ref, runtime_minutes, ttb_normally_s, score, score_count),
-       season:seasons(id, season_number, episode_count, air_date, runtime_minutes,
-         show:items(id, provider, title, image_ref, score, score_count))`,
-    )
-    .eq("user_id", userId);
-  if (error) throw error;
+  // Paged: a library can hold more entries than PostgREST returns at once.
+  const entries = await fetchAll((from, to) =>
+    supabase
+      .from("library_entries")
+      .select(
+        `id, status,
+         item:items(provider, media_type, title, image_ref, runtime_minutes, ttb_normally_s, score, score_count),
+         season:seasons(id, season_number, episode_count, air_date, runtime_minutes,
+           show:items(id, provider, title, image_ref, score, score_count))`,
+      )
+      .eq("user_id", userId)
+      .order("id")
+      .range(from, to),
+  );
 
   const items: ItemRow[] = [];
   const shows = new Map<string, Show>();
@@ -145,26 +150,32 @@ async function addProgress(
   finishedSeasonIds: Set<string>,
 ): Promise<void> {
   if (!shows.size) return;
-  const { data: seasons, error } = await supabase
-    .from("seasons")
-    .select("id, show_id, season_number")
-    .in("show_id", [...shows.keys()]);
-  if (error) throw error;
-
-  const { data: exclusions, error: exclusionsError } = await supabase
-    .from("progress_exclusions")
-    .select("season_id")
-    .eq("user_id", userId)
-    .in(
-      "season_id",
-      seasons.map((s) => s.id),
-    );
-  if (exclusionsError) throw exclusionsError;
+  // Chunked and paged, so many shows never make a URL too long or lose
+  // seasons past one page.
+  const [seasons, exclusions] = await Promise.all([
+    fetchAllIn([...shows.keys()], (ids, from, to) =>
+      supabase.from("seasons").select("id, show_id, season_number").in("show_id", ids).order("id").range(from, to),
+    ),
+    // All of the user's exclusions; only those on these shows' seasons match below.
+    fetchAll((from, to) =>
+      supabase
+        .from("progress_exclusions")
+        .select("season_id")
+        .eq("user_id", userId)
+        .order("season_id")
+        .range(from, to),
+    ),
+  ]);
   const excluded = new Set(exclusions.map((x) => x.season_id));
 
+  const byShow = new Map<string, { id: string; number: number }[]>();
+  for (const s of seasons) {
+    const list = byShow.get(s.show_id) ?? [];
+    list.push({ id: s.id, number: s.season_number });
+    byShow.set(s.show_id, list);
+  }
   for (const show of shows.values()) {
-    const all = seasons.filter((s) => s.show_id === show.showId).map((s) => ({ id: s.id, number: s.season_number }));
-    show.progress = showProgress(all, finishedSeasonIds, excluded);
+    show.progress = showProgress(byShow.get(show.showId) ?? [], finishedSeasonIds, excluded);
   }
 }
 

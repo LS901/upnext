@@ -2,6 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { MediaType, Provider } from "@/lib/providers/types";
 import type { Database } from "@/lib/supabase/database.types";
+import { fetchAllIn } from "@/lib/supabase/fetch-all";
 
 type Client = SupabaseClient<Database>;
 
@@ -22,37 +23,55 @@ export async function inLibrary(supabase: Client, userId: string, keys: ItemKey[
   if (!keys.length) return found;
   const wanted = new Set<string>(keys);
 
-  const { data: items, error } = await supabase
-    .from("items")
-    .select("id, provider, media_type, provider_id")
-    .in("provider_id", [...new Set(keys.map((k) => k.split(":")[2]))]);
-  if (error) throw error;
+  // Every list of ids below is chunked and paged (fetchAllIn), so a long list
+  // of keys, or shows with many seasons, never makes a URL too long or loses
+  // rows past one page.
+  const items = await fetchAllIn(
+    keys.map((k) => k.split(":")[2]),
+    (ids, from, to) =>
+      supabase
+        .from("items")
+        .select("id, provider, media_type, provider_id")
+        .in("provider_id", ids)
+        .order("id")
+        .range(from, to),
+  );
   const known = items
-    .map((i) => ({ id: i.id, key: itemKey(i.provider, i.media_type, i.provider_id) }))
+    .map((i) => ({ id: i.id, mediaType: i.media_type, key: itemKey(i.provider, i.media_type, i.provider_id) }))
     .filter((i) => wanted.has(i.key));
   if (!known.length) return found;
   const keyOf = new Map(known.map((i) => [i.id, i.key]));
+  const shows = known.filter((i) => i.mediaType === "show").map((i) => i.id);
+  const others = known.filter((i) => i.mediaType !== "show").map((i) => i.id);
 
-  const { data: seasons, error: seasonsError } = await supabase
-    .from("seasons")
-    .select("id, show_id")
-    .in("show_id", [...keyOf.keys()]);
-  if (seasonsError) throw seasonsError;
+  const seasons = await fetchAllIn(shows, (ids, from, to) =>
+    supabase.from("seasons").select("id, show_id").in("show_id", ids).order("id").range(from, to),
+  );
   const showOf = new Map(seasons.map((s) => [s.id, s.show_id]));
 
   const [byItem, bySeason] = await Promise.all([
-    supabase.from("library_entries").select("item_id").eq("user_id", userId).in("item_id", [...keyOf.keys()]),
-    showOf.size
-      ? supabase.from("library_entries").select("season_id").eq("user_id", userId).in("season_id", [...showOf.keys()])
-      : Promise.resolve({ data: [], error: null }),
+    fetchAllIn(others, (ids, from, to) =>
+      supabase
+        .from("library_entries")
+        .select("item_id")
+        .eq("user_id", userId)
+        .in("item_id", ids)
+        .order("id")
+        .range(from, to),
+    ),
+    fetchAllIn([...showOf.keys()], (ids, from, to) =>
+      supabase
+        .from("library_entries")
+        .select("season_id")
+        .eq("user_id", userId)
+        .in("season_id", ids)
+        .order("id")
+        .range(from, to),
+    ),
   ]);
-  if (byItem.error) throw byItem.error;
-  if (bySeason.error) throw bySeason.error;
 
-  for (const e of byItem.data) found.add(keyOf.get(e.item_id!)!);
-  for (const e of bySeason.data as { season_id: string | null }[]) {
-    found.add(keyOf.get(showOf.get(e.season_id!)!)!);
-  }
+  for (const e of byItem) found.add(keyOf.get(e.item_id!)!);
+  for (const e of bySeason) found.add(keyOf.get(showOf.get(e.season_id!)!)!);
   return found;
 }
 
