@@ -98,6 +98,26 @@ Email only: a magic link plus a 6-digit code in the same email (owner said, 2026
 - **Provider tests:** the client unit tests stub `fetch` with the trimmed fixtures in `src/lib/providers/__fixtures__/`; `src/lib/providers/privacy.test.ts` checks INV-006. `supabase/tests/import-and-refresh.test.ts` runs import, refresh, purge, prune and the cron route against local Supabase with provider HTTP stubbed; a db test that stubs `fetch` must pass Supabase requests through to the real `fetch`.
 - `npm run check` = lint + `npm run typecheck` (`next typegen && tsc --noEmit`) + `npm test`. Because `npm test` includes the `db` project, `check` needs `npx supabase start` running.
 
+### CI (GitHub Actions)
+
+- **`.github/workflows/ci.yml` runs on every PR and every push to `main`.** Each job is a required check on `main`.
+  - `check`: `npm run check` against a local Supabase started in the job.
+  - `e2e`: `npm run e2e` against the stub providers. Traces from failed tests are uploaded as the `playwright-test-results` artifact.
+  - `domain`: `npm run domain:check`.
+  - `secrets`: gitleaks over the whole git history.
+  - `audit`: `npm audit --audit-level=high`.
+- **CI holds no secrets.** No repo secrets exist and none are needed. Supabase keys come from the job's own `npx supabase start`, and the provider keys in `playwright.config.ts` are fake sentinels. Never add real provider keys to CI; `npm run providers:check` stays a manual check.
+- **The jobs skip unused Supabase services** (`SUPABASE_SKIP`: realtime, storage, imgproxy, postgres-meta, studio, edge-runtime, logflare, vector, supavisor). Auth, PostgREST, Kong and Mailpit stay. If a feature needs one of the skipped services, take it off that list.
+- **`.github/workflows/codeql.yml`** runs CodeQL on PRs, on pushes to `main` and every Monday. It covers `javascript-typescript` and `actions` (the workflows themselves). Results go to the repo's Security tab.
+- **`.github/dependabot.yml`** opens weekly update PRs for npm and GitHub Actions. Minor and patch updates are grouped; each major gets its own PR.
+- **Actions are pinned to commit SHAs** with the version in a comment, and the gitleaks image is pinned by digest. Dependabot bumps the action SHAs. Bump the gitleaks image by hand.
+- **Branch protection on `main`:**
+  - every CI job and both CodeQL jobs must pass;
+  - changes arrive by PR, with no approvals required (the owner can't approve their own PR);
+  - no force pushes or deletions;
+  - admins can bypass in an emergency (owner said, 2026-11-26).
+- **`scripts/check-knowledge.mjs` is a copy of the kit's domain checker** (agent-workflow team-workflow 0.2.1). The kit repo is private, so CI can't fetch it. Refresh the copy when the kit's rules change.
+
 ## 7. Conventions
 
 - Path alias `@/*` → `src/*`.
@@ -131,6 +151,7 @@ Email only: a magic link plus a 6-digit code in the same email (owner said, 2026
 - **The Auth layer refuses passwords:** the app is email sign-in only, and `enable_confirmations` plus the `refuse_passwords` trigger on `auth.users` enforce it below the UI (details under Auth). Don't add a password flow or a password-based test helper; sign test users in with `signInByMagicLink()`.
 - **Supabase env names differ by CLI version:** `npx supabase status -o env` gives `API_URL`, `PUBLISHABLE_KEY` and `SECRET_KEY`, with `ANON_KEY` and `SERVICE_ROLE_KEY` as older names. The test setup and `playwright.config.ts` accept both.
 - **Hide whether a row exists:** a policy that only checks `user_id = auth.uid()` lets an insert reach the primary key or foreign key, whose error code (`23505` against `23503`) tells the caller whether another user's row exists. The notes insert policy therefore also requires owning the entry (`20261126083849_notes_insert_owns_entry.sql`). Apply the same thinking to any new private table.
-- **Next step (owner agreed):** CI on pull requests through GitHub Actions: `npm run check` with local Supabase, Playwright e2e against the stub providers, the domain check, gitleaks, Dependabot with `npm audit`, and CodeQL, plus branch protection on `main`. Sentry belongs to the later deployment task.
+- **gitleaks flags the e2e sentinels:** `SENTINEL_TMDB_7f3a` and friends look like API keys to its `generic-api-key` rule. `.gitleaks.toml` allows only values matching `^SENTINEL_[A-Z_]+_7f3a$`; a realistic key next to them is still caught. Keep new sentinels in that shape. To run the scan locally (Git Bash): `MSYS_NO_PATHCONV=1 docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.30.1 git /repo --config /repo/.gitleaks.toml --redact`.
+- **Sentry belongs to the later deployment task,** not to CI.
 - **Mailpit shows the raw `&` in the HTML part:** `e2e/mailpit.ts` returns the HTML and the text part; the sign-in test reads the code from the text. The link in the HTML needs `&amp;` decoded.
 - **The email is in the `/login?sent=` URL**, so it lands in the user's browser history. Accepted for now.

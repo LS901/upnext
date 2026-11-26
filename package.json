@@ -17,6 +17,7 @@
     "db:types": "supabase gen types typescript --local > src/lib/supabase/database.types.ts",
     "providers:check": "node --experimental-strip-types --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/providers-check.ts",
     "refresh": "node --experimental-strip-types --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/refresh.ts",
+    "domain:check": "node scripts/check-knowledge.mjs .claude/skills/domain",
     "check": "npm run lint && npm run typecheck && npm test"
   },
   "dependencies": {

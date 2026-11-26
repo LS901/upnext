@@ -21,11 +21,14 @@ what's next, and what you've finished. Installable web app (PWA).
 One test file: `npx vitest run src/path/to/file.test.tsx`
 `npm run e2e` builds the app and serves it on port 3100.
 `npm test` (so `npm run check`) and `npm run e2e` need `npx supabase start` running first: the database boundary tests in `supabase/tests/` fail without it, on purpose.
+`npm run domain:check` checks the domain skill's reference files.
+CI (`.github/workflows/`) runs check, e2e, the domain check, gitleaks, `npm audit` and CodeQL on every PR; all must pass to merge into `main`.
 
 ## Where things live
 - `src/app/`: routes and route handlers; unit tests sit beside the code they cover (here and in `src/lib/`) as `*.test.ts(x)`
 - `src/lib/`: `providers/` (TMDB and IGDB clients), `catalogue/` (import and refresh), `library/`, `supabase/`, `auth/`, `format/`
-- `scripts/`: the `providers:check` and `refresh` scripts
+- `scripts/`: the `providers:check` and `refresh` scripts, and `check-knowledge.mjs` (the domain checker)
+- `.github/`: CI and CodeQL workflows, Dependabot config; `.gitleaks.toml` is the secret-scan config
 - `e2e/`: Playwright specs and the stub provider server (`stub-providers.ts`, port 3101)
 - `supabase/migrations/`: SQL migrations (source of truth for the schema)
 - `supabase/seed.sql`: invented seed data only, never real users
