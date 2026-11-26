@@ -1,0 +1,23 @@
+# Weekly dependency update PRs. Minor and patch updates are grouped into one
+# PR per ecosystem; majors come one PR each so they can be judged on their own.
+# CI (.github/workflows/ci.yml) runs on every one of these PRs.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      npm-minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      actions-minor-and-patch:
+        update-types: [minor, patch]

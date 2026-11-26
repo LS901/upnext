@@ -1,0 +1,10 @@
+# gitleaks config: the default rules, plus one narrow allowance.
+# CI runs gitleaks over the whole history on every PR (.github/workflows/ci.yml).
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Fake sentinel values that e2e/secrets.spec.ts plants and then hunts for in the build (INV-005)"
+# Only the exact sentinel shape, e.g. SENTINEL_TMDB_7f3a. A real key never looks like this.
+regexes = ['''^SENTINEL_[A-Z_]+_7f3a$''']
