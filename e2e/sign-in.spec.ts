@@ -12,9 +12,12 @@ async function requestSignIn(page: Page, typed: string) {
   await page.goto("/login");
   await page.getByLabel("Email").fill(typed);
   await page.getByRole("button", { name: "Email me a sign-in link" }).click();
+  // Sending goes through Supabase Auth and the local mail catcher. On a freshly
+  // started server with several workers sending at once it can take longer
+  // than Playwright's 5 s default, so allow more time here.
   await expect(
     page.getByText("Check your email. Open the link, or enter the 6-digit code here.")
-  ).toBeVisible();
+  ).toBeVisible({ timeout: 15_000 });
 }
 
 function linkFrom(html: string): string {
