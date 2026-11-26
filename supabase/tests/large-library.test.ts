@@ -5,14 +5,17 @@ import { randomInt } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
 import { inLibrary, itemKey } from "../../src/lib/library/in-library";
 import { getMyLibrary, type ShowRow } from "../../src/lib/library/queries";
+import { PAGE_SIZE } from "../../src/lib/supabase/fetch-all";
 import { adminClient, createTestUser, deleteTestUsers, type TestUser } from "./helpers";
 
 vi.mock("server-only", () => ({}));
 
 // 110 shows x 3 seasons = 330 seasons (over 300, and over 100 shows);
-// 330 season entries + 720 movie entries = 1050 entries (over 1000).
+// 330 season entries + 720 movie entries = 1050 entries: over max_rows
+// (1000), and over two pages of PAGE_SIZE, so the paging is exercised.
 const SHOWS = 110;
 const MOVIES = 720;
+const ENTRIES = SHOWS * 3 + MOVIES;
 const CHUNK = 200;
 
 const chunks = <T>(rows: T[], size = CHUNK) =>
@@ -93,6 +96,9 @@ describe("a large library", () => {
   }, 120_000);
 
   test("getMyLibrary returns every entry, with the right progress for every show", async () => {
+    // The library must span more than max_rows and more than two pages.
+    expect(ENTRIES).toBeGreaterThan(1000);
+    expect(ENTRIES).toBeGreaterThan(PAGE_SIZE * 2);
     const { groups } = await getMyLibrary(a.client, a.id);
     const rows = groups.flatMap((g) => g.rows);
 

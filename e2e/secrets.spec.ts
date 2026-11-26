@@ -16,6 +16,10 @@ const SENTINELS: Record<string, string> = {
 };
 
 const PAGES = ["/", "/login", "/search", "/library"];
+const SIGNED_IN_ONLY = ["/search", "/library"];
+// The meta refresh Next streams for a redirect: standard HTML, which a browser
+// without JavaScript follows. Matched on the attributes, not Next's element id or delay.
+const LOGIN_REFRESH = /<meta\b[^>]*http-equiv="refresh"[^>]*content="\d+;\s*url=\/login"/i;
 
 function filesUnder(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
@@ -42,7 +46,12 @@ test("INV-005: no server secret in client bundles or pages", async ({ request })
   for (const path of PAGES) {
     const response = await request.get(path);
     expect(response.ok(), `GET ${path}`).toBe(true);
-    leaks.push(...leaksIn(`the HTML of ${path}`, await response.text()));
+    const html = await response.text();
+    leaks.push(...leaksIn(`the HTML of ${path}`, html));
+    // Signed out, these answer 200 with their prerendered shell, and the
+    // redirect to sign-in is streamed into the HTML. Check it's there, so the
+    // HTML scanned above is the signed-out page (signed-in HTML isn't scanned).
+    if (SIGNED_IN_ONLY.includes(path)) expect(html, `GET ${path}`).toMatch(LOGIN_REFRESH);
   }
 
   expect(leaks).toEqual([]);

@@ -1,11 +1,12 @@
 import type { PostgrestError } from "@supabase/supabase-js";
 
 /**
- * Rows per page. PostgREST returns at most `max_rows` rows a request (1000 in
- * supabase/config.jsonc, and on hosted Supabase by default) and says nothing
- * when it cuts a result short, so this must not exceed it.
+ * Rows per page. Must stay below PostgREST's `max_rows` (1000 in
+ * supabase/config.jsonc, and the hosted default). PostgREST cuts a result at
+ * `max_rows` without saying so, and a short page ends the paging, so a page
+ * size above `max_rows` would truncate silently.
  */
-export const PAGE_SIZE = 1000;
+export const PAGE_SIZE = 500;
 
 /** Ids per `.in()` filter, so the request URL stays well under the server's limit. */
 export const IN_CHUNK = 100;
