@@ -1,6 +1,6 @@
 Last reviewed: 2026-11-26
 
-Sources: owner interview and follow-up, 2026-11-26 (Lewis); owner decisions on show progress and books, 2026-11-26; owner on audiobooks (a version under books, picked with a selector), 2026-11-26; schema in `supabase/migrations/20261126082919_library_entries.sql` and `20261126083314_notes_and_exclusions.sql`. The data model and its row-level security exist; there are no library pages or handlers yet.
+Sources: owner interview and follow-up, 2026-11-26 (Lewis); owner decisions on show progress and books, 2026-11-26; owner on audiobooks (a version under books, picked with a selector), 2026-11-26; schema in `supabase/migrations/20261126082919_library_entries.sql` and `20261126083314_notes_and_exclusions.sql`. The data model and its row-level security exist, and the My library page (`src/app/library/`, `src/lib/library/`) shows status and show progress; there are no lists or public profile pages yet.
 
 # Library and status
 
@@ -37,7 +37,7 @@ A show has **no status of its own**. Its seasons carry the statuses, and a **pro
 - Denominator: the show's seasons minus the user's exclusions. Numerator: the user's Finished season entries that aren't excluded.
 - A **newly aired season is untracked** until the user adds it; it doesn't appear as Backlog on its own (owner said, 2026-11-26).
 
-The summary is computed in the library pages task; today only the exclusions are stored.
+The summary is computed by `showProgress` (`src/lib/library/progress.ts`) and shown on My library. **Specials (TMDB season 0) are left out of the count** (ruling, owner may overrule): only seasons numbered 1 or more count. There is no UI to set exclusions yet; the maths honours them.
 
 ## Books (planned)
 
@@ -50,7 +50,7 @@ Books become a **fourth media type**, planned for after the TMDB and IGDB import
 
 ## Unconfirmed
 
-- **Leaving up next**: probably an item drops off the shortlist when it moves to In progress. Owner to confirm.
+- **Leaving up next**: probably an item drops off the shortlist when it moves to In progress. Owner to confirm. Today's code (`setEntryStatus` in `src/lib/library/queries.ts`) clears `up_next_position` whenever an entry moves to any status other than Backlog, because the schema check allows a position only while the status is Backlog. That follows from the schema, not from an owner decision, so the owner must confirm it and the question stays open.
 - **Transitions**: probably any status can move to any other. Is there anything that should be blocked, for example Backlog straight to Finished? Owner to confirm.
 - **Print and audiobook of one book**: whether one user can track both versions of the same book at once, and how that squares with one entry per item (INV-008). Left to the books task.
 - **Audiobook data**: where audiobook editions, narrators and lengths come from. Left to the books task.

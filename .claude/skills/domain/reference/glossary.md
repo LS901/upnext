@@ -1,6 +1,6 @@
 Last reviewed: 2026-11-26
 
-Sources: owner interview, 2026-11-26 (Lewis); API research, 2026-11-26 (TMDB API terms and FAQ, IGDB API docs, community reports linked in `metadata.md`); owner follow-up, 2026-11-26 (no user ratings, a status per season, one entry per item with a play count, private lists); owner decisions on show progress, sign-in and books, 2026-11-26; owner on audiobooks (a version under books), 2026-11-26; `supabase/migrations/`. The data model exists; there are no library pages yet.
+Sources: owner interview, 2026-11-26 (Lewis); API research, 2026-11-26 (TMDB API terms and FAQ, IGDB API docs, community reports linked in `metadata.md`); owner follow-up, 2026-11-26 (no user ratings, a status per season, one entry per item with a play count, private lists); owner decisions on show progress, sign-in and books, 2026-11-26; owner on audiobooks (a version under books), 2026-11-26; `supabase/migrations/`. The data model, search and My library exist.
 
 # Glossary
 
@@ -24,14 +24,14 @@ Paths below are relative to the named repo. Examples are invented.
 | **Show progress** | A summary derived from a show's seasons, such as "2 of 4 seasons finished": the Finished season entries that aren't excluded, out of all seasons minus the exclusions. A show has no status of its own. | owner said (2026-11-26) |
 | **Time to finish** | How long an item takes. Movie: its runtime. Show: the sum of episode runtimes, per season and in total. Game: its time to beat. | owner said (2026-11-26) |
 | **Time to beat** | A game's estimated play time from IGDB `game_time_to_beats`: `hastily` (main story), `normally` (story plus some side content) and `completely` (100%), each an average in seconds, with `count` submissions behind it. | research: IGDB API docs (2026-11-26) |
-| **Metadata provider** | The outside source of item data: TMDB for movies and shows, IGDB for games. | research (2026-11-26); not yet confirmed by owner |
+| **Metadata provider** | The outside source of item data: TMDB for movies and shows, IGDB for games. | owner said (2026-11-26): credentials set up |
 | **Up next** | An ordered shortlist inside the Backlog: what the user plans to start soonest. It is not a separate status. | owner said (2026-11-26) |
 | **Public library** | The default. Other users, and signed-out visitors, can read a user's library (read-only), but never its notes. | owner said (2026-11-26) |
 | **Private library** | A library its owner opted out of sharing. Nobody else sees it. | owner said (2026-11-26) |
 | **Notes** | A user's free-text notes on a library entry. Always private to the owner. | owner said (2026-11-26) |
 | **Public profile** | A user's page others can view, showing their library unless it is private. | owner said (2026-11-26) |
 | **List** | A user-made collection of items, for example "Cosy winter games". Public by default; the owner can make a single list private. | owner said (2026-11-26) |
-| **Review score** | A provider's aggregate score for an item (TMDB vote average, IGDB rating), shown as item info with how many votes it rests on. upnext has no user ratings of its own. | owner said (2026-11-26); fields in `metadata.md` |
+| **Review score** | A provider's aggregate score for an item, normalised to 0-100 (TMDB `vote_average × 10`, IGDB `total_rating`) and shown as item info with the vote count behind it. Unknown is "No score", never 0. upnext has no user ratings of its own. | owner said (2026-11-26); normalisation in `metadata.md` (ruling, owner may overrule) |
 | **Spoiler** | Season synopses, episode titles or stills for seasons after the user's current season progress. Hidden unless the user opts in. | owner confirmed INV-004 (2026-11-26) |
 | **Audiobook** | A version of a book, not a media type of its own. When adding a book the user picks the audiobook version with a selector, and it is tracked as its own entry, with its own status and play count. | owner said (2026-11-26) |
 
