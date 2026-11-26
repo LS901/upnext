@@ -1,0 +1,10 @@
+{
+  "page": 1,
+  "results": [
+    { "media_type": "movie", "id": 9001, "title": "The Lantern Orchard", "release_date": "2019-06-14", "poster_path": "/lantern.jpg" },
+    { "media_type": "tv", "id": 9002, "name": "Harbour of Echoes", "first_air_date": "2021-03-02", "poster_path": null },
+    { "media_type": "person", "id": 9003, "name": "Quill Marrow", "profile_path": "/quill.jpg" },
+    { "media_type": "movie", "id": 9004, "title": "Undated Tale", "release_date": "", "poster_path": null }
+  ],
+  "total_results": 4
+}

@@ -1,17 +1,25 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
+import { localSupabase } from "./local-supabase";
 
-// playwright.config.ts passes these to the build and the server as the real secrets' env names.
+// playwright.config.ts passes these to the build and the server as the real secrets' env names:
+// the local service-role key (the app needs the real one at runtime) and fake provider secrets.
 // If any of them shows up in what the browser receives, a server secret has leaked (INV-005).
-const SENTINELS = [
-  "SENTINEL_SERVICE_ROLE_7f3a",
-  "SENTINEL_TMDB_7f3a",
-  "SENTINEL_IGDB_ID_7f3a",
-  "SENTINEL_IGDB_SECRET_7f3a",
-];
+// Reported by name, so a failure never prints a key.
+const SENTINELS: Record<string, string> = {
+  SUPABASE_SERVICE_ROLE_KEY: localSupabase().serviceRoleKey,
+  TMDB_API_READ_ACCESS_TOKEN: "SENTINEL_TMDB_7f3a",
+  IGDB_CLIENT_ID: "SENTINEL_IGDB_ID_7f3a",
+  IGDB_CLIENT_SECRET: "SENTINEL_IGDB_SECRET_7f3a",
+  CRON_SECRET: "SENTINEL_CRON_7f3a",
+};
 
-const PAGES = ["/", "/login"];
+const PAGES = ["/", "/login", "/search", "/library"];
+const SIGNED_IN_ONLY = ["/search", "/library"];
+// The meta refresh Next streams for a redirect: standard HTML, which a browser
+// without JavaScript follows. Matched on the attributes, not Next's element id or delay.
+const LOGIN_REFRESH = /<meta\b[^>]*http-equiv="refresh"[^>]*content="\d+;\s*url=\/login"/i;
 
 function filesUnder(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
@@ -21,9 +29,9 @@ function filesUnder(dir: string): string[] {
 }
 
 function leaksIn(label: string, content: string): string[] {
-  return SENTINELS.filter((sentinel) => content.includes(sentinel)).map(
-    (sentinel) => `${sentinel} found in ${label}`
-  );
+  return Object.entries(SENTINELS)
+    .filter(([, value]) => content.includes(value))
+    .map(([name]) => `${name} found in ${label}`);
 }
 
 test("INV-005: no server secret in client bundles or pages", async ({ request }) => {
@@ -38,7 +46,12 @@ test("INV-005: no server secret in client bundles or pages", async ({ request })
   for (const path of PAGES) {
     const response = await request.get(path);
     expect(response.ok(), `GET ${path}`).toBe(true);
-    leaks.push(...leaksIn(`the HTML of ${path}`, await response.text()));
+    const html = await response.text();
+    leaks.push(...leaksIn(`the HTML of ${path}`, html));
+    // Signed out, these answer 200 with their prerendered shell, and the
+    // redirect to sign-in is streamed into the HTML. Check it's there, so the
+    // HTML scanned above is the signed-out page (signed-in HTML isn't scanned).
+    if (SIGNED_IN_ONLY.includes(path)) expect(html, `GET ${path}`).toMatch(LOGIN_REFRESH);
   }
 
   expect(leaks).toEqual([]);

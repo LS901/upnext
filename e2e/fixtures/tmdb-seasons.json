@@ -1,0 +1,43 @@
+{
+  "9101": {
+    "0": {
+      "season_number": 0,
+      "overview": "SPOILER-OVERVIEW-0",
+      "episodes": [
+        { "episode_number": 1, "name": "SPOILER-EPISODE-0-1", "overview": "SPOILER-OVERVIEW-0", "runtime": 30 },
+        { "episode_number": 2, "name": "SPOILER-EPISODE-0-2", "overview": "SPOILER-OVERVIEW-0", "runtime": 30 }
+      ]
+    },
+    "1": {
+      "season_number": 1,
+      "overview": "SPOILER-OVERVIEW-1",
+      "episodes": [
+        { "episode_number": 1, "name": "SPOILER-EPISODE-1-1", "overview": "SPOILER-OVERVIEW-1", "runtime": 50 },
+        { "episode_number": 2, "name": "SPOILER-EPISODE-1-2", "overview": "SPOILER-OVERVIEW-1", "runtime": 48 }
+      ]
+    },
+    "2": {
+      "season_number": 2,
+      "overview": "SPOILER-OVERVIEW-2",
+      "episodes": [
+        { "episode_number": 1, "name": "SPOILER-EPISODE-2-1", "overview": "SPOILER-OVERVIEW-2", "runtime": 52 }
+      ]
+    },
+    "3": {
+      "season_number": 3,
+      "overview": "SPOILER-OVERVIEW-3",
+      "episodes": [
+        { "episode_number": 1, "name": "SPOILER-EPISODE-3-1", "overview": "SPOILER-OVERVIEW-3", "runtime": null }
+      ]
+    }
+  },
+  "9102": {
+    "0": {
+      "season_number": 0,
+      "overview": "SPOILER-OVERVIEW-0",
+      "episodes": [
+        { "episode_number": 1, "name": "SPOILER-EPISODE-0-1", "overview": "SPOILER-OVERVIEW-0", "runtime": null }
+      ]
+    }
+  }
+}

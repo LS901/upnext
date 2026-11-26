@@ -16,6 +16,12 @@ export async function AccountMenu() {
 
   return (
     <div className="flex items-center gap-4">
+      <Link href="/search" className="underline">
+        Search
+      </Link>
+      <Link href="/library" className="underline">
+        My library
+      </Link>
       <span>{user.username}</span>
       <form action={signOut}>
         <button type="submit" className="underline">

@@ -1,0 +1,36 @@
+{
+  "9101": {
+    "id": 9101,
+    "name": "Harbour of Glass",
+    "first_air_date": "2021-09-03",
+    "poster_path": null,
+    "vote_average": 8.2,
+    "vote_count": 140,
+    "seasons": [
+      { "season_number": 0, "name": "Specials", "episode_count": 2, "air_date": "2022-12-20", "overview": "SPOILER-OVERVIEW-0" },
+      { "season_number": 1, "name": "Season 1", "episode_count": 8, "air_date": "2021-09-03", "overview": "SPOILER-OVERVIEW-1" },
+      { "season_number": 2, "name": "Season 2", "episode_count": 8, "air_date": "2022-09-02", "overview": "SPOILER-OVERVIEW-2" },
+      { "season_number": 3, "name": "Season 3", "episode_count": 6, "air_date": "2024-03-15", "overview": "SPOILER-OVERVIEW-3" }
+    ]
+  },
+  "9102": {
+    "id": 9102,
+    "name": "Saltmarsh Specials",
+    "first_air_date": null,
+    "poster_path": null,
+    "vote_average": 0,
+    "vote_count": 0,
+    "seasons": [
+      { "season_number": 0, "name": "Specials", "episode_count": null, "air_date": null, "overview": "SPOILER-OVERVIEW-0" }
+    ]
+  },
+  "9103": {
+    "id": 9103,
+    "name": "Unwritten Tides",
+    "first_air_date": "2027-01-01",
+    "poster_path": null,
+    "vote_average": 0,
+    "vote_count": 0,
+    "seasons": []
+  }
+}
