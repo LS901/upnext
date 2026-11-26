@@ -107,16 +107,25 @@ describe("notes and progress exclusions", () => {
 
   test("INV-001: nobody writes another user's notes", async () => {
     const entry = await addEntry(a);
-    // before A has a note on it, so the primary key doesn't fire first
-    const defaulted = await b.client
-      .from("entry_notes")
-      .insert({ entry_id: entry.id, body: "hijack" });
-    expect(defaulted.error?.code).toBe("23503");
+    // the same answer before and after A writes a note, so B can't probe
+    // whether a note exists
+    const attempts = async () => {
+      const plain = await b.client
+        .from("entry_notes")
+        .insert({ entry_id: entry.id, body: "hijack" });
+      expect(plain.error?.code).toBe("42501");
+      const upsert = await b.client
+        .from("entry_notes")
+        .upsert({ entry_id: entry.id, body: "hijack" }, { onConflict: "entry_id" });
+      expect(upsert.error?.code).toBe("42501");
+    };
+    await attempts();
 
     const { error: seed } = await a.client
       .from("entry_notes")
       .insert({ entry_id: entry.id, body: "mine" });
     expect(seed).toBeNull();
+    await attempts();
 
     const forged = await b.client
       .from("entry_notes")
