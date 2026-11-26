@@ -11,7 +11,7 @@ import { searchTmdb } from "@/lib/providers/tmdb";
 import { ProviderError, type MediaType, type Provider, type SearchResult } from "@/lib/providers/types";
 import { createClient } from "@/lib/supabase/server";
 import { addItem } from "./actions";
-import { summarise, type Answer, type Outcome } from "./outcome";
+import { PROVIDER_TYPES, providersToAsk, summarise, type Answer, type Outcome } from "./outcome";
 import { MAX_QUERY_LENGTH, parseSearch, type SearchState } from "./params";
 import { logProviderFailure, PROVIDER_NAMES } from "./shared";
 
@@ -34,18 +34,17 @@ export default function SearchPage({ searchParams }: PageProps<"/search">) {
   );
 }
 
-// Queries only the providers whose types aren't hidden, in parallel. A
-// provider that fails (down, rate-limited) is reported, not fatal.
+const SEARCHES: Record<Provider, (q: string) => Promise<SearchResult[]>> = { tmdb: searchTmdb, igdb: searchIgdb };
+
+// Queries only the providers whose types aren't hidden (none when every type
+// is), in parallel. A provider that fails (down, rate-limited) is reported,
+// not fatal.
 async function runSearch({ q, exclude }: SearchState): Promise<Outcome> {
-  const hidden = new Set(exclude);
-  const ask = async (
-    provider: Provider,
-    types: MediaType[],
-    search: (q: string) => Promise<SearchResult[]>,
-  ): Promise<Answer> => {
-    if (types.every((t) => hidden.has(t))) return { provider, status: "skipped" };
+  const asked = new Set(providersToAsk(exclude));
+  const ask = async (provider: Provider): Promise<Answer> => {
+    if (!asked.has(provider)) return { provider, status: "skipped" };
     try {
-      return { provider, status: "answered", results: await search(q) };
+      return { provider, status: "answered", results: await SEARCHES[provider](q) };
     } catch (err) {
       if (!(err instanceof ProviderError)) throw err;
       logProviderFailure(err);
@@ -53,7 +52,7 @@ async function runSearch({ q, exclude }: SearchState): Promise<Outcome> {
     }
   };
 
-  const answers = await Promise.all([ask("tmdb", ["movie", "show"], searchTmdb), ask("igdb", ["game"], searchIgdb)]);
+  const answers = await Promise.all((Object.keys(PROVIDER_TYPES) as Provider[]).map(ask));
   return summarise(answers, exclude);
 }
 
@@ -95,6 +94,9 @@ async function SearchContent({ searchParams }: Pick<PageProps<"/search">, "searc
         ))}
 
         {!outcome && <p className="text-zinc-600 dark:text-zinc-400">Type a title to search.</p>}
+        {outcome?.everythingHidden && (
+          <p className="text-zinc-600 dark:text-zinc-400">Everything is hidden. Untick a type to search.</p>
+        )}
         {outcome?.nothingFound && (
           <p className="text-zinc-600 dark:text-zinc-400">Nothing found.</p>
         )}

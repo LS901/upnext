@@ -162,6 +162,14 @@ test("search shows both providers and hides excluded types", async ({ page }) =>
   await expect(result(page, "Clockwork Lighthouse")).toBeVisible();
   await expect(result(page, "Kestrel Morning")).toHaveCount(0);
   expect((await stubRequests()).filter((r) => r.term === gamesOnly).map((r) => r.provider)).toEqual(["igdb"]);
+
+  // Hide all three: no provider is asked, and the page says why it's empty.
+  await page.getByRole("checkbox", { name: "Games" }).check();
+  const nothingShown = unique("Kestrel");
+  await search(page, nothingShown);
+  await expect(page.getByText("Everything is hidden. Untick a type to search.")).toBeVisible();
+  await expect(page.getByText("Nothing found.")).toHaveCount(0);
+  expect((await stubRequests()).filter((r) => r.term === nothingShown)).toEqual([]);
 });
 
 test("one provider down still shows the other's results", async ({ page }) => {

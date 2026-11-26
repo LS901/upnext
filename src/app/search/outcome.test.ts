@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import type { SearchResult } from "@/lib/providers/types";
-import { summarise } from "./outcome";
+import { providersToAsk, summarise } from "./outcome";
 
 const movie: SearchResult = {
   provider: "tmdb",
@@ -19,12 +19,14 @@ test("a failed provider never reads as Nothing found, even when the other was sk
     results: [],
     failed: ["igdb"],
     nothingFound: false,
+    everythingHidden: false,
   });
   // Games hidden, TMDB down.
   expect(summarise([{ provider: "tmdb", status: "failed" }, { provider: "igdb", status: "skipped" }], [])).toEqual({
     results: [],
     failed: ["tmdb"],
     nothingFound: false,
+    everythingHidden: false,
   });
 });
 
@@ -45,16 +47,43 @@ test("nothing queried (every type hidden) is not Nothing found", () => {
   ).toBe(false);
 });
 
+test("every type hidden asks no provider and reads as everything hidden", () => {
+  const all = ["movie", "show", "game"] as const;
+  expect(providersToAsk(all)).toEqual([]);
+  expect(summarise([{ provider: "tmdb", status: "skipped" }, { provider: "igdb", status: "skipped" }], all)).toEqual({
+    results: [],
+    failed: [],
+    nothingFound: false,
+    everythingHidden: true,
+  });
+});
+
+test("a provider is asked unless every one of its types is hidden", () => {
+  expect(providersToAsk([])).toEqual(["tmdb", "igdb"]);
+  expect(providersToAsk(["movie"])).toEqual(["tmdb", "igdb"]);
+  expect(providersToAsk(["movie", "show"])).toEqual(["igdb"]);
+  expect(providersToAsk(["game"])).toEqual(["tmdb"]);
+  expect(summarise([{ provider: "tmdb", status: "skipped" }, { provider: "igdb", status: "failed" }], []).everythingHidden).toBe(
+    false,
+  );
+});
+
 test("results of hidden types are dropped, and Nothing found turns on if none are left", () => {
   const answers = [
     { provider: "tmdb", status: "answered", results: [movie, show] },
     { provider: "igdb", status: "answered", results: [game] },
   ] as const;
-  expect(summarise([...answers], [])).toEqual({ results: [movie, show, game], failed: [], nothingFound: false });
+  expect(summarise([...answers], [])).toEqual({
+    results: [movie, show, game],
+    failed: [],
+    nothingFound: false,
+    everythingHidden: false,
+  });
   expect(summarise([...answers], ["show"]).results).toEqual([movie, game]);
   expect(summarise([answers[0], { provider: "igdb", status: "skipped" }], ["movie", "show"])).toEqual({
     results: [],
     failed: [],
     nothingFound: true,
+    everythingHidden: false,
   });
 });
