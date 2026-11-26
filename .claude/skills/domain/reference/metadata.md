@@ -1,6 +1,6 @@
 Last reviewed: 2026-11-26
 
-Sources: owner interview, 2026-11-26 (Lewis); API research, 2026-11-26: TMDB API Terms of Use (themoviedb.org/api-terms-of-use) and FAQ (developer.themoviedb.org/docs/faq); IGDB API docs (api-docs.igdb.com) and partnership page (igdb.com/api); Letterboxd API page (letterboxd.com/api-beta); community reports on HowLongToBeat wrappers; owner follow-up, 2026-11-26 (review scores); owner on books, 2026-11-26; Open Library proposal from research, not yet checked against its docs; owner on the book provider (Open Library if it is the best free source, after a comparison), 2026-11-26; owner set up the TMDB and IGDB credentials, 2026-11-26; provider clients, import and refresh built, 2026-11-26 (`src/lib/providers/`, `src/lib/catalogue/`).
+Sources: owner interview, 2026-11-26 (Lewis); API research, 2026-11-26: TMDB API Terms of Use (themoviedb.org/api-terms-of-use) and FAQ (developer.themoviedb.org/docs/faq); IGDB API docs (api-docs.igdb.com) and partnership page (igdb.com/api); Letterboxd API page (letterboxd.com/api-beta); community reports on HowLongToBeat wrappers; owner follow-up, 2026-11-26 (review scores); owner on books, 2026-11-26; Open Library proposal from research, not yet checked against its docs; owner on the book provider (Open Library if it is the best free source, after a comparison), 2026-11-26; owner set up the TMDB and IGDB credentials, 2026-11-26; provider clients, import and refresh built, 2026-11-26 (`src/lib/providers/`, `src/lib/catalogue/`); the branch's final review, 2026-11-26 (Before public signups).
 
 # Metadata: where item data comes from
 
@@ -44,7 +44,7 @@ The owner wants review info pulled in from the providers, and upnext has no user
 - **Failed sub-requests:** a failed season request leaves only that season's runtime unknown, and a failed IGDB time-to-beat request leaves only the time to beat unknown. Neither fails the import, and a value already stored is kept (owner said, 2026-11-26).
 - **Specials:** TMDB season 0 ("Specials") is imported and listed in the season picker as "Specials". It is left out of progress counts, which count seasons numbered 1 or more (ruling, owner may overrule).
 - **Season picker:** it uses one summary TMDB request and stores nothing. Only the import writes the catalogue.
-- **Provider failures** are logged server-side with the provider name and HTTP status only, never query text or user data (INV-006).
+- **Provider failures** are logged server-side with the provider name and HTTP status only, never query text or user data (INV-006). A refresh logs a failed item by its catalogue id and the error's code or name only.
 - **Provider storage under the Twitch agreement is still unconfirmed:** the Twitch Developer Service Agreement's terms on storing IGDB data have not been read.
 
 ## Before going commercial
@@ -55,6 +55,13 @@ A checklist, asked for by the owner (owner said, 2026-11-26). upnext is personal
 - **IGDB:** free only for non-commercial use under the Twitch Developer Service Agreement. Monetised use goes through an IGDB partnership (partner@igdb.com).
 - **If access ever ends:** TMDB content must be purged, cached copies included.
 - **Recheck both providers' current terms at that point.**
+
+## Before public signups
+
+Release checks for the day signups open to people other than the owner, from the branch's final review (final review, 2026-11-26).
+
+- **Cap imports per user:** add a per-user import cap or rate limit before signups open. Any signed-in account can import items, and every imported item joins the global refresh queue, so one account could flood it and push everyone else's items past the 150-day purge (final review, 2026-11-26).
+- **Confirm or undo Remove:** before any notes or play-count UI lands, Remove needs a confirmation or an undo. Deleting an entry cascades to its notes, so one stray click would lose them for good (INV-003) (final review, 2026-11-26).
 
 ## Rules of thumb
 
