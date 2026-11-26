@@ -202,14 +202,13 @@ export async function setEntryStatus(
   if (!data.length) throw new Error("That entry isn't in your library.");
 }
 
-/** Deletes one of the user's entries. Throws when no row went: see setEntryStatus. */
+/**
+ * Deletes one of the user's entries. Idempotent: when no row goes, the entry
+ * is already gone (a double-click on Remove), which is success. The filter on
+ * the user, and RLS, mean another user's entry is never deleted (INV-001),
+ * and the same quiet success tells the caller nothing about it.
+ */
 export async function deleteEntry(supabase: Client, userId: string, entryId: string): Promise<void> {
-  const { data, error } = await supabase
-    .from("library_entries")
-    .delete()
-    .eq("id", entryId)
-    .eq("user_id", userId)
-    .select("id");
+  const { error } = await supabase.from("library_entries").delete().eq("id", entryId).eq("user_id", userId);
   if (error) throw error;
-  if (!data.length) throw new Error("That entry isn't in your library.");
 }

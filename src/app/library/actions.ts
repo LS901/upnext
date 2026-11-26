@@ -11,7 +11,8 @@ import { createClient } from "@/lib/supabase/server";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Both write as the user: RLS lets them touch only their own entries
-// (INV-001), and an entry they don't own changes nothing, which throws.
+// (INV-001). A status change to an entry they don't own changes nothing,
+// which throws; a remove of one that's gone (or not theirs) is a no-op.
 
 export async function setStatus(formData: FormData) {
   const entryId = text(formData, "entryId");

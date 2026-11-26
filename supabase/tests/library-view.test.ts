@@ -141,7 +141,10 @@ describe("My library", () => {
     await expect(setEntryStatus(a.client, b.id, entry.bMovie, "finished")).rejects.toThrow(
       "That entry isn't in your library.",
     );
-    await expect(deleteEntry(a.client, b.id, entry.bS1)).rejects.toThrow("That entry isn't in your library.");
+    // A delete reads "already gone" either way, so it tells the caller
+    // nothing about another user's entry, and removes nothing.
+    await expect(deleteEntry(a.client, a.id, entry.bS1)).resolves.toBeUndefined();
+    await expect(deleteEntry(a.client, b.id, entry.bS1)).resolves.toBeUndefined();
 
     const { data } = await adminClient().from("library_entries").select("id, status").in("id", [entry.bMovie, entry.bS1]);
     expect(data).toEqual(
@@ -169,6 +172,7 @@ describe("My library", () => {
       .select("id", { count: "exact", head: true })
       .eq("id", entry.aMovie);
     expect(count).toBe(0);
-    await expect(deleteEntry(a.client, a.id, entry.aMovie)).rejects.toThrow("That entry isn't in your library.");
+    // A second Remove (a double-click) finds it already gone: that's success.
+    await expect(deleteEntry(a.client, a.id, entry.aMovie)).resolves.toBeUndefined();
   });
 });

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { seasonLabel } from "@/app/search/season-label";
-import { quietButton, TYPE_LABELS } from "@/app/ui";
+import { TYPE_LABELS } from "@/app/ui";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { formatDuration } from "@/lib/format/duration";
 import { formatScore } from "@/lib/format/score";
@@ -12,6 +12,7 @@ import { getMyLibrary, type ItemRow, type LibraryGroup, type SeasonRow, type Sho
 import type { EntryStatus } from "@/lib/library/status";
 import { createClient } from "@/lib/supabase/server";
 import { removeEntry, setStatus } from "./actions";
+import { RemoveButton } from "./remove-button";
 import { StatusSelect } from "./status-select";
 
 export const metadata: Metadata = { title: "My library" };
@@ -140,9 +141,7 @@ function EntryControls({ entryId, status }: { entryId: string; status: EntryStat
       </form>
       <form action={removeEntry}>
         <input type="hidden" name="entryId" value={entryId} />
-        <button type="submit" className={quietButton}>
-          Remove
-        </button>
+        <RemoveButton />
       </form>
     </div>
   );

@@ -186,3 +186,37 @@ test("a show with only specials reads No seasons yet", async ({ page }) => {
   await expect(show).toContainText("No score");
   await expect(seasonRow(show, "Specials")).toContainText("Time to finish: unknown");
 });
+
+test("a double-click on Remove removes the entry once, with no error page", async ({ page, account }) => {
+  const label = "Season 3 · 6 episodes · 2024";
+  await page.goto("/search/show/9101");
+  await page.getByRole("checkbox", { name: label, exact: true }).check();
+  await page.getByRole("button", { name: "Add seasons" }).click();
+  await expect(page).toHaveURL("/search/show/9101?added=1");
+
+  await page.goto("/library");
+  const season = seasonRow(row(group(page, "Backlog"), "Harbour of Glass"), label);
+  await expect(season.getByRole("button", { name: "Remove" })).toBeEnabled(); // hydrated
+  await season.getByRole("button", { name: "Remove" }).dblclick();
+
+  await expect(page.getByRole("heading", { level: 4, name: label })).toHaveCount(0);
+  await expect(page.getByRole("heading", { level: 1, name: "My library" })).toBeVisible();
+  await expect(page.getByText("Something went wrong")).toHaveCount(0);
+  await expect(page.getByText(/This page couldn.t load|Application error/)).toHaveCount(0); // Next's default
+
+  const admin = adminClient();
+  const { data: show } = await admin
+    .from("items")
+    .select("id")
+    .eq("provider", "tmdb")
+    .eq("media_type", "show")
+    .eq("provider_id", "9101")
+    .single();
+  const { data: season3 } = await admin.from("seasons").select("id").eq("show_id", show!.id).eq("season_number", 3).single();
+  const { count } = await admin
+    .from("library_entries")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", await userId(account.username))
+    .eq("season_id", season3!.id);
+  expect(count).toBe(0);
+});
