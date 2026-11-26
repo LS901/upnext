@@ -12,13 +12,14 @@ what's next, and what you've finished. Installable web app (PWA).
 - Install: `npm install` (first e2e run also needs `npx playwright install chromium`)
 - Dev: `npm run dev`
 - Local DB: `npx supabase start` / `npx supabase db reset` (applies migrations + seed)
+- DB types: `npm run db:types` regenerates `src/lib/supabase/database.types.ts`; run it after every migration
 - Lint: `npm run lint` · Types: `npm run typecheck` · Tests: `npm test` · E2E: `npm run e2e`
 
 ## Check command (definition of done)
 `npm run check` = `npm run lint && npm run typecheck && npm test`
 One test file: `npx vitest run src/path/to/file.test.tsx`
 `npm run e2e` builds the app and serves it on port 3100.
-Boundary tests that hit the DB need `npx supabase start` running first.
+`npm test` (so `npm run check`) and `npm run e2e` need `npx supabase start` running first: the database boundary tests in `supabase/tests/` fail without it, on purpose.
 
 ## Where things live
 - `src/app/`: routes and route handlers; unit tests sit beside them as `*.test.tsx`

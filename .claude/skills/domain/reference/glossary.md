@@ -1,6 +1,6 @@
 Last reviewed: 2026-11-26
 
-Sources: owner interview, 2026-11-26 (Lewis); API research, 2026-11-26 (TMDB API terms and FAQ, IGDB API docs, community reports linked in `metadata.md`); owner follow-up, 2026-11-26 (no user ratings, a status per season, one entry per item with a play count, private lists). The app is scaffolded but has no library code yet.
+Sources: owner interview, 2026-11-26 (Lewis); API research, 2026-11-26 (TMDB API terms and FAQ, IGDB API docs, community reports linked in `metadata.md`); owner follow-up, 2026-11-26 (no user ratings, a status per season, one entry per item with a play count, private lists); owner decisions on show progress, sign-in and books, 2026-11-26; `supabase/migrations/`. The data model exists; there are no library pages yet.
 
 # Glossary
 
@@ -8,7 +8,7 @@ Paths below are relative to the named repo. Examples are invented.
 
 | Term | Meaning | Source |
 |---|---|---|
-| **Media type** | One of `movie`, `show` (TV) or `game`. Every item has exactly one. | owner said (2026-11-26) |
+| **Media type** | One of `movie`, `show` (TV) or `game`. Every item has exactly one. `book` is planned as a fourth, after the TMDB and IGDB import. | owner said (2026-11-26) |
 | **Item** | A movie, show or game in the shared catalogue, described by metadata from a provider (see `metadata.md`). It belongs to no user. | owner said (2026-11-26) |
 | **Library** | One user's collection of library entries. | owner said (2026-11-26) |
 | **Library entry** | A user's own record of one item: status (per season for shows), play count, notes and dates. A user has at most one entry per item. The user owns this data, not the provider. | owner said (2026-11-26) |
@@ -20,6 +20,8 @@ Paths below are relative to the named repo. Examples are invented.
 | **Paused** | Started, then put on hold, with the intent to return. | owner said (2026-11-26) |
 | **Dropped** | Started, then abandoned. Kept for the record, not deleted. | owner said (2026-11-26) |
 | **Season progress** | For shows, each season has its own status (Backlog, In progress, Finished, Paused or Dropped). Never tracked per episode. Finishing a season marks only that season Finished. | owner said (2026-11-26) |
+| **Progress exclusion** | A season a user leaves out of a show's progress count, for example the seasons of an anthology they don't plan to watch. It never changes the season's entry, and a user can exclude a season they never added. Stored in `progress_exclusions`. | owner said (2026-11-26); `supabase/migrations/20261126083314_notes_and_exclusions.sql` |
+| **Show progress** | A summary derived from a show's seasons, such as "2 of 4 seasons finished": the Finished season entries that aren't excluded, out of all seasons minus the exclusions. A show has no status of its own. | owner said (2026-11-26) |
 | **Time to finish** | How long an item takes. Movie: its runtime. Show: the sum of episode runtimes, per season and in total. Game: its time to beat. | owner said (2026-11-26) |
 | **Time to beat** | A game's estimated play time from IGDB `game_time_to_beats`: `hastily` (main story), `normally` (story plus some side content) and `completely` (100%), each an average in seconds, with `count` submissions behind it. | research: IGDB API docs (2026-11-26) |
 | **Metadata provider** | The outside source of item data: TMDB for movies and shows, IGDB for games. | research (2026-11-26); not yet confirmed by owner |
@@ -38,4 +40,4 @@ Guesses that need the owner's word before anyone relies on them.
 
 | Term | Guessed meaning | Source |
 |---|---|---|
-| **Show status** | Whether a show has an overall status of its own, or only its seasons do (perhaps with a summary derived from them). | guess |
+| **Audiobook** | A separate item from its book, with its own entry, status and play count. Whether it is its own media type or a format of book is undecided. | owner said (2026-11-26); type undecided |

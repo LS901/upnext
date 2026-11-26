@@ -1,6 +1,6 @@
 Last reviewed: 2026-11-26
 
-Sources: owner interview and follow-up, 2026-11-26 (Lewis). No code yet.
+Sources: owner interview and follow-up, 2026-11-26 (Lewis); row-level security in `supabase/migrations/` (libraries, exclusions and notes; lists and spoiler handling have no code yet).
 
 # Sharing and spoilers
 
@@ -10,6 +10,7 @@ Sources: owner interview and follow-up, 2026-11-26 (Lewis). No code yet.
 - **Opt out.** An owner can make their library private, and then nobody else sees it.
 - **Private lists.** Lists are public by default, and the owner can make any single list private (owner said, follow-up 2026-11-26).
 - **Notes are always private**, even in a public library.
+- **Sign-in is by email only** (magic link or 6-digit code). Google and other social sign-in were dropped (owner said, 2026-11-26). A user's email is never shown to others (proposed INV-009).
 - **Read-only.** Nobody but the owner ever changes a library (INV-001). Visibility rules are INV-002.
 
 ## Spoilers (owner said, 2026-11-26)
