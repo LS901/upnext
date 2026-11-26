@@ -22,7 +22,7 @@ One test file: `npx vitest run src/path/to/file.test.tsx`
 `npm test` (so `npm run check`) and `npm run e2e` need `npx supabase start` running first: the database boundary tests in `supabase/tests/` fail without it, on purpose.
 
 ## Where things live
-- `src/app/`: routes and route handlers; unit tests sit beside them as `*.test.tsx`
+- `src/app/`: routes and route handlers; unit tests sit beside the code they cover (here and in `src/lib/`) as `*.test.ts(x)`
 - `e2e/`: Playwright specs
 - `supabase/migrations/`: SQL migrations (source of truth for the schema)
 - `supabase/seed.sql`: invented seed data only, never real users

@@ -1,6 +1,6 @@
 Last reviewed: 2026-11-26
 
-Sources: owner interview, 2026-11-26 (Lewis): picked "library leaks", "silent data loss", "spoilers" and "secrets or data exposed" as must-never-happen. Owner confirmed all seven rules below on 2026-11-26, after setting the visibility model: libraries are public by default and readable by others, owners can opt out to private, notes always stay private, and others never write. Owner follow-up, 2026-11-26: no user ratings, so ratings dropped from INV-001 and INV-003 and play counts added; single lists can be private (INV-002); "more plays on one entry, no duplicates" (INV-008). API research, 2026-11-26, for INV-007. Code today, 2026-11-26: the database model, email sign-in and the INV-005 scan are built (`supabase/migrations/`, `supabase/tests/`, `e2e/`); INV-004, INV-006 and the import half of INV-003 have no code yet. INV-009 was proposed in the same change and awaits the owner.
+Sources: owner interview, 2026-11-26 (Lewis): picked "library leaks", "silent data loss", "spoilers" and "secrets or data exposed" as must-never-happen. Owner confirmed INV-001 to INV-007 on 2026-11-26, after setting the visibility model: libraries are public by default and readable by others, owners can opt out to private, notes always stay private, and others never write. Owner follow-up, 2026-11-26: no user ratings, so ratings dropped from INV-001 and INV-003 and play counts added; single lists can be private (INV-002); "more plays on one entry, no duplicates" (INV-008). API research, 2026-11-26, for INV-007. Code today, 2026-11-26: the database model, email sign-in and the INV-005 scan are built (`supabase/migrations/`, `supabase/tests/`, `e2e/`); INV-004, INV-006 and the import half of INV-003 have no code yet. INV-009 was proposed in the same change; owner confirmed 2026-11-26.
 
 # Invariants: what must never happen
 
@@ -25,7 +25,7 @@ Rules for this file (the team-workflow session-start check enforces them):
 - **Never:** a user creates, changes or deletes another user's library entries, statuses, season progress, play counts, notes or lists. Others may only read, and only what INV-002 allows.
 - **Why:** trust. A library is a personal record, and only its owner may shape it.
 - **Enforced by:** upnext (Supabase row-level security on every user-owned table, allowing writes only where `user_id = auth.uid()`, plus server-side checks in route handlers).
-- **Code today:** Row-level security is on `profiles`, `library_entries`, `entry_notes` and `progress_exclusions`, and every write policy checks `user_id = auth.uid()` (`id = auth.uid()` for profiles). `items` and `seasons` have no write policies, so only the service role writes the catalogue. Tests, run against local Supabase through the real client: `supabase/tests/profiles.test.ts`, `library-entries.test.ts`, `notes-and-exclusions.test.ts` and `catalogue.test.ts`. Gap: lists don't exist yet, so list writes are untested; no route handler writes user data yet.
+- **Code today:** Row-level security is on `profiles`, `library_entries`, `entry_notes` and `progress_exclusions`, and every write policy checks `user_id = auth.uid()` (`id = auth.uid()` for profiles). `items` and `seasons` have no write policies, so only the service role writes the catalogue. Tests, run against local Supabase through the real client: `supabase/tests/profiles.test.ts`, `library-entries.test.ts`, `notes-and-exclusions.test.ts` and `catalogue.test.ts`. Accounts can't be claimed by someone else: sign-in is email only, and the Auth layer refuses passwords (`supabase/migrations/20261126120000_refuse_passwords.sql`, `enable_confirmations` in `supabase/config.jsonc`), so a password sign-up for another person's address never gets a session or a working password (`supabase/tests/auth.test.ts`). Gap: lists don't exist yet, so list writes are untested; no route handler writes user data yet.
 - **Test at the boundary:** against local Supabase, sign in as invented user B and insert, update and delete user A's entries, season statuses and lists through the real client (anon key with B's session). Expect every write rejected and A's rows unchanged.
 - **Status:** Confirmed
 
@@ -85,14 +85,14 @@ Rules for this file (the team-workflow session-start check enforces them):
 - **Test at the boundary:** as an invented user, add the same item twice through the real add handler, then import a file listing it again. Expect one entry, and a direct insert of a duplicate row rejected by the database.
 - **Status:** Confirmed
 
+### INV-009 — A user's email is never shown to anyone else
+- **Never:** a user's email address appears to another user or a signed-out visitor: in a profile, a library page, a username, an API response or a page's HTML.
+- **Why:** privacy. Profiles and libraries are public by default, so anything copied into them is world-readable. Proposed in the library and sign-in design, 2026-11-26; owner confirmed 2026-11-26.
+- **Enforced by:** upnext (the `profiles` table has no email column; the sign-up trigger makes a random username; pages and handlers must never select from `auth.users`).
+- **Code today:** `profiles` holds no email, and `handle_new_user()` generates `user-` plus 8 random characters (`supabase/migrations/20261126082056_profiles.sql`). Tests: `supabase/tests/profiles.test.ts` ("signing up creates a profile with a generated username", "profiles have no email column"). Gap: the profiles update policy lets a user set their own username to anything; unrestricted username edits are accepted for now, so a user could set an email-like username themselves. Username rules are a later task. The email also appears in the `/login?sent=` URL in the user's own browser.
+- **Test at the boundary:** as invented user A, render A's public profile and library signed out and as user B. Expect the email, and its local part, nowhere in the HTML or responses.
+- **Status:** Confirmed
+
 ## Unconfirmed
 
 <!-- New rules go here until the owner confirms them. -->
-
-### INV-009 — A user's email is never shown to anyone else
-- **Never:** a user's email address appears to another user or a signed-out visitor: in a profile, a library page, a username, an API response or a page's HTML.
-- **Why:** privacy. Profiles and libraries are public by default, so anything copied into them is world-readable. Proposed in the library and sign-in design, 2026-11-26; owner to confirm.
-- **Enforced by:** upnext (the `profiles` table has no email column; the sign-up trigger makes a random username; pages and handlers must never select from `auth.users`).
-- **Code today:** `profiles` holds no email, and `handle_new_user()` generates `user-` plus 8 random characters (`supabase/migrations/20261126082056_profiles.sql`). Tests: `supabase/tests/profiles.test.ts` ("signing up creates a profile with a generated username", "profiles have no email column"). Gap: the profiles update policy lets a user set their own username to anything, including an email; username rules are a later task. The email also appears in the `/login?sent=` URL in the user's own browser.
-- **Test at the boundary:** as invented user A, render A's public profile and library signed out and as user B. Expect the email, and its local part, nowhere in the HTML or responses.
-- **Status:** Unconfirmed

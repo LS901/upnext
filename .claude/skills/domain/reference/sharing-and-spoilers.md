@@ -1,16 +1,16 @@
 Last reviewed: 2026-11-26
 
-Sources: owner interview and follow-up, 2026-11-26 (Lewis); row-level security in `supabase/migrations/` (libraries, exclusions and notes; lists and spoiler handling have no code yet).
+Sources: owner interview and follow-up, 2026-11-26 (Lewis); owner answers, 2026-11-26 (library-wide private switch stays, INV-009 confirmed); row-level security in `supabase/migrations/` (libraries, exclusions and notes; lists and spoiler handling have no code yet).
 
 # Sharing and spoilers
 
 ## Visibility (owner said, 2026-11-26)
 
 - **Public by default.** Other users, and signed-out visitors, can read a user's library: statuses, season progress, play counts and lists.
-- **Opt out.** An owner can make their library private, and then nobody else sees it.
+- **Opt out.** An owner can make their whole library private with one switch, and then nobody else sees it. The switch stays alongside private lists (owner confirmed, 2026-11-26). In the database it is `profiles.library_private`.
 - **Private lists.** Lists are public by default, and the owner can make any single list private (owner said, follow-up 2026-11-26).
 - **Notes are always private**, even in a public library.
-- **Sign-in is by email only** (magic link or 6-digit code). Google and other social sign-in were dropped (owner said, 2026-11-26). A user's email is never shown to others (proposed INV-009).
+- **Sign-in is by email only** (magic link or 6-digit code). Google and other social sign-in were dropped (owner said, 2026-11-26). A user's email is never shown to others (INV-009, owner confirmed 2026-11-26).
 - **Read-only.** Nobody but the owner ever changes a library (INV-001). Visibility rules are INV-002.
 
 ## Spoilers (owner said, 2026-11-26)
@@ -20,6 +20,5 @@ Sources: owner interview and follow-up, 2026-11-26 (Lewis); row-level security i
 
 ## Unconfirmed
 
-- **Library-level opt-out**: the follow-up ("everything public by default, except notes, with separate private lists") didn't mention making the whole library private. Does that opt-out stay? Assumed yes until the owner says otherwise.
 - **Spoilers on someone else's library**: when viewing another user's library, are spoilers judged against the viewer's progress or hidden entirely? Probably the viewer's. Owner to confirm.
 - **Spoiler opt-in**: per show, or one global setting? Owner to confirm.

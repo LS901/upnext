@@ -1,6 +1,6 @@
 Last reviewed: 2026-11-26
 
-Sources: owner interview and follow-up, 2026-11-26 (Lewis); owner decisions on show progress and books, 2026-11-26; schema in `supabase/migrations/20261126082919_library_entries.sql` and `20261126083314_notes_and_exclusions.sql`. The data model and its row-level security exist; there are no library pages or handlers yet.
+Sources: owner interview and follow-up, 2026-11-26 (Lewis); owner decisions on show progress and books, 2026-11-26; owner on audiobooks (a version under books, picked with a selector), 2026-11-26; schema in `supabase/migrations/20261126082919_library_entries.sql` and `20261126083314_notes_and_exclusions.sql`. The data model and its row-level security exist; there are no library pages or handlers yet.
 
 # Library and status
 
@@ -45,12 +45,13 @@ Books become a **fourth media type**, planned for after the TMDB and IGDB import
 
 - A book is tracked like a movie: one status for the item, and a play count for rereads.
 - A **book series works like a show**: each book is its own entity with its own status, and a series progress such as "3 of 7 read" is derived, with the same exclusions (owner said, 2026-11-26).
-- An **audiobook is a separate item from its book**, with its own entry, status and play count (owner said, 2026-11-26).
-- The provider is proposed in `metadata.md` (Open Library, unconfirmed).
+- **Audiobooks live under books**, not as a media type of their own. When a user adds a book, a selector lets them pick the audiobook version, and that version is tracked as its own entry, with its own status and play count (owner said, 2026-11-26).
+- The provider is proposed in `metadata.md` (still unconfirmed; the books task starts by comparing free sources).
 
 ## Unconfirmed
 
 - **Leaving up next**: probably an item drops off the shortlist when it moves to In progress. Owner to confirm.
 - **Transitions**: probably any status can move to any other. Is there anything that should be blocked, for example Backlog straight to Finished? Owner to confirm.
-- **Audiobooks**: whether an audiobook is its own media type or a format of book, and where audiobook data comes from. Left to the books task.
+- **Print and audiobook of one book**: whether one user can track both versions of the same book at once, and how that squares with one entry per item (INV-008). Left to the books task.
+- **Audiobook data**: where audiobook editions, narrators and lengths come from. Left to the books task.
 - **Dates**: which dates are kept (added, started, finished), and whether they can be edited. Owner to confirm.

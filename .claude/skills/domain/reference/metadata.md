@@ -1,6 +1,6 @@
 Last reviewed: 2026-11-26
 
-Sources: owner interview, 2026-11-26 (Lewis); API research, 2026-11-26: TMDB API Terms of Use (themoviedb.org/api-terms-of-use) and FAQ (developer.themoviedb.org/docs/faq); IGDB API docs (api-docs.igdb.com) and partnership page (igdb.com/api); Letterboxd API page (letterboxd.com/api-beta); community reports on HowLongToBeat wrappers; owner follow-up, 2026-11-26 (review scores); owner on books, 2026-11-26; Open Library proposal from research, not yet checked against its docs. No provider code yet.
+Sources: owner interview, 2026-11-26 (Lewis); API research, 2026-11-26: TMDB API Terms of Use (themoviedb.org/api-terms-of-use) and FAQ (developer.themoviedb.org/docs/faq); IGDB API docs (api-docs.igdb.com) and partnership page (igdb.com/api); Letterboxd API page (letterboxd.com/api-beta); community reports on HowLongToBeat wrappers; owner follow-up, 2026-11-26 (review scores); owner on books, 2026-11-26; Open Library proposal from research, not yet checked against its docs; owner on the book provider (Open Library if it is the best free source, after a comparison), 2026-11-26. No provider code yet.
 
 # Metadata: where item data comes from
 
@@ -16,7 +16,9 @@ The owner asked for useful item info when items are pulled in: time to finish fo
 
 ## Books (planned)
 
-Books are a planned fourth media type, after the TMDB and IGDB import (owner said, 2026-11-26). Proposed provider, **unconfirmed** and not yet checked against its docs: **Open Library**. It is free, needs no key and its data is open. Time to finish would come from the page count, and the review score from its ratings. Check the fields and terms when the books task starts. Series and audiobooks are described in `library-and-status.md`.
+Books are a planned fourth media type, after the TMDB and IGDB import (owner said, 2026-11-26). Proposed provider, not yet checked against its docs: **Open Library**. It is free, needs no key and its data is open. Time to finish would come from the page count, and the review score from its ratings.
+
+The owner accepts Open Library **if it is the best free source** (owner said, 2026-11-26), so it stays proposed. The books task starts by comparing free book sources (Open Library, Google Books, Hardcover) on series data, audiobook editions, ratings and terms, and picks from that. Series and audiobooks are described in `library-and-status.md`.
 
 ## Review scores
 
@@ -44,4 +46,4 @@ Show the vote count beside a score, and "no score" rather than 0 when a score is
 - The owner has not formally chosen the providers above (INV-007, which the owner confirmed, names them).
 - How long provider data may be cached or stored. One community reading of TMDB's terms says server-side caching isn't allowed, but that is not an official ruling. Read the current terms before designing storage.
 - Whether users can override provider fields, for example a custom time to beat.
-- Open Library as the book provider, and where audiobook data comes from.
+- The book provider: Open Library if the comparison with Google Books and Hardcover finds it the best free source (owner said, 2026-11-26), and where audiobook data comes from.
