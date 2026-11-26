@@ -6,6 +6,7 @@ import { importItem, type ImportedItem } from "@/lib/catalogue/import";
 import { ProviderError, type MediaType, type Provider } from "@/lib/providers/types";
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
+import { text, texts } from "@/app/form-data";
 import { parseSearch, searchHref } from "./params";
 import { logProviderFailure, PROVIDER_ID } from "./shared";
 
@@ -15,14 +16,6 @@ type NewEntry = Pick<
 >;
 
 const SEASON_NUMBER = /^\d{1,4}$/;
-
-// Form fields are untrusted: a field that isn't text (a file) counts as absent.
-const text = (formData: FormData, name: string): string => {
-  const value = formData.get(name);
-  return typeof value === "string" ? value : "";
-};
-const texts = (formData: FormData, name: string): string[] =>
-  formData.getAll(name).filter((v): v is string => typeof v === "string");
 
 // Adds a movie or game to the signed-in user's Backlog. Only the provider and
 // its id come from the form: importItem fetches everything else itself.

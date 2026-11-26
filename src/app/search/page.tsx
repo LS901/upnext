@@ -3,6 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
+import { primaryButton, quietButton, TYPE_LABELS } from "@/app/ui";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { inLibrary, itemKey, type ItemKey } from "@/lib/library/in-library";
 import { searchIgdb } from "@/lib/providers/igdb";
@@ -12,16 +13,14 @@ import { createClient } from "@/lib/supabase/server";
 import { addItem } from "./actions";
 import { summarise, type Answer, type Outcome } from "./outcome";
 import { MAX_QUERY_LENGTH, parseSearch, type SearchState } from "./params";
-import { logProviderFailure, primaryButton, PROVIDER_NAMES } from "./shared";
+import { logProviderFailure, PROVIDER_NAMES } from "./shared";
 
 export const metadata: Metadata = { title: "Search" };
 
-const TYPE_LABELS: Record<MediaType, string> = { movie: "Movie", show: "TV", game: "Game" };
 const HIDE_LABELS: Record<MediaType, string> = { movie: "Movies", show: "TV", game: "Games" };
 
 const input =
   "mt-1 block w-full rounded-md border border-black/20 bg-transparent px-3 py-2 dark:border-white/20";
-const quiet = "rounded-md border border-black/20 px-3 py-1.5 text-sm dark:border-white/20";
 
 export default function SearchPage({ searchParams }: PageProps<"/search">) {
   return (
@@ -147,7 +146,7 @@ function Result({ result: r, owned, state }: { result: SearchResult; owned: bool
       </div>
       <div className="flex items-center gap-3">
         {owned && (
-          <button type="button" disabled className={`${quiet} opacity-60`}>
+          <button type="button" disabled className={`${quietButton} opacity-60`}>
             In your library
           </button>
         )}
@@ -165,7 +164,7 @@ function Result({ result: r, owned, state }: { result: SearchResult; owned: bool
               {state.exclude.map((type) => (
                 <input key={type} type="hidden" name="exclude" value={type} />
               ))}
-              <button type="submit" className={quiet}>
+              <button type="submit" className={quietButton}>
                 Add
               </button>
             </form>

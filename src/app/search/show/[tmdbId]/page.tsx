@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { cache, Suspense } from "react";
+import { primaryButton } from "@/app/ui";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { seasonsInLibrary } from "@/lib/library/in-library";
 import { getTmdbShowSeasons } from "@/lib/providers/tmdb";
@@ -8,7 +9,7 @@ import { ProviderError, type ShowSeasons } from "@/lib/providers/types";
 import { createClient } from "@/lib/supabase/server";
 import { addSeasons } from "../../actions";
 import { seasonLabel } from "../../season-label";
-import { logProviderFailure, primaryButton, PROVIDER_ID, PROVIDER_NAMES } from "../../shared";
+import { logProviderFailure, PROVIDER_ID, PROVIDER_NAMES } from "../../shared";
 
 // The metadata and the page share one session check and one TMDB request per render.
 const currentUser = cache(getCurrentUser);
