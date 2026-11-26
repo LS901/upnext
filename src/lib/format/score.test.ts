@@ -12,6 +12,6 @@ test("no score is No score", () => {
   expect(formatScore(null, 12)).toBe("No score");
 });
 
-test("an unknown vote count is said to be unknown", () => {
-  expect(formatScore(64, null)).toBe("Score 64/100 (votes unknown)");
+test("an unknown vote count is left out", () => {
+  expect(formatScore(64, null)).toBe("Score 64/100");
 });

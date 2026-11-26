@@ -50,7 +50,7 @@ Books become a **fourth media type**, planned for after the TMDB and IGDB import
 
 ## Unconfirmed
 
-- **Leaving up next**: probably an item drops off the shortlist when it moves to In progress. Owner to confirm. Today's code (`setEntryStatus` in `src/lib/library/queries.ts`) clears `up_next_position` whenever an entry moves to any status other than Backlog, because the schema check allows a position only while the status is Backlog. That follows from the schema, not from an owner decision, so the owner must confirm it and the question stays open.
+- **Leaving up next**: an entry drops off the shortlist when it moves to any status other than Backlog. If it later returns to Backlog, it does not get its old place back (owner said, 2026-11-26). `setEntryStatus` in `src/lib/library/queries.ts` clears `up_next_position`, which the schema check also requires.
 - **Transitions**: probably any status can move to any other. Is there anything that should be blocked, for example Backlog straight to Finished? Owner to confirm.
 - **Print and audiobook of one book**: whether one user can track both versions of the same book at once, and how that squares with one entry per item (INV-008). Left to the books task.
 - **Audiobook data**: where audiobook editions, narrators and lengths come from. Left to the books task.

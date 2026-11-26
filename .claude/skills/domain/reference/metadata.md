@@ -29,7 +29,7 @@ The owner wants review info pulled in from the providers, and upnext has no user
 | TMDB (movie, show) | `vote_average` (out of 10), `vote_count` | `vote_average × 10`, rounded to 2 decimals, with `vote_count` |
 | IGDB (game) | `total_rating` (out of 100, users and critics together), `total_rating_count` | `total_rating` as it is, with `total_rating_count` |
 
-- A score with no votes, or out of range, is **null, never 0**. The library page shows "No score", and "(votes unknown)" when the score exists but its count doesn't. These are copy choices, not owner-confirmed.
+- A score with no votes, or out of range, is **null, never 0**. The library page shows "No score". When the score exists but its count doesn't, it shows the score alone, with no vote count (owner said, 2026-11-26).
 - For games the combined `total_rating` is used, not the critics' `aggregated_rating` alone (ruling, owner may overrule). Confirm before the library UI hardens.
 - Show the vote count beside the score (`src/lib/format/score.ts`).
 
