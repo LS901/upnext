@@ -1,0 +1,5 @@
+[
+  { "id": 5001, "name": "Lantern Keep", "first_release_date": 1577836800, "cover": { "id": 1, "image_id": "co1abc" } },
+  { "id": 5002, "name": "Undated Game" },
+  { "id": 5003, "first_release_date": 1577836800 }
+]
