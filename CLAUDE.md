@@ -29,4 +29,5 @@ Boundary tests that hit the DB need `npx supabase start` running first.
 
 ## Conventions
 - Secrets go in `.env.local` (gitignored). Never commit Supabase service-role keys.
-- Domain terms and invariants come from the `team-workflow:domain` skill; don't copy them here.
+- Domain terms and invariants live in the `domain` skill (`.claude/skills/domain/`); technical
+  reference in `.claude/skills/tech-reference/`. Don't copy them into this file.

@@ -1,6 +1,6 @@
 {
   "extraKnownMarketplaces": {
-    "upnext-workflow": { "source": { "source": "github", "repo": "LS901/upnext-workflow" } }
+    "agent-workflow": { "source": { "source": "github", "repo": "LS901/agent-workflow" } }
   },
-  "enabledPlugins": { "team-workflow@upnext-workflow": true }
+  "enabledPlugins": { "team-workflow@agent-workflow": true }
 }
