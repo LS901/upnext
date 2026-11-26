@@ -1,5 +1,9 @@
 // @vitest-environment node
-import { AuthRetryableFetchError, AuthSessionMissingError } from "@supabase/supabase-js";
+import {
+  AuthApiError,
+  AuthRetryableFetchError,
+  AuthSessionMissingError,
+} from "@supabase/supabase-js";
 import { beforeEach, expect, test, vi } from "vitest";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "./current-user";
@@ -36,7 +40,36 @@ test("returns null when there is no session", async () => {
   await expect(getCurrentUser()).resolves.toBeNull();
 });
 
-test("throws on any other auth error", async () => {
+// A deleted account, a revoked session or a token signed with a rotated key: the
+// cookie still holds a token, but Supabase Auth rejects it. That is signed out.
+test("returns null when Auth rejects the token as a deleted user (403)", async () => {
+  useClient(
+    fakeClient({
+      data: { user: null },
+      error: new AuthApiError("User from sub claim in JWT does not exist", 403, "user_not_found"),
+    }),
+  );
+  await expect(getCurrentUser()).resolves.toBeNull();
+});
+
+test("returns null when Auth rejects the token as invalid (401)", async () => {
+  useClient(
+    fakeClient({ data: { user: null }, error: new AuthApiError("invalid JWT", 401, "bad_jwt") }),
+  );
+  await expect(getCurrentUser()).resolves.toBeNull();
+});
+
+test("throws when Auth fails with a server error", async () => {
+  useClient(
+    fakeClient({
+      data: { user: null },
+      error: new AuthApiError("Database error", 500, "unexpected_failure"),
+    }),
+  );
+  await expect(getCurrentUser()).rejects.toThrow(/Database error/);
+});
+
+test("throws when Auth can't be reached", async () => {
   useClient(fakeClient({ data: { user: null }, error: new AuthRetryableFetchError("fetch failed", 0) }));
   await expect(getCurrentUser()).rejects.toThrow(/fetch failed/);
 });

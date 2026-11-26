@@ -1,18 +1,23 @@
 import "server-only";
-import { isAuthSessionMissingError } from "@supabase/supabase-js";
+import { isAuthApiError, isAuthSessionMissingError } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 
 export type CurrentUser = { id: string; username: string };
 
-// The signed-in user, or null when there's no session. Any other failure throws,
-// so an outage never looks like being signed out. Reads the session cookie, so
-// anything that calls this renders at request time and must sit inside <Suspense>.
+// The signed-in user, or null when there's no session or Supabase Auth rejects
+// the token (401 or 403: a deleted account, a revoked session, a rotated signing
+// key). Any other failure throws, so an outage never looks like being signed out.
+// Reads the session cookie, so anything that calls this renders at request time
+// and must sit inside <Suspense>.
 export async function getCurrentUser(): Promise<CurrentUser | null> {
   const supabase = await createClient();
 
   // getUser() checks the token with Supabase Auth rather than trusting the cookie.
   const auth = await supabase.auth.getUser();
   if (isAuthSessionMissingError(auth.error)) return null;
+  if (isAuthApiError(auth.error) && (auth.error.status === 401 || auth.error.status === 403)) {
+    return null;
+  }
   if (auth.error) {
     throw new Error(`Couldn't check the session: ${auth.error.message}`, { cause: auth.error });
   }
