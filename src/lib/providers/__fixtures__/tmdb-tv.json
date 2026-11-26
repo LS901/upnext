@@ -1,0 +1,9 @@
+{
+  "id": 9002, "name": "Harbour of Echoes", "poster_path": "/harbour.jpg", "first_air_date": "2021-03-02",
+  "vote_average": 8.1, "vote_count": 560,
+  "seasons": [
+    { "season_number": 0, "name": "Specials", "episode_count": 2, "air_date": null, "overview": "SECRET specials synopsis" },
+    { "season_number": 1, "name": "Season 1", "episode_count": 3, "air_date": "2021-03-02", "overview": "SECRET season one synopsis" },
+    { "season_number": 2, "name": "Season 2", "episode_count": 2, "air_date": "2022-04-05", "overview": "" }
+  ]
+}
