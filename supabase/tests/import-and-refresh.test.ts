@@ -4,11 +4,12 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, inject, t
 import { importItem } from "../../src/lib/catalogue/import";
 import { refreshStaleItems } from "../../src/lib/catalogue/refresh";
 import { resetIgdbTokenForTests } from "../../src/lib/providers/igdb";
-import { POST } from "../../src/app/api/cron/refresh/route";
 import * as cronRoute from "../../src/app/api/cron/refresh/route";
 import { adminClient, createTestUser, deleteTestUsers, type TestUser } from "./helpers";
 
 vi.mock("server-only", () => ({}));
+
+const { POST } = cronRoute;
 
 const TMDB = "http://tmdb.test/3";
 const IGDB = "http://igdb.test/v4";
@@ -119,17 +120,34 @@ function stubGame(id: string, name: string, normally: number | null = 54000) {
 
 const createdItems: string[] = [];
 
-async function track(itemId: string) {
+function track(itemId: string) {
   createdItems.push(itemId);
   return itemId;
 }
 
-async function setItem(id: string, patch: { refreshed_at?: string; created_at?: string }) {
-  const { error } = await adminClient().from("items").update(patch).eq("id", id);
+async function setItem(
+  id: string,
+  patch: { refreshed_at?: string; created_at?: string; refresh_attempted_at?: string },
+) {
+  // Ageing refreshed_at ages the last attempt with it, as time passing would.
+  const row = { refresh_attempted_at: patch.refreshed_at, ...patch };
+  const { error } = await adminClient().from("items").update(row).eq("id", id);
   expect(error).toBeNull();
 }
 
 const daysAgo = (n: number) => new Date(Date.now() - n * DAY).toISOString();
+
+/** An item row without the columns every refresh attempt bumps. */
+function withoutAttempt<T extends { refresh_attempted_at: string | null; updated_at: string } | null>(row: T) {
+  if (!row) return row;
+  const { refresh_attempted_at: _attempt, updated_at: _updated, ...rest } = row;
+  void _attempt;
+  void _updated;
+  return rest;
+}
+
+const isRecent = (ts: string | null | undefined) =>
+  ts != null && Date.now() - new Date(ts).getTime() < 60_000;
 
 async function getItem(id: string) {
   const { data, error } = await adminClient().from("items").select("*").eq("id", id).maybeSingle();
@@ -206,12 +224,14 @@ describe("catalogue import and refresh", () => {
     vi.stubEnv("CRON_SECRET", CRON_SECRET);
     vi.stubGlobal("fetch", providerFetch);
 
-    // Only this test's items may be stale, so the refresh counts are exact.
-    const { error } = await adminClient()
-      .from("items")
-      .update({ refreshed_at: new Date().toISOString() })
-      .lt("refreshed_at", daysAgo(1));
-    expect(error).toBeNull();
+    // Only this test's items may be stale or old enough to prune, so the counts
+    // are exact and the seed catalogue other test files rely on is never pruned.
+    const now = new Date().toISOString();
+    const admin = adminClient();
+    const fresh = await admin.from("items").update({ refreshed_at: now }).lt("refreshed_at", daysAgo(1));
+    expect(fresh.error).toBeNull();
+    const young = await admin.from("items").update({ created_at: now }).lt("created_at", daysAgo(1));
+    expect(young.error).toBeNull();
   });
 
   afterEach(async () => {
@@ -243,7 +263,7 @@ describe("catalogue import and refresh", () => {
     ]);
 
     const first = await importItem("tmdb", "show", id);
-    await track(first.itemId);
+    track(first.itemId);
     const second = await importItem("tmdb", "show", id);
 
     expect(second).toEqual(first);
@@ -278,7 +298,7 @@ describe("catalogue import and refresh", () => {
     const id = newId();
     stubGame(id, "Invented Keep");
     const { itemId, seasons } = await importItem("igdb", "game", id);
-    await track(itemId);
+    track(itemId);
     expect(seasons).toEqual([]);
     expect(await getItem(itemId)).toMatchObject({
       media_type: "game",
@@ -299,7 +319,7 @@ describe("catalogue import and refresh", () => {
       { n: 3, runtimes: [20] },
     ]);
     const { itemId, seasons } = await importItem("tmdb", "show", id);
-    await track(itemId);
+    track(itemId);
     const s = Object.fromEntries(seasons.map((x) => [x.number, x.id]));
 
     const e1 = await addSeasonEntry(a, s[1], { status: "finished", play_count: 2 });
@@ -322,6 +342,9 @@ describe("catalogue import and refresh", () => {
     const again = await importItem("tmdb", "show", id);
 
     expect(again.itemId).toBe(itemId);
+    // The dropped season is still returned: a user tracks it.
+    expect(again.seasons.map((x) => x.number)).toEqual([1, 2, 3, 4]);
+    expect(again.seasons.find((x) => x.number === 2)?.id).toBe(s[2]);
     expect((await getItem(itemId))?.title).toBe("Invented Harbour (Renamed)");
     const after = await getSeasons(itemId);
     expect(after.map((x) => [x.season_number, x.runtime_minutes])).toEqual([
@@ -347,7 +370,7 @@ describe("catalogue import and refresh", () => {
     tmdbRoutes[`/tv/${id}/season/2`] = fail(500);
 
     const { itemId, seasons } = await importItem("tmdb", "show", id);
-    await track(itemId);
+    track(itemId);
     expect(seasons.map((x) => x.number)).toEqual([1, 2, 3]);
     const rows = await getSeasons(itemId);
     expect(rows.map((x) => [x.season_number, x.runtime_minutes, x.episode_count])).toEqual([
@@ -373,9 +396,9 @@ describe("catalogue import and refresh", () => {
     stubMovie(staleId, "Invented Stale");
     stubMovie(failingId, "Invented Failing");
     stubMovie(freshId, "Invented Fresh");
-    const stale = await track((await importItem("tmdb", "movie", staleId)).itemId);
-    const failing = await track((await importItem("tmdb", "movie", failingId)).itemId);
-    const fresh = await track((await importItem("tmdb", "movie", freshId)).itemId);
+    const stale = track((await importItem("tmdb", "movie", staleId)).itemId);
+    const failing = track((await importItem("tmdb", "movie", failingId)).itemId);
+    const fresh = track((await importItem("tmdb", "movie", freshId)).itemId);
     await setItem(stale, { refreshed_at: daysAgo(8) });
     await setItem(failing, { refreshed_at: daysAgo(9) });
     await setItem(fresh, { refreshed_at: daysAgo(6) });
@@ -393,7 +416,9 @@ describe("catalogue import and refresh", () => {
     const staleAfter = await getItem(stale);
     expect(staleAfter).toMatchObject({ title: "Invented Stale (Renamed)", runtime_minutes: 120 });
     expect(Date.now() - new Date(staleAfter!.refreshed_at).getTime()).toBeLessThan(60_000);
-    expect(await getItem(failing)).toEqual(failingBefore);
+    const failingAfter = await getItem(failing);
+    expect(withoutAttempt(failingAfter)).toEqual(withoutAttempt(failingBefore));
+    expect(isRecent(failingAfter!.refresh_attempted_at)).toBe(true);
     expect(await getItem(fresh)).toEqual(freshBefore);
     expect(providerCalls.some((u) => u.includes(`/movie/${freshId}`))).toBe(false);
   });
@@ -402,14 +427,36 @@ describe("catalogue import and refresh", () => {
     const [olderId, newerId] = [newId(), newId()];
     stubMovie(olderId, "Invented Older");
     stubMovie(newerId, "Invented Newer");
-    const older = await track((await importItem("tmdb", "movie", olderId)).itemId);
-    const newer = await track((await importItem("tmdb", "movie", newerId)).itemId);
+    const older = track((await importItem("tmdb", "movie", olderId)).itemId);
+    const newer = track((await importItem("tmdb", "movie", newerId)).itemId);
     await setItem(older, { refreshed_at: daysAgo(20) });
     await setItem(newer, { refreshed_at: daysAgo(10) });
 
     expect(await refreshStaleItems({ limit: 1 })).toMatchObject({ refreshed: 1, failed: 0 });
     expect(new Date((await getItem(older))!.refreshed_at).getTime()).toBeGreaterThan(Date.now() - 60_000);
     expect(new Date((await getItem(newer))!.refreshed_at).getTime()).toBeLessThan(Date.now() - 9 * DAY);
+  });
+
+  test("an item that keeps failing doesn't block the refresh queue", async () => {
+    const [failingId, healthyId] = [newId(), newId()];
+    stubMovie(failingId, "Invented Gone Upstream");
+    stubMovie(healthyId, "Invented Healthy");
+    const failing = track((await importItem("tmdb", "movie", failingId)).itemId);
+    const healthy = track((await importItem("tmdb", "movie", healthyId)).itemId);
+    await setItem(failing, { refreshed_at: daysAgo(20), refresh_attempted_at: daysAgo(20) });
+    await setItem(healthy, { refreshed_at: daysAgo(10), refresh_attempted_at: daysAgo(10) });
+    const failingBefore = await getItem(failing);
+    tmdbRoutes[`/movie/${failingId}`] = fail(404);
+
+    expect(await refreshStaleItems({ limit: 1 })).toMatchObject({ refreshed: 0, failed: 1 });
+    const failingAfter = await getItem(failing);
+    expect(isRecent(failingAfter!.refresh_attempted_at)).toBe(true);
+    expect(failingAfter!.refreshed_at).toBe(failingBefore!.refreshed_at);
+
+    expect(await refreshStaleItems({ limit: 1 })).toMatchObject({ refreshed: 1, failed: 0 });
+    const healthyAfter = await getItem(healthy);
+    expect(isRecent(healthyAfter!.refreshed_at)).toBe(true);
+    expect(isRecent(healthyAfter!.refresh_attempted_at)).toBe(true);
   });
 
   test("a refresh with a failing season keeps the known runtime", async () => {
@@ -419,7 +466,7 @@ describe("catalogue import and refresh", () => {
       { n: 2, runtimes: [200, 200] },
     ]);
     const { itemId } = await importItem("tmdb", "show", id);
-    await track(itemId);
+    track(itemId);
     expect((await getSeasons(itemId)).map((x) => x.runtime_minutes)).toEqual([50, 400]);
     await setItem(itemId, { refreshed_at: daysAgo(8) });
 
@@ -441,7 +488,7 @@ describe("catalogue import and refresh", () => {
     const id = newId();
     stubGame(id, "Invented Quest", 54000);
     const { itemId } = await importItem("igdb", "game", id);
-    await track(itemId);
+    track(itemId);
     await setItem(itemId, { refreshed_at: daysAgo(8) });
 
     stubGame(id, "Invented Quest (Remastered)");
@@ -468,9 +515,9 @@ describe("catalogue import and refresh", () => {
     stubGame(oldGameId, "Invented Old Game");
     stubShow(recentShowId, "Invented Recent Show", [{ n: 1, runtimes: [30] }]);
     const oldShow = await importItem("tmdb", "show", oldShowId);
-    await track(oldShow.itemId);
-    const oldGame = await track((await importItem("igdb", "game", oldGameId)).itemId);
-    const recent = await track((await importItem("tmdb", "show", recentShowId)).itemId);
+    track(oldShow.itemId);
+    const oldGame = track((await importItem("igdb", "game", oldGameId)).itemId);
+    const recent = track((await importItem("tmdb", "show", recentShowId)).itemId);
 
     const s = Object.fromEntries(oldShow.seasons.map((x) => [x.number, x.id]));
     const entry = await addSeasonEntry(a, s[1], { status: "finished", play_count: 2 });
@@ -514,7 +561,7 @@ describe("catalogue import and refresh", () => {
       [s[2], 2, "Season 2", null, null, null],
     ]);
 
-    expect(await getItem(recent)).toEqual(recentBefore);
+    expect(withoutAttempt(await getItem(recent))).toEqual(withoutAttempt(recentBefore));
     expect(await getSeasons(recent)).toEqual(recentSeasonsBefore);
     expect(await userRows(a)).toEqual(userBefore);
   });
@@ -527,7 +574,7 @@ describe("catalogue import and refresh", () => {
     ];
     stubShow(id, "Invented Comeback", seasons);
     const { itemId } = await importItem("tmdb", "show", id);
-    await track(itemId);
+    track(itemId);
     const fullItem = await getItem(itemId);
     const fullSeasons = await getSeasons(itemId);
     await setItem(itemId, { refreshed_at: daysAgo(151) });
@@ -536,6 +583,8 @@ describe("catalogue import and refresh", () => {
     expect(await refreshStaleItems()).toMatchObject({ failed: 1, purged: 1 });
     expect((await getItem(itemId))!.provider_data_purged_at).not.toBeNull();
 
+    // A week later the provider is back.
+    await setItem(itemId, { refresh_attempted_at: daysAgo(8) });
     stubShow(id, "Invented Comeback", seasons);
     expect(await refreshStaleItems()).toMatchObject({ refreshed: 1, failed: 0, purged: 0 });
 
@@ -568,7 +617,7 @@ describe("catalogue import and refresh", () => {
       untrackedYoung: await importItem("tmdb", "show", ids.untrackedYoung),
       movieTracked: await importItem("tmdb", "movie", ids.movieTracked),
     };
-    for (const r of Object.values(imp)) await track(r.itemId);
+    for (const r of Object.values(imp)) track(r.itemId);
 
     await addSeasonEntry(a, imp.tracked.seasons[1].id);
     await addExclusion(a, imp.excludedOnly.seasons[0].id);
@@ -583,7 +632,7 @@ describe("catalogue import and refresh", () => {
     const userBefore = await userRows(a);
 
     const result = await refreshStaleItems();
-    expect(result.pruned).toBeGreaterThanOrEqual(1);
+    expect(result.pruned).toBe(1);
 
     expect(await getItem(imp.untrackedOld.itemId)).toBeNull();
     expect(await getSeasons(imp.untrackedOld.itemId)).toEqual([]);
@@ -600,7 +649,7 @@ describe("catalogue import and refresh", () => {
   test("the cron route rejects a missing or wrong secret", async () => {
     const id = newId();
     stubMovie(id, "Invented Cron");
-    const itemId = await track((await importItem("tmdb", "movie", id)).itemId);
+    const itemId = track((await importItem("tmdb", "movie", id)).itemId);
     await setItem(itemId, { refreshed_at: daysAgo(8) });
     const before = (await getItem(itemId))!.refreshed_at;
     providerCalls.length = 0;
@@ -631,7 +680,7 @@ describe("catalogue import and refresh", () => {
   test("the cron route refreshes with the right secret, and only POST is exported", async () => {
     const id = newId();
     stubMovie(id, "Invented Cron OK");
-    const itemId = await track((await importItem("tmdb", "movie", id)).itemId);
+    const itemId = track((await importItem("tmdb", "movie", id)).itemId);
     await setItem(itemId, { refreshed_at: daysAgo(8) });
     stubMovie(id, "Invented Cron OK (Renamed)");
 

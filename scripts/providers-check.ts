@@ -36,8 +36,13 @@ async function checkIgdb(): Promise<string> {
   tokenUrl.searchParams.set("grant_type", "client_credentials");
   const tokenRes = await fetch(tokenUrl, { method: "POST" });
   if (!tokenRes.ok) return failed(tokenRes);
-  const { access_token: token } = (await tokenRes.json()) as { access_token?: string };
-  if (!token) return "failed (no token)";
+  let token: unknown;
+  try {
+    token = ((await tokenRes.json()) as { access_token?: unknown }).access_token;
+  } catch {
+    return "failed (bad response)";
+  }
+  if (typeof token !== "string" || !token) return "failed (bad response)";
 
   const res = await fetch(`${base("IGDB_API_BASE_URL", "https://api.igdb.com/v4")}/games`, {
     method: "POST",

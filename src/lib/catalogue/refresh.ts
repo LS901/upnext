@@ -22,9 +22,11 @@ export type RefreshResult = {
 const daysAgo = (days: number) => new Date(Date.now() - days * DAY_MS).toISOString();
 
 /**
- * Re-imports the items not refreshed for `olderThanDays`, oldest first, one at
- * a time (the provider clients keep within their rate limits). A provider
- * failure counts as failed and the pass moves on. Then purges provider data
+ * Re-imports the items not refreshed for `olderThanDays`, one at a time (the
+ * provider clients keep within their rate limits). Every attempt is stamped
+ * in refresh_attempted_at, and items not attempted within the same window go
+ * first, so an item that keeps failing upstream can't block the queue. A
+ * provider failure counts as failed and the pass moves on. Then purges provider data
  * that has gone too long without a refresh, and prunes untracked items.
  * Never writes or deletes user data (INV-003).
  */
@@ -34,10 +36,13 @@ export async function refreshStaleItems(
   const { olderThanDays = 7, limit = 50 } = opts;
   const admin = createAdminClient();
 
+  const cutoff = daysAgo(olderThanDays);
   const { data: stale, error } = await admin
     .from("items")
-    .select("provider, media_type, provider_id")
-    .lt("refreshed_at", daysAgo(olderThanDays))
+    .select("id, provider, media_type, provider_id")
+    .lt("refreshed_at", cutoff)
+    .or(`refresh_attempted_at.is.null,refresh_attempted_at.lt."${cutoff}"`)
+    .order("refresh_attempted_at", { ascending: true, nullsFirst: true })
     .order("refreshed_at", { ascending: true })
     .limit(limit);
   if (error) throw error;
@@ -45,6 +50,12 @@ export async function refreshStaleItems(
   let refreshed = 0;
   let failed = 0;
   for (const item of stale) {
+    // Stamped before the attempt, so a failure of any kind still counts.
+    const attempt = await admin
+      .from("items")
+      .update({ refresh_attempted_at: new Date().toISOString() })
+      .eq("id", item.id);
+    if (attempt.error) throw attempt.error;
     try {
       await importItem(item.provider, item.media_type, item.provider_id);
       refreshed++;

@@ -25,6 +25,7 @@ export async function importItem(
 ): Promise<ImportedItem> {
   const details = await getDetails(provider, mediaType, providerId);
   const admin = createAdminClient();
+  const now = new Date().toISOString();
 
   const item: ItemRow = {
     provider: details.provider,
@@ -36,7 +37,8 @@ export async function importItem(
     runtime_minutes: details.runtimeMinutes,
     score: details.score,
     score_count: details.scoreCount,
-    refreshed_at: new Date().toISOString(),
+    refreshed_at: now,
+    refresh_attempted_at: now,
     provider_data_purged_at: null,
   };
   if (!details.timeToBeatUnavailable) {
@@ -53,15 +55,25 @@ export async function importItem(
     .single();
   if (error) throw error;
 
-  const seasons = await upsertSeasons(admin, saved.id, details.seasons ?? []);
-  return { itemId: saved.id, seasons };
+  if (details.seasons === null) return { itemId: saved.id, seasons: [] };
+  await upsertSeasons(admin, saved.id, details.seasons);
+
+  // Every season the catalogue holds, including ones the provider has dropped
+  // since (they are kept because a user may track them).
+  const { data: seasons, error: seasonsError } = await admin
+    .from("seasons")
+    .select("id, season_number")
+    .eq("show_id", saved.id)
+    .order("season_number");
+  if (seasonsError) throw seasonsError;
+  return { itemId: saved.id, seasons: seasons.map((s) => ({ id: s.id, number: s.season_number })) };
 }
 
 async function upsertSeasons(
   admin: ReturnType<typeof createAdminClient>,
   showId: string,
   seasons: SeasonDetails[],
-): Promise<ImportedItem["seasons"]> {
+): Promise<void> {
   const row = (s: SeasonDetails): SeasonRow => ({
     show_id: showId,
     season_number: s.number,
@@ -76,15 +88,9 @@ async function upsertSeasons(
     seasons.filter((s) => s.runtimeUnavailable).map(row),
   ];
 
-  const out: ImportedItem["seasons"] = [];
   for (const rows of groups) {
     if (!rows.length) continue;
-    const { data, error } = await admin
-      .from("seasons")
-      .upsert(rows, { onConflict: "show_id,season_number" })
-      .select("id, season_number");
+    const { error } = await admin.from("seasons").upsert(rows, { onConflict: "show_id,season_number" });
     if (error) throw error;
-    for (const s of data) out.push({ id: s.id, number: s.season_number });
   }
-  return out.sort((a, b) => a.number - b.number);
 }
