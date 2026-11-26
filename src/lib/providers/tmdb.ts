@@ -90,13 +90,33 @@ export async function searchTmdb(query: string): Promise<SearchResult[]> {
 
 const MAX_SEASON_REQUESTS = 5;
 
-/** The fields read from an entry in a show's `seasons` list; never its overview. */
-function seasonSummary(s: Json): SeasonSummary {
-  return { number: int(s.season_number) ?? 0, episodeCount: int(s.episode_count), airDate: str(s.air_date) };
+type ListedSeason = { entry: Json; number: number };
+
+/**
+ * A show's `seasons` list, one entry per season number (the first wins). An
+ * entry with no number is dropped rather than read as season 0 (Specials).
+ */
+function listedSeasons(d: Json): ListedSeason[] {
+  const list = Array.isArray(d.seasons) ? (d.seasons as Json[]) : [];
+  const seen = new Set<number>();
+  const out: ListedSeason[] = [];
+  for (const entry of list) {
+    const number = int(entry.season_number);
+    if (number === null || seen.has(number)) continue;
+    seen.add(number);
+    out.push({ entry, number });
+  }
+  return out;
 }
 
-async function getSeason(tvId: string, s: Json): Promise<SeasonDetails> {
-  const { number, episodeCount, airDate } = seasonSummary(s);
+/** The fields read from an entry in a show's `seasons` list; never its overview. */
+function seasonSummary({ entry: s, number }: ListedSeason): SeasonSummary {
+  return { number, episodeCount: int(s.episode_count), airDate: str(s.air_date) };
+}
+
+async function getSeason(tvId: string, listed: ListedSeason): Promise<SeasonDetails> {
+  const s = listed.entry;
+  const { number, episodeCount, airDate } = seasonSummary(listed);
   const season = { number, title: str(s.name), episodeCount, airDate };
   // Only episode runtimes are read; overviews and episode titles are ignored.
   // A failed season request (404, 429, 5xx) costs that season its runtime,
@@ -139,8 +159,7 @@ export async function getTmdbShowSeasons(id: string): Promise<ShowSeasons> {
   const d = await tmdbGet(`/tv/${encodeURIComponent(id)}`);
   const title = str(d.name);
   if (title === null) throw new ProviderError("tmdb", null, "tmdb details had no title");
-  const list = Array.isArray(d.seasons) ? (d.seasons as Json[]) : [];
-  return { title, seasons: list.map(seasonSummary) };
+  return { title, seasons: listedSeasons(d).map(seasonSummary) };
 }
 
 export async function getTmdbDetails(
@@ -154,8 +173,7 @@ export async function getTmdbDetails(
 
   let seasons: SeasonDetails[] | null = null;
   if (!isMovie) {
-    const list = Array.isArray(d.seasons) ? (d.seasons as Json[]) : [];
-    seasons = await mapLimited(list, MAX_SEASON_REQUESTS, (s) => getSeason(id, s));
+    seasons = await mapLimited(listedSeasons(d), MAX_SEASON_REQUESTS, (s) => getSeason(id, s));
   }
 
   return {

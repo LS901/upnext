@@ -21,7 +21,14 @@ try {
     method: "POST",
     headers: { Authorization: `Bearer ${secret}` },
   });
-  console.log(`HTTP ${res.status}: ${await res.text()}`);
+  const body = await res.text();
+  if (res.ok) {
+    const counts = JSON.parse(body) as Record<string, number>;
+    const line = ["refreshed", "failed", "purged", "pruned"].map((key) => `${key} ${counts[key]}`).join(", ");
+    console.log(`HTTP ${res.status}: ${line}`);
+  } else {
+    console.log(`HTTP ${res.status}: ${body}`);
+  }
   process.exitCode = res.ok ? 0 : 1;
 } catch {
   console.error("Couldn't reach http://localhost:3000. Is `npm run dev` running?");

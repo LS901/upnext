@@ -459,6 +459,43 @@ describe("catalogue import and refresh", () => {
     expect(isRecent(healthyAfter!.refresh_attempted_at)).toBe(true);
   });
 
+  test("an item failing with a non-provider error is counted and logged; the rest of the run still happens", async () => {
+    const [badId, goodId, oldId, untrackedId] = [newId(), newId(), newId(), newId()];
+    stubMovie(badId, "Invented Bad Date");
+    stubMovie(goodId, "Invented Good Next");
+    stubMovie(oldId, "Invented Long Unrefreshed");
+    stubMovie(untrackedId, "Invented Untracked");
+    const bad = track((await importItem("tmdb", "movie", badId)).itemId);
+    const good = track((await importItem("tmdb", "movie", goodId)).itemId);
+    const old = track((await importItem("tmdb", "movie", oldId)).itemId);
+    const untracked = track((await importItem("tmdb", "movie", untrackedId)).itemId);
+    // The bad item goes first; the old one is due a purge; the untracked one a prune.
+    await setItem(bad, { refreshed_at: daysAgo(160), refresh_attempted_at: daysAgo(30) });
+    await setItem(good, { refreshed_at: daysAgo(8), refresh_attempted_at: daysAgo(8) });
+    await setItem(old, { refreshed_at: daysAgo(151), refresh_attempted_at: daysAgo(9) });
+    await setItem(untracked, { created_at: daysAgo(31) });
+
+    // A date the database refuses: the import fails with a Postgres error, not a ProviderError.
+    tmdbRoutes[`/movie/${badId}`] = { ...(tmdbRoutes[`/movie/${badId}`] as object), release_date: "INVENTED-not-a-date" };
+    stubMovie(goodId, "Invented Good Next (Renamed)");
+    tmdbRoutes[`/movie/${oldId}`] = fail(404);
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const result = await refreshStaleItems();
+
+    // bad and old failed, good refreshed; bad and old were purged, untracked was pruned.
+    expect(result).toEqual({ refreshed: 1, failed: 2, purged: 2, pruned: 1 });
+    expect((await getItem(good))!.title).toBe("Invented Good Next (Renamed)");
+    expect((await getItem(old))!.provider_data_purged_at).not.toBeNull();
+    expect(await getItem(untracked)).toBeNull();
+
+    // Logged with the item id and the error's code or name only: no provider payload.
+    const logged = errors.mock.calls.map((c) => c.join(" "));
+    errors.mockRestore();
+    expect(logged).toEqual([`Refresh failed for item ${bad} (22007)`, `Refresh failed for item ${old} (ProviderError)`]);
+    expect(logged.join("\n")).not.toContain("INVENTED");
+  });
+
   test("a refresh with a failing season keeps the known runtime", async () => {
     const id = newId();
     stubShow(id, "Invented Long Show", [
@@ -691,7 +728,7 @@ describe("catalogue import and refresh", () => {
       }),
     );
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ refreshed: 1, failed: 0 });
+    expect(await res.json()).toEqual({ refreshed: 1, failed: 0, purged: 0, pruned: 0 });
     expect((await getItem(itemId))!.title).toBe("Invented Cron OK (Renamed)");
     expect(Object.keys(cronRoute)).toEqual(["POST"]);
   });

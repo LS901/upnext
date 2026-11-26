@@ -9,8 +9,8 @@ export async function POST(request: Request): Promise<Response> {
   if (!authorised(request.headers.get("authorization"))) {
     return Response.json({ error: "unauthorized" }, { status: 401 });
   }
-  const { refreshed, failed } = await refreshStaleItems();
-  return Response.json({ refreshed, failed });
+  const { refreshed, failed, purged, pruned } = await refreshStaleItems();
+  return Response.json({ refreshed, failed, purged, pruned });
 }
 
 function authorised(header: string | null): boolean {

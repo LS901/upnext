@@ -1,5 +1,4 @@
 import "server-only";
-import { ProviderError } from "@/lib/providers/types";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { importItem } from "./import";
 
@@ -21,14 +20,25 @@ export type RefreshResult = {
 
 const daysAgo = (days: number) => new Date(Date.now() - days * DAY_MS).toISOString();
 
+/** A Postgres error's code (such as 22007), else the error's name (such as ProviderError). */
+function errorCode(err: unknown): string {
+  if (err && typeof err === "object") {
+    const { code, name } = err as { code?: unknown; name?: unknown };
+    if (typeof code === "string" && code) return code;
+    if (typeof name === "string" && name) return name;
+  }
+  return "unknown";
+}
+
 /**
  * Re-imports the items not refreshed for `olderThanDays`, one at a time (the
  * provider clients keep within their rate limits). Every attempt is stamped
  * in refresh_attempted_at, and items not attempted within the same window go
- * first, so an item that keeps failing upstream can't block the queue. A
- * provider failure counts as failed and the pass moves on. Then purges provider data
- * that has gone too long without a refresh, and prunes untracked items.
- * Never writes or deletes user data (INV-003).
+ * first, so an item that keeps failing upstream can't block the queue. Any
+ * failure of one item (a provider error, a database error, bad data) counts
+ * as failed and the pass moves on, so one bad item never stops the run. Then
+ * it always purges provider data that has gone too long without a refresh,
+ * and prunes untracked items. Never writes or deletes user data (INV-003).
  */
 export async function refreshStaleItems(
   opts: { olderThanDays?: number; limit?: number } = {},
@@ -50,18 +60,20 @@ export async function refreshStaleItems(
   let refreshed = 0;
   let failed = 0;
   for (const item of stale) {
-    // Stamped before the attempt, so a failure of any kind still counts.
-    const attempt = await admin
-      .from("items")
-      .update({ refresh_attempted_at: new Date().toISOString() })
-      .eq("id", item.id);
-    if (attempt.error) throw attempt.error;
     try {
+      // Stamped before the attempt, so a failure of any kind still counts.
+      const attempt = await admin
+        .from("items")
+        .update({ refresh_attempted_at: new Date().toISOString() })
+        .eq("id", item.id);
+      if (attempt.error) throw attempt.error;
       await importItem(item.provider, item.media_type, item.provider_id);
       refreshed++;
     } catch (err) {
-      if (!(err instanceof ProviderError)) throw err;
       failed++;
+      // The item id and the error's code or name only: never a provider
+      // payload or a message that could quote one (INV-005, INV-006).
+      console.error(`Refresh failed for item ${item.id} (${errorCode(err)})`);
     }
   }
 

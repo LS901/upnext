@@ -170,6 +170,34 @@ test("at most 5 season requests are in flight at once", async () => {
   expect(d.seasons?.every((s) => s.runtimeMinutes === 30)).toBe(true);
 });
 
+test("a season listed twice is kept once, and a season with no number is dropped, not made 0", async () => {
+  const listed = [
+    { season_number: 1, name: "Season 1", episode_count: 3 },
+    { season_number: 1, name: "Season 1 (again)", episode_count: 9 },
+    { name: "Unnumbered", episode_count: 4 },
+    { season_number: null, name: "Null number", episode_count: 4 },
+    { season_number: 2, name: "Season 2", episode_count: 2 },
+  ];
+  const fn = stubFetch({
+    "/tv/9200": { id: 9200, name: "Odd Seasons", seasons: listed },
+    "/tv/9200/season/1": { episodes: [{ runtime: 30 }] },
+    "/tv/9200/season/2": { episodes: [{ runtime: 40 }] },
+  });
+  const d = await getTmdbDetails("show", "9200");
+  expect(d.seasons?.map((s) => [s.number, s.title, s.episodeCount, s.runtimeMinutes])).toEqual([
+    [1, "Season 1", 3, 30],
+    [2, "Season 2", 2, 40],
+  ]);
+  // One request for the show and one per distinct season; never season 0.
+  expect(fn.mock.calls.map((c) => new URL(String(c[0])).pathname).sort()).toEqual([
+    "/3/tv/9200",
+    "/3/tv/9200/season/1",
+    "/3/tv/9200/season/2",
+  ]);
+  // The season picker reads the same list the same way.
+  expect((await getTmdbShowSeasons("9200")).seasons.map((s) => s.number)).toEqual([1, 2]);
+});
+
 test("no season overview or episode title reaches the result", async () => {
   stubFetch(SHOW_ROUTES);
   expect(JSON.stringify(await getTmdbDetails("show", "9002"))).not.toContain("SECRET");
