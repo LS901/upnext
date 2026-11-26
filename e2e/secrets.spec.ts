@@ -12,9 +12,10 @@ const SENTINELS: Record<string, string> = {
   TMDB_API_READ_ACCESS_TOKEN: "SENTINEL_TMDB_7f3a",
   IGDB_CLIENT_ID: "SENTINEL_IGDB_ID_7f3a",
   IGDB_CLIENT_SECRET: "SENTINEL_IGDB_SECRET_7f3a",
+  CRON_SECRET: "SENTINEL_CRON_7f3a",
 };
 
-const PAGES = ["/", "/login"];
+const PAGES = ["/", "/login", "/search", "/library"];
 
 function filesUnder(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {

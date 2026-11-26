@@ -10,7 +10,7 @@ test("credits are one click from the home page (INV-007)", async ({ page }) => {
   await page.getByRole("link", { name: "Credits" }).click();
   await expect(page).toHaveURL("/credits");
   await expect(
-    page.getByText("This product uses the TMDB API but is not endorsed or certified by TMDB.")
+    page.getByText("This product uses TMDB and the TMDB APIs but is not endorsed, certified, or otherwise approved by TMDB.")
   ).toBeVisible();
   await expect(page.getByRole("link", { name: "IGDB.com" })).toHaveAttribute("href", "https://www.igdb.com");
 });

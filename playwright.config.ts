@@ -46,6 +46,7 @@ export default defineConfig({
         TMDB_API_READ_ACCESS_TOKEN: "SENTINEL_TMDB_7f3a",
         IGDB_CLIENT_ID: "SENTINEL_IGDB_ID_7f3a",
         IGDB_CLIENT_SECRET: "SENTINEL_IGDB_SECRET_7f3a",
+        CRON_SECRET: "SENTINEL_CRON_7f3a",
         TMDB_API_BASE_URL: `${STUB}/tmdb`,
         IGDB_API_BASE_URL: `${STUB}/igdb`,
         TWITCH_TOKEN_URL: `${STUB}/twitch/token`,

@@ -19,7 +19,13 @@ export default function CreditsPage() {
           </a>
           .
         </p>
-        <p>This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
+        <a href="https://www.themoviedb.org" className="inline-block">
+          {/* eslint-disable-next-line @next/next/no-img-element -- local SVG: nothing to optimise */}
+          <img src="/tmdb-logo.svg" alt="TMDB" width={92} height={66} />
+        </a>
+        <p>
+          This product uses TMDB and the TMDB APIs but is not endorsed, certified, or otherwise approved by TMDB.
+        </p>
       </section>
       <section className="mt-8 space-y-2">
         <h2 className="text-xl font-medium">Games</h2>
