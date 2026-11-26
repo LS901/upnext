@@ -45,6 +45,8 @@ export async function verifyCode(formData: FormData) {
 
 export async function signOut() {
   const supabase = await createClient();
-  await supabase.auth.signOut();
+  // On some failures Supabase keeps the session; don't pretend it's gone.
+  const { error } = await supabase.auth.signOut();
+  if (error) throw new Error(`Couldn't sign out: ${error.message}`, { cause: error });
   redirect("/");
 }
