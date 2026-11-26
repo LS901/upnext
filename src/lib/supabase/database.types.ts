@@ -23,7 +23,21 @@ export type Database = {
           }
         },"public": {
           Tables: {
-            "profiles": {
+            "items": {
+                  Row: {
+                    "created_at": string,"id": string,"media_type": Database["public"]['Enums']["media_type"],"provider": Database["public"]['Enums']["provider"],"provider_id": string,"title": string,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"id"?: string,"media_type": Database["public"]['Enums']["media_type"],"provider": Database["public"]['Enums']["provider"],"provider_id": string,"title": string,"updated_at"?: string
+                  }
+                  Update: {
+                    "created_at"?: string,"id"?: string,"media_type"?: Database["public"]['Enums']["media_type"],"provider"?: Database["public"]['Enums']["provider"],"provider_id"?: string,"title"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"profiles": {
                   Row: {
                     "created_at": string,"id": string,"library_private": boolean,"username": string
                   }
@@ -37,6 +51,26 @@ export type Database = {
                   Relationships: [
                     
                   ]
+                },"seasons": {
+                  Row: {
+                    "id": string,"season_number": number,"show_id": string,"show_media_type": Database["public"]['Enums']["media_type"],"title": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "id"?: string,"season_number": number,"show_id": string,"show_media_type"?: Database["public"]['Enums']["media_type"],"title"?: string | null
+                  }
+                  Update: {
+                    "id"?: string,"season_number"?: number,"show_id"?: string,"show_media_type"?: Database["public"]['Enums']["media_type"],"title"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "seasons_show_id_show_media_type_fkey"
+      columns: ["show_id","show_media_type"]
+isOneToOne: false
+      referencedRelation: "items"
+      referencedColumns: ["id","media_type"]
+    }
+                  ]
                 }
           }
           Views: {
@@ -46,7 +80,7 @@ export type Database = {
             [_ in never]: never
           }
           Enums: {
-            [_ in never]: never
+            "media_type": "movie"|"show"|"game","provider": "tmdb"|"igdb"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -166,7 +200,7 @@ export const Constants = {
           }
         },"public": {
           Enums: {
-            
+            "media_type": ["movie", "show", "game"],"provider": ["tmdb", "igdb"]
           }
         }
 } as const
