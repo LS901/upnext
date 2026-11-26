@@ -51,6 +51,11 @@ export default defineConfig({
     env: {
       NEXT_PUBLIC_SUPABASE_URL: supabase.url,
       NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: supabase.publishableKey,
+      // Fake server secrets that e2e/secrets.spec.ts hunts for in the build output (INV-005).
+      SUPABASE_SERVICE_ROLE_KEY: "SENTINEL_SERVICE_ROLE_7f3a",
+      TMDB_API_READ_ACCESS_TOKEN: "SENTINEL_TMDB_7f3a",
+      IGDB_CLIENT_ID: "SENTINEL_IGDB_ID_7f3a",
+      IGDB_CLIENT_SECRET: "SENTINEL_IGDB_SECRET_7f3a",
     },
   },
 });
