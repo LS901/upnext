@@ -7,6 +7,7 @@ import type { Database } from "@/lib/supabase/database.types";
 import { fetchAll, fetchAllIn } from "@/lib/supabase/fetch-all";
 import { showProgress } from "./progress";
 import { LIBRARY_ORDER, STATUS_LABELS, type EntryStatus } from "./status";
+import { QUEUE_TYPES, type QueueType } from "./up-next-order";
 
 type Client = SupabaseClient<Database>;
 
@@ -45,10 +46,18 @@ export type ShowRow = Score & {
 
 export type LibraryGroup = { status: EntryStatus; label: string; rows: (ItemRow | ShowRow)[] };
 
-/** The user's library, grouped by status in LIBRARY_ORDER; empty groups are left out. */
-export type LibraryView = { groups: LibraryGroup[] };
+/** A queued season: shown on its own in the TV queue, with its show's title and poster. */
+export type QueuedSeasonRow = Score &
+  SeasonRow & { kind: "season"; showTitle: string; imageUrl: string | null };
 
-type Show = Omit<ShowRow, "seasons"> & { seasons: SeasonRow[] };
+export type UpNextRow = ItemRow | QueuedSeasonRow;
+
+/**
+ * The user's library: the Up next queues, one per media type and each in the
+ * user's order, then everything else grouped by status in LIBRARY_ORDER (empty
+ * groups left out). A queued entry shows in its queue only, not under Backlog.
+ */
+export type LibraryView = { upNext: Record<QueueType, UpNextRow[]>; groups: LibraryGroup[] };
 
 function imageUrl(provider: Provider, ref: string | null): string | null {
   return provider === "tmdb" ? tmdbImageUrl(ref) : igdbImageUrl(ref);
@@ -67,7 +76,7 @@ export async function getMyLibrary(supabase: Client, userId: string): Promise<Li
     supabase
       .from("library_entries")
       .select(
-        `id, status,
+        `id, status, up_next_position,
          item:items(provider, media_type, title, image_ref, runtime_minutes, ttb_normally_s, score, score_count),
          season:seasons(id, season_number, episode_count, air_date, runtime_minutes,
            show:items(id, provider, title, image_ref, score, score_count))`,
@@ -78,12 +87,13 @@ export async function getMyLibrary(supabase: Client, userId: string): Promise<Li
   );
 
   const items: ItemRow[] = [];
-  const shows = new Map<string, Show>();
+  const shows = new Map<string, ShowRow>();
+  const queued: { type: QueueType; position: number; row: UpNextRow }[] = [];
   for (const e of entries) {
     if (e.item) {
       const i = e.item;
       if (i.media_type === "show") continue; // the schema allows only movies and games here
-      items.push({
+      const row: ItemRow = {
         kind: "item",
         entryId: e.id,
         status: e.status,
@@ -93,9 +103,34 @@ export async function getMyLibrary(supabase: Client, userId: string): Promise<Li
         minutes: i.media_type === "movie" ? i.runtime_minutes : storyMinutes(i.ttb_normally_s),
         score: i.score,
         scoreCount: i.score_count,
-      });
+      };
+      if (e.up_next_position !== null) queued.push({ type: i.media_type, position: e.up_next_position, row });
+      else items.push(row);
     } else if (e.season) {
       const s = e.season;
+      const seasonRow: SeasonRow = {
+        entryId: e.id,
+        status: e.status,
+        number: s.season_number,
+        episodeCount: s.episode_count,
+        airDate: s.air_date,
+        runtimeMinutes: s.runtime_minutes,
+      };
+      if (e.up_next_position !== null) {
+        queued.push({
+          type: "show",
+          position: e.up_next_position,
+          row: {
+            ...seasonRow,
+            kind: "season",
+            showTitle: s.show.title,
+            imageUrl: imageUrl(s.show.provider, s.show.image_ref),
+            score: s.show.score,
+            scoreCount: s.show.score_count,
+          },
+        });
+        continue;
+      }
       let show = shows.get(s.show.id);
       if (!show) {
         show = {
@@ -110,14 +145,7 @@ export async function getMyLibrary(supabase: Client, userId: string): Promise<Li
         };
         shows.set(show.showId, show);
       }
-      show.seasons.push({
-        entryId: e.id,
-        status: e.status,
-        number: s.season_number,
-        episodeCount: s.episode_count,
-        airDate: s.air_date,
-        runtimeMinutes: s.runtime_minutes,
-      });
+      show.seasons.push(seasonRow);
     }
   }
 
@@ -138,7 +166,14 @@ export async function getMyLibrary(supabase: Client, userId: string): Promise<Li
     ].sort(byTitle);
     if (rows.length) groups.push({ status, label: STATUS_LABELS[status], rows });
   }
-  return { groups };
+
+  // Each queue in the user's order; ties (two adds at once) settle by entry id,
+  // compared as the database orders it (plain order, not locale order).
+  queued.sort((x, y) => x.position - y.position || (x.row.entryId < y.row.entryId ? -1 : 1));
+  const upNext = Object.fromEntries(
+    QUEUE_TYPES.map((type) => [type, queued.filter((q) => q.type === type).map((q) => q.row)]),
+  ) as Record<QueueType, UpNextRow[]>;
+  return { upNext, groups };
 }
 
 // Every season of each show counts, not only the ones the user added, minus
@@ -146,7 +181,7 @@ export async function getMyLibrary(supabase: Client, userId: string): Promise<Li
 async function addProgress(
   supabase: Client,
   userId: string,
-  shows: Map<string, Show>,
+  shows: Map<string, ShowRow>,
   finishedSeasonIds: Set<string>,
 ): Promise<void> {
   if (!shows.size) return;

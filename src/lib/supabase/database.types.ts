@@ -143,7 +143,9 @@ isOneToOne: false
             [_ in never]: never
           }
           Functions: {
-            [_ in never]: never
+            "set_up_next_order":
+{ Args: { "entry_ids": (string)[] }; Returns: number
+                           }
           }
           Enums: {
             "entry_status": "backlog"|"in_progress"|"finished"|"paused"|"dropped","media_type": "movie"|"show"|"game","provider": "tmdb"|"igdb"

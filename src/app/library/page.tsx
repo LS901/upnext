@@ -1,19 +1,39 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
-import { seasonLabel } from "@/app/search/season-label";
+import { seasonDetails, seasonLabel, seasonName } from "@/app/search/season-label";
 import { TYPE_LABELS } from "@/app/ui";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { formatDuration } from "@/lib/format/duration";
 import { formatScore } from "@/lib/format/score";
-import { getMyLibrary, type ItemRow, type LibraryGroup, type SeasonRow, type ShowRow } from "@/lib/library/queries";
+import {
+  getMyLibrary,
+  type ItemRow,
+  type LibraryGroup,
+  type LibraryView,
+  type SeasonRow,
+  type ShowRow,
+  type UpNextRow,
+} from "@/lib/library/queries";
 import type { EntryStatus } from "@/lib/library/status";
+import {
+  HIDDEN_COOKIE,
+  parseHidden,
+  QUEUE_LABELS,
+  QUEUE_TYPES,
+  targetFor,
+  type Direction,
+  type QueueType,
+} from "@/lib/library/up-next-order";
 import { createClient } from "@/lib/supabase/server";
-import { removeEntry, setStatus } from "./actions";
-import { RemoveButton } from "./remove-button";
+import { addUpNext, placeUpNext, removeEntry, removeUpNext, setStatus } from "./actions";
+import { QueueVisibility } from "./queue-visibility";
+import { SortableQueue } from "./sortable-queue";
 import { StatusSelect } from "./status-select";
+import { SubmitButton } from "./submit-button";
 
 export const metadata: Metadata = { title: "My library" };
 
@@ -35,8 +55,9 @@ async function Library() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
-  const { groups } = await getMyLibrary(await createClient(), user.id);
-  if (!groups.length) {
+  const { upNext, groups } = await getMyLibrary(await createClient(), user.id);
+  const hidden = parseHidden((await cookies()).get(HIDDEN_COOKIE)?.value);
+  if (!groups.length && QUEUE_TYPES.every((type) => !upNext[type].length)) {
     return (
       <p className="mt-6 text-zinc-600 dark:text-zinc-400">
         Nothing here yet.{" "}
@@ -49,10 +70,120 @@ async function Library() {
   }
   return (
     <div className="mt-6 flex flex-col gap-10">
+      <UpNext upNext={upNext} hidden={hidden} backlog={groups.find((g) => g.status === "backlog")} />
       {groups.map((group) => (
         <Group key={group.status} group={group} />
       ))}
     </div>
+  );
+}
+
+// One queue per media type, each in the user's order (owner said, 2026-11-26).
+function UpNext({
+  upNext,
+  hidden,
+  backlog,
+}: {
+  upNext: LibraryView["upNext"];
+  hidden: QueueType[];
+  backlog: LibraryGroup | undefined;
+}) {
+  // Whether Backlog (below) has anything of each type that could be added.
+  const inBacklog = (type: QueueType) =>
+    !!backlog?.rows.some((r) => (r.kind === "show" ? type === "show" : r.mediaType === type));
+  const counts = Object.fromEntries(QUEUE_TYPES.map((type) => [type, upNext[type].length])) as Record<QueueType, number>;
+  return (
+    <section aria-labelledby="up-next">
+      <h2 id="up-next" className="text-xl font-semibold">
+        Up next
+      </h2>
+      <QueueVisibility hidden={hidden} counts={counts} />
+      <div className="mt-4 flex flex-col gap-6">
+        {QUEUE_TYPES.filter((type) => !hidden.includes(type)).map((type) => (
+          <Queue key={type} type={type} rows={upNext[type]} hasBacklog={inBacklog(type)} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function Queue({ type, rows, hasBacklog }: { type: QueueType; rows: UpNextRow[]; hasBacklog: boolean }) {
+  const id = `queue-${type}`;
+  const label = QUEUE_LABELS[type];
+  const order = rows.map((r) => r.entryId);
+  return (
+    <section aria-labelledby={id}>
+      <h3 id={id} className="font-semibold">
+        {label}
+      </h3>
+      {rows.length ? (
+        <SortableQueue
+          label={`${label} up next`}
+          items={rows.map((row) => ({
+            entryId: row.entryId,
+            title: queuedTitle(row),
+            row: <QueuedRow row={row} order={order} />,
+          }))}
+        />
+      ) : (
+        <p className={`mt-1 ${muted}`}>
+          {hasBacklog ? "Nothing up next. Add something from your Backlog below." : "Nothing up next."}
+        </p>
+      )}
+    </section>
+  );
+}
+
+/** A queued season names its show and season, so two seasons of one show read apart. */
+function queuedTitle(row: UpNextRow): string {
+  if (row.kind !== "season") return row.title;
+  return `${row.showTitle} · ${seasonName(row.number)}`;
+}
+
+function QueuedRow({ row, order }: { row: UpNextRow; order: string[] }) {
+  const season = row.kind === "season";
+  const meta = season
+    ? [...seasonDetails(row), `Time to finish: ${formatDuration(row.runtimeMinutes)}`, formatScore(row.score, row.scoreCount)]
+    : [itemMeta(row)];
+  return (
+    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-4">
+      <Poster url={row.imageUrl} />
+      <div className="min-w-0 flex-1">
+        <h4 className="font-medium">{queuedTitle(row)}</h4>
+        <p className={muted}>{meta.join(" · ")}</p>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <form action={setStatus}>
+          <input type="hidden" name="entryId" value={row.entryId} />
+          <input type="hidden" name="status" value="in_progress" />
+          <SubmitButton>Start</SubmitButton>
+        </form>
+        <MoveButton entryId={row.entryId} order={order} direction="up" label="Move up" />
+        <MoveButton entryId={row.entryId} order={order} direction="down" label="Move down" />
+        <MoveButton entryId={row.entryId} order={order} direction="top" label="Move to top" />
+        <form action={removeUpNext}>
+          <input type="hidden" name="entryId" value={row.entryId} />
+          <SubmitButton>Remove from Up next</SubmitButton>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Sends the exact place to move to (before which entry), worked out from the
+ * order on this page, so a repeated click lands in the same place rather than
+ * moving again. Disabled when the move would do nothing; it then targets the
+ * entry itself, which moves nothing, in case it's sent before hydration.
+ */
+function MoveButton(props: { entryId: string; order: string[]; direction: Direction; label: string }) {
+  const target = targetFor(props.order, props.entryId, props.direction);
+  return (
+    <form action={placeUpNext}>
+      <input type="hidden" name="entryId" value={props.entryId} />
+      <input type="hidden" name="beforeId" value={target ? (target.beforeId ?? "") : props.entryId} />
+      <SubmitButton disabled={!target}>{props.label}</SubmitButton>
+    </form>
   );
 }
 
@@ -80,17 +211,21 @@ function Poster({ url }: { url: string | null }) {
   );
 }
 
-function Item({ item }: { item: ItemRow }) {
+function itemMeta(item: ItemRow): string {
   const time =
     item.mediaType === "game"
       ? `Time to beat: ${formatDuration(item.minutes)} (story)`
       : `Time to finish: ${formatDuration(item.minutes)}`;
+  return [TYPE_LABELS[item.mediaType], time, formatScore(item.score, item.scoreCount)].join(" · ");
+}
+
+function Item({ item }: { item: ItemRow }) {
   return (
     <li className="flex flex-wrap items-center gap-4 py-3">
       <Poster url={item.imageUrl} />
       <div className="min-w-0 flex-1">
         <h3 className="font-medium">{item.title}</h3>
-        <p className={muted}>{[TYPE_LABELS[item.mediaType], time, formatScore(item.score, item.scoreCount)].join(" · ")}</p>
+        <p className={muted}>{itemMeta(item)}</p>
       </div>
       <EntryControls entryId={item.entryId} status={item.status} />
     </li>
@@ -132,16 +267,23 @@ function Season({ season }: { season: SeasonRow }) {
   );
 }
 
+// Only Backlog entries can go in Up next (owner said, 2026-11-26).
 function EntryControls({ entryId, status }: { entryId: string; status: EntryStatus }) {
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex flex-wrap items-center gap-3">
+      {status === "backlog" && (
+        <form action={addUpNext}>
+          <input type="hidden" name="entryId" value={entryId} />
+          <SubmitButton>Add to Up next</SubmitButton>
+        </form>
+      )}
       <form action={setStatus}>
         <input type="hidden" name="entryId" value={entryId} />
         <StatusSelect status={status} />
       </form>
       <form action={removeEntry}>
         <input type="hidden" name="entryId" value={entryId} />
-        <RemoveButton />
+        <SubmitButton>Remove</SubmitButton>
       </form>
     </div>
   );

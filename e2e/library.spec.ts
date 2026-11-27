@@ -99,8 +99,8 @@ test("add a movie and two seasons, then finish a season", async ({ page }) => {
   await page.goto("/library");
   await expect(page).toHaveTitle("My library · upnext");
   await expect(page.getByText("Nothing here yet.")).toHaveCount(0);
-  const groups = page.getByRole("region");
-  await expect(groups).toHaveCount(1);
+  // Up next always comes first; then the one status group so far.
+  await expect(page.getByRole("heading", { level: 2 })).toHaveText(["Up next", "Backlog"]);
   const backlog = group(page, "Backlog");
 
   const movie = row(backlog, "Kestrel Morning");
@@ -132,7 +132,7 @@ test("add a movie and two seasons, then finish a season", async ({ page }) => {
   await expect(row(backlog, "Harbour of Glass")).toContainText("1 of 3 seasons finished");
   await expect(seasonRow(row(backlog, "Harbour of Glass"), "Season 1 · 8 episodes · 2021")).toHaveCount(0);
   // Groups run In progress, Backlog, Paused, Finished, Dropped, and empty ones are left out.
-  await expect(groups.getByRole("heading", { level: 2 })).toHaveText(["Backlog", "Finished"]);
+  await expect(page.getByRole("heading", { level: 2 })).toHaveText(["Up next", "Backlog", "Finished"]);
 
   // It sticks after a reload.
   await page.reload();
@@ -151,9 +151,9 @@ test("a game shows its time to beat, and Remove takes it out", async ({ page, ac
   await expect(game).toContainText("Time to beat: 12 h (story)");
   await expect(game).toContainText("Score 82/100 (44 votes)");
 
-  // In progress comes first.
+  // In progress comes first of the status groups (after Up next).
   await game.getByRole("combobox", { name: "Status" }).selectOption("In progress");
-  await expect(page.getByRole("region").first().getByRole("heading", { level: 2 })).toHaveText("In progress");
+  await expect(page.getByRole("heading", { level: 2 }).nth(1)).toHaveText("In progress");
   const playing = row(group(page, "In progress"), "Clockwork Lighthouse");
   await expect(playing).toBeVisible();
 
