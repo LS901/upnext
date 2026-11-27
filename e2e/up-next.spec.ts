@@ -211,7 +211,12 @@ test("Start and Remove from Up next take an entry off its queue", async ({ page 
   await expect(titles(movies)).toHaveText([kite]);
   await expect(row(group(page, "Backlog"), moss).getByRole("button", { name: "Add to Up next" })).toBeVisible();
 
-  // Back in, it goes to the bottom.
+  // Back in, it goes to the bottom. Focus left in the queue earlier, then
+  // clicked away from, isn't pulled back when the queue changes.
+  const kiteToTop = queued(movies, kite).getByRole("button", { name: "Move to top" });
+  await kiteToTop.focus();
+  await page.getByRole("heading", { level: 1, name: "My library" }).click();
   await row(group(page, "Backlog"), moss).getByRole("button", { name: "Add to Up next" }).click();
   await expect(titles(movies)).toHaveText([kite, moss]);
+  await expect(kiteToTop).not.toBeFocused();
 });

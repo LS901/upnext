@@ -20,6 +20,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
+  useEffect,
   useId,
   useLayoutEffect,
   useOptimistic,
@@ -46,6 +47,8 @@ const noSubscription = () => () => {};
  * some of their elements, and the browser drops focus from an element it moves.
  * So the list remembers the last thing focused in it and, when a reorder leaves
  * focus nowhere, puts it back: the dragged handle, or the Move button pressed.
+ * It forgets once the user moves on: by keyboard (focus lands outside the list)
+ * or by pointer (a press anywhere outside it, even on plain text).
  */
 export function SortableQueue({ label, items }: { label: string; items: QueueItem[] }) {
   const [order, setOrder] = useOptimistic(items.map((i) => i.entryId));
@@ -72,6 +75,13 @@ export function SortableQueue({ label, items }: { label: string; items: QueueIte
   function onFocus(e: FocusEvent<HTMLOListElement>) {
     lastFocused.current = e.target;
   }
+  useEffect(() => {
+    function onPointerDown(e: PointerEvent) {
+      if (!(e.target instanceof Node) || !list.current?.contains(e.target)) lastFocused.current = null;
+    }
+    document.addEventListener("pointerdown", onPointerDown, true);
+    return () => document.removeEventListener("pointerdown", onPointerDown, true);
+  }, []);
   function onBlur(e: FocusEvent<HTMLOListElement>) {
     // Focus moved somewhere else on purpose; a reorder's lost focus has no target.
     if (e.relatedTarget && !list.current?.contains(e.relatedTarget)) lastFocused.current = null;
