@@ -1,6 +1,6 @@
 # upnext
 
-Backlog and tracker for movies, TV shows and games: what you're watching or playing,
+Backlog and tracker for movies, TV shows, games and books: what you're watching, playing or reading,
 what's next, and what you've finished. Installable web app (PWA).
 
 ## Stack
@@ -14,7 +14,7 @@ what's next, and what you've finished. Installable web app (PWA).
 - Local DB: `npx supabase start` / `npx supabase db reset` (applies migrations + seed)
 - DB types: `npm run db:types` regenerates `src/lib/supabase/database.types.ts`; run it after every migration
 - Lint: `npm run lint` · Types: `npm run typecheck` · Tests: `npm test` · E2E: `npm run e2e`
-- Providers: `npm run providers:check` checks the TMDB and IGDB credentials in `.env.local`; `npm run refresh` runs the catalogue refresh on a running `npm run dev` (needs `CRON_SECRET`). Node 22.6 or later.
+- Providers: `npm run providers:check` checks the TMDB, IGDB and Hardcover credentials in `.env.local`; `npm run refresh` runs the catalogue refresh on a running `npm run dev` (needs `CRON_SECRET`). Node 22.6 or later.
 
 ## Check command (definition of done)
 `npm run check` = `npm run lint && npm run typecheck && npm test`
@@ -26,7 +26,7 @@ CI (`.github/workflows/`) runs check, e2e, the domain check, gitleaks, `npm audi
 
 ## Where things live
 - `src/app/`: routes and route handlers; unit tests sit beside the code they cover (here and in `src/lib/`) as `*.test.ts(x)`
-- `src/lib/`: `providers/` (TMDB and IGDB clients), `catalogue/` (import and refresh), `library/`, `supabase/`, `auth/`, `format/`
+- `src/lib/`: `providers/` (TMDB, IGDB and Hardcover clients: movies and TV, games, books), `catalogue/` (import and refresh), `library/`, `supabase/`, `auth/`, `format/`
 - `scripts/`: the `providers:check` and `refresh` scripts, and `check-knowledge.mjs` (the domain checker)
 - `.github/`: CI and CodeQL workflows, Dependabot config and its auto-merge workflow; `.gitleaks.toml` is the secret-scan config
 - `e2e/`: Playwright specs and the stub provider server (`stub-providers.ts`, port 3101)

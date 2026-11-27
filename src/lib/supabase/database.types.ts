@@ -23,7 +23,41 @@ export type Database = {
           }
         },"public": {
           Tables: {
-            "entry_notes": {
+            "book_exclusions": {
+                  Row: {
+                    "created_at": string,"item_id": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"item_id": string,"user_id"?: string
+                  }
+                  Update: {
+                    "created_at"?: string,"item_id"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "book_exclusions_item_id_fkey"
+      columns: ["item_id"]
+isOneToOne: false
+      referencedRelation: "items"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"book_series": {
+                  Row: {
+                    "created_at": string,"id": string,"is_completed": boolean | null,"name": string,"primary_books_count": number | null,"provider": Database["public"]['Enums']["provider"],"provider_id": string,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"id"?: string,"is_completed"?: boolean | null,"name": string,"primary_books_count"?: number | null,"provider": Database["public"]['Enums']["provider"],"provider_id": string,"updated_at"?: string
+                  }
+                  Update: {
+                    "created_at"?: string,"id"?: string,"is_completed"?: boolean | null,"name"?: string,"primary_books_count"?: number | null,"provider"?: Database["public"]['Enums']["provider"],"provider_id"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"entry_notes": {
                   Row: {
                     "body": string,"entry_id": string,"updated_at": string,"user_id": string
                   }
@@ -45,28 +79,34 @@ isOneToOne: false
                   ]
                 },"items": {
                   Row: {
-                    "created_at": string,"id": string,"image_ref": string | null,"media_type": Database["public"]['Enums']["media_type"],"provider": Database["public"]['Enums']["provider"],"provider_data_purged_at": string | null,"provider_id": string,"refresh_attempted_at": string | null,"refreshed_at": string,"release_date": string | null,"runtime_minutes": number | null,"score": number | null,"score_count": number | null,"title": string,"ttb_completely_s": number | null,"ttb_count": number | null,"ttb_hastily_s": number | null,"ttb_normally_s": number | null,"updated_at": string
+                    "audio_minutes": number | null,"created_at": string,"has_audiobook": boolean | null,"id": string,"image_ref": string | null,"media_type": Database["public"]['Enums']["media_type"],"narrators": string | null,"page_count": number | null,"provider": Database["public"]['Enums']["provider"],"provider_data_purged_at": string | null,"provider_id": string,"refresh_attempted_at": string | null,"refreshed_at": string,"release_date": string | null,"runtime_minutes": number | null,"score": number | null,"score_count": number | null,"series_id": string | null,"series_position": number | null,"series_position_label": string | null,"title": string,"ttb_completely_s": number | null,"ttb_count": number | null,"ttb_hastily_s": number | null,"ttb_normally_s": number | null,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "created_at"?: string,"id"?: string,"image_ref"?: string | null,"media_type": Database["public"]['Enums']["media_type"],"provider": Database["public"]['Enums']["provider"],"provider_data_purged_at"?: string | null,"provider_id": string,"refresh_attempted_at"?: string | null,"refreshed_at"?: string,"release_date"?: string | null,"runtime_minutes"?: number | null,"score"?: number | null,"score_count"?: number | null,"title": string,"ttb_completely_s"?: number | null,"ttb_count"?: number | null,"ttb_hastily_s"?: number | null,"ttb_normally_s"?: number | null,"updated_at"?: string
+                    "audio_minutes"?: number | null,"created_at"?: string,"has_audiobook"?: boolean | null,"id"?: string,"image_ref"?: string | null,"media_type": Database["public"]['Enums']["media_type"],"narrators"?: string | null,"page_count"?: number | null,"provider": Database["public"]['Enums']["provider"],"provider_data_purged_at"?: string | null,"provider_id": string,"refresh_attempted_at"?: string | null,"refreshed_at"?: string,"release_date"?: string | null,"runtime_minutes"?: number | null,"score"?: number | null,"score_count"?: number | null,"series_id"?: string | null,"series_position"?: number | null,"series_position_label"?: string | null,"title": string,"ttb_completely_s"?: number | null,"ttb_count"?: number | null,"ttb_hastily_s"?: number | null,"ttb_normally_s"?: number | null,"updated_at"?: string
                   }
                   Update: {
-                    "created_at"?: string,"id"?: string,"image_ref"?: string | null,"media_type"?: Database["public"]['Enums']["media_type"],"provider"?: Database["public"]['Enums']["provider"],"provider_data_purged_at"?: string | null,"provider_id"?: string,"refresh_attempted_at"?: string | null,"refreshed_at"?: string,"release_date"?: string | null,"runtime_minutes"?: number | null,"score"?: number | null,"score_count"?: number | null,"title"?: string,"ttb_completely_s"?: number | null,"ttb_count"?: number | null,"ttb_hastily_s"?: number | null,"ttb_normally_s"?: number | null,"updated_at"?: string
+                    "audio_minutes"?: number | null,"created_at"?: string,"has_audiobook"?: boolean | null,"id"?: string,"image_ref"?: string | null,"media_type"?: Database["public"]['Enums']["media_type"],"narrators"?: string | null,"page_count"?: number | null,"provider"?: Database["public"]['Enums']["provider"],"provider_data_purged_at"?: string | null,"provider_id"?: string,"refresh_attempted_at"?: string | null,"refreshed_at"?: string,"release_date"?: string | null,"runtime_minutes"?: number | null,"score"?: number | null,"score_count"?: number | null,"series_id"?: string | null,"series_position"?: number | null,"series_position_label"?: string | null,"title"?: string,"ttb_completely_s"?: number | null,"ttb_count"?: number | null,"ttb_hastily_s"?: number | null,"ttb_normally_s"?: number | null,"updated_at"?: string
                   }
                   Relationships: [
-                    
+                    {
+      foreignKeyName: "items_series_id_fkey"
+      columns: ["series_id"]
+isOneToOne: false
+      referencedRelation: "book_series"
+      referencedColumns: ["id"]
+    }
                   ]
                 },"library_entries": {
                   Row: {
-                    "created_at": string,"finished_at": string | null,"id": string,"item_id": string | null,"item_media_type": Database["public"]['Enums']["media_type"] | null,"play_count": number,"season_id": string | null,"status": Database["public"]['Enums']["entry_status"],"up_next_position": number | null,"updated_at": string,"user_id": string
+                    "book_version": Database["public"]['Enums']["book_version"] | null,"created_at": string,"finished_at": string | null,"id": string,"item_id": string | null,"item_media_type": Database["public"]['Enums']["media_type"] | null,"play_count": number,"season_id": string | null,"status": Database["public"]['Enums']["entry_status"],"up_next_position": number | null,"updated_at": string,"user_id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "created_at"?: string,"finished_at"?: string | null,"id"?: string,"item_id"?: string | null,"item_media_type"?: Database["public"]['Enums']["media_type"] | null,"play_count"?: number,"season_id"?: string | null,"status"?: Database["public"]['Enums']["entry_status"],"up_next_position"?: number | null,"updated_at"?: string,"user_id"?: string
+                    "book_version"?: Database["public"]['Enums']["book_version"] | null,"created_at"?: string,"finished_at"?: string | null,"id"?: string,"item_id"?: string | null,"item_media_type"?: Database["public"]['Enums']["media_type"] | null,"play_count"?: number,"season_id"?: string | null,"status"?: Database["public"]['Enums']["entry_status"],"up_next_position"?: number | null,"updated_at"?: string,"user_id"?: string
                   }
                   Update: {
-                    "created_at"?: string,"finished_at"?: string | null,"id"?: string,"item_id"?: string | null,"item_media_type"?: Database["public"]['Enums']["media_type"] | null,"play_count"?: number,"season_id"?: string | null,"status"?: Database["public"]['Enums']["entry_status"],"up_next_position"?: number | null,"updated_at"?: string,"user_id"?: string
+                    "book_version"?: Database["public"]['Enums']["book_version"] | null,"created_at"?: string,"finished_at"?: string | null,"id"?: string,"item_id"?: string | null,"item_media_type"?: Database["public"]['Enums']["media_type"] | null,"play_count"?: number,"season_id"?: string | null,"status"?: Database["public"]['Enums']["entry_status"],"up_next_position"?: number | null,"updated_at"?: string,"user_id"?: string
                   }
                   Relationships: [
                     {
@@ -143,12 +183,15 @@ isOneToOne: false
             [_ in never]: never
           }
           Functions: {
-            "set_up_next_order":
+            "backfill_up_next":
+{ Args: Record<PropertyKey, never>; Returns: number
+                           },
+"set_up_next_order":
 { Args: { "entry_ids": (string)[] }; Returns: number
                            }
           }
           Enums: {
-            "entry_status": "backlog"|"in_progress"|"finished"|"paused"|"dropped","media_type": "movie"|"show"|"game","provider": "tmdb"|"igdb"
+            "book_version": "print"|"audio","entry_status": "backlog"|"in_progress"|"finished"|"paused"|"dropped","media_type": "movie"|"show"|"game"|"book","provider": "tmdb"|"igdb"|"hardcover"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -268,7 +311,7 @@ export const Constants = {
           }
         },"public": {
           Enums: {
-            "entry_status": ["backlog", "in_progress", "finished", "paused", "dropped"],"media_type": ["movie", "show", "game"],"provider": ["tmdb", "igdb"]
+            "book_version": ["print", "audio"],"entry_status": ["backlog", "in_progress", "finished", "paused", "dropped"],"media_type": ["movie", "show", "game", "book"],"provider": ["tmdb", "igdb", "hardcover"]
           }
         }
 } as const

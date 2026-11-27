@@ -4,3 +4,8 @@ import { seasonName } from "@/app/search/season-label";
 export function entryTitle(title: string, seasonNumber: number | null): string {
   return seasonNumber === null ? title : `${title} · ${seasonName(seasonNumber)}`;
 }
+
+/** An audiobook's title ends ` · Audiobook`; print and everything else read as their title. */
+export function audiobookTitle(title: string, version: "print" | "audio" | null | undefined): string {
+  return version === "audio" ? `${title} · Audiobook` : title;
+}

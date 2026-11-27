@@ -1,6 +1,6 @@
-Last reviewed: 2026-11-26
+Last reviewed: 2026-11-27
 
-Sources: owner interview, 2026-11-26 (Lewis): picked "library leaks", "silent data loss", "spoilers" and "secrets or data exposed" as must-never-happen. Owner confirmed INV-001 to INV-007 on 2026-11-26, after setting the visibility model: libraries are public by default and readable by others, owners can opt out to private, notes always stay private, and others never write. Owner follow-up, 2026-11-26: no user ratings, so ratings dropped from INV-001 and INV-003 and play counts added; single lists can be private (INV-002); "more plays on one entry, no duplicates" (INV-008). API research, 2026-11-26, for INV-007. Code today, 2026-11-26: the database model, email sign-in, the INV-005 scan, the TMDB and IGDB clients, the catalogue import and refresh, search, My library and the Credits attribution are built (`src/`, `supabase/migrations/`, `supabase/tests/`, `e2e/`). INV-009 was proposed in the same change; owner confirmed 2026-11-26.
+Sources: owner on versions, 2026-11-27 (one entry per item per version, INV-008); owner interview, 2026-11-26 (Lewis): picked "library leaks", "silent data loss", "spoilers" and "secrets or data exposed" as must-never-happen. Owner confirmed INV-001 to INV-007 on 2026-11-26, after setting the visibility model: libraries are public by default and readable by others, owners can opt out to private, notes always stay private, and others never write. Owner follow-up, 2026-11-26: no user ratings, so ratings dropped from INV-001 and INV-003 and play counts added; single lists can be private (INV-002); "more plays on one entry, no duplicates" (INV-008). API research, 2026-11-26, for INV-007. Code today, 2026-11-26: the database model, email sign-in, the INV-005 scan, the TMDB and IGDB clients, the catalogue import and refresh, search, My library and the Credits attribution are built (`src/`, `supabase/migrations/`, `supabase/tests/`, `e2e/`). INV-009 was proposed in the same change; owner confirmed 2026-11-26.
 
 # Invariants: what must never happen
 
@@ -77,12 +77,12 @@ Rules for this file (the team-workflow session-start check enforces them):
 - **Test at the boundary:** render the About/Credits page and expect the exact TMDB notice text and an IGDB attribution. The commercial part is a release check: recheck both providers' terms before any paid tier or ads.
 - **Status:** Confirmed
 
-### INV-008 — A user never has two library entries for the same item
-- **Never:** a user's library holds two entries for one item. A rewatch or replay adds to the existing entry's play count instead.
+### INV-008 — A user never has two library entries for the same item and version
+- **Never:** a user's library holds two entries for one item and version: one entry per item per version; books have a print and an audio version, other items have no version (owner said, 2026-11-27). A rewatch or replay adds to the existing entry's play count instead.
 - **Why:** duplicates split one item's history across entries, so play counts, statuses and lists stop agreeing.
-- **Enforced by:** upnext (a unique constraint on the user and item columns of the library entry table, and add or import handlers that update the existing entry rather than insert).
-- **Code today:** `library_entries` has `unique (user_id, item_id)` and `unique (user_id, season_id)` (`supabase/migrations/20261126082919_library_entries.sql`), tested in `supabase/tests/library-entries.test.ts` ("INV-008: no duplicate entries": a second insert of the same movie or season fails, and two different seasons of one show are fine). The add actions (`addItem`, `addSeasons` in `src/app/search/actions.ts`) treat a duplicate (23505) as success and leave the existing entry alone; tests in `src/app/search/actions.test.ts` and "adding a movie twice keeps one entry" in `e2e/search.spec.ts`. Gap: no play-count action yet, and no file import.
-- **Test at the boundary:** as an invented user, add the same item twice through the real add handler, then import a file listing it again. Expect one entry, and a direct insert of a duplicate row rejected by the database.
+- **Enforced by:** upnext (a unique index on the user, item and book version columns of the library entry table (season entries are unaffected), and add or import handlers that update the existing entry rather than insert).
+- **Code today:** `library_entries` has a unique index on `(user_id, item_id, book_version)` with nulls not distinct, where `item_id` is not null (`supabase/migrations/20261127110100_books.sql`; it replaced `unique (user_id, item_id)`, tested in `supabase/tests/books-schema.test.ts`), a check that `book_version` is set exactly on book entries, and `unique (user_id, season_id)` (`supabase/migrations/20261126082919_library_entries.sql`), tested in `supabase/tests/library-entries.test.ts` ("INV-008: no duplicate entries": a second insert of the same movie or season fails, and two different seasons of one show are fine). The add actions (`addItem`, `addSeasons` in `src/app/search/actions.ts`) treat a duplicate (23505) as success and leave the existing entry alone; tests in `src/app/search/actions.test.ts` and "adding a movie twice keeps one entry" in `e2e/search.spec.ts`. Gap: no play-count action yet, and no file import.
+- **Test at the boundary:** as an invented user, add the same item (for a book, the same version) twice through the real add handler, then import a file listing it again. Expect one entry, and a direct insert of a duplicate row rejected by the database. A print and an audio entry of one book are both allowed. Tests: `supabase/tests/books-schema.test.ts` plus the existing entries tests (`supabase/tests/library-entries.test.ts`).
 - **Status:** Confirmed
 
 ### INV-009 — A user's email is never shown to anyone else
@@ -96,3 +96,11 @@ Rules for this file (the team-workflow session-start check enforces them):
 ## Unconfirmed
 
 <!-- New rules go here until the owner confirms them. -->
+
+### INV-010 — A not-started entry is always in its type's Up next queue
+- **Never:** a library entry with the status Up next (`backlog`) has no queue position, or an entry in any other status keeps one.
+- **Why:** Up next and Backlog are one list (owner design, 2026-11-27); an entry with no position would vanish from My library, which shows only queued entries for that status.
+- **Enforced by:** upnext (the `library_entries_queue_backlog` trigger assigns the bottom position and clears it on leaving, and a check requires `(status = 'backlog') = (up_next_position is not null)`).
+- **Code today:** `supabase/migrations/20261127120000_up_next_is_backlog.sql` adds the trigger, the check and the backfill of older entries. Tests: `supabase/tests/up-next-merge.test.ts` (insert by the user's client and by admin, return from Paused, Dropped, In progress and Finished, the right queue per type, other users unaffected, the backfill).
+- **Test at the boundary:** as an invented user, add an item of each type and move entries between statuses through the real handlers and direct writes. Expect every Up next entry to have a position, and every other entry none.
+- **Status:** Unconfirmed

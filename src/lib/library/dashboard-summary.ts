@@ -5,50 +5,54 @@ export type DashboardStats = {
   backlog: number;
   backlogMinutes: number;
   backlogUnknownTime: number;
+  backlogPages: number;
   inProgress: number;
   finished: number;
 };
 
-/** Entries per status (a movie, game or season each counts 1) and the Backlog's time. Queued entries are Backlog. */
+/** Entries per status (a movie, game, book entry or season each counts 1) and Up next's time. Up next holds every `backlog` entry. */
 export function summarise(view: LibraryView): DashboardStats {
-  const stats: DashboardStats = { backlog: 0, backlogMinutes: 0, backlogUnknownTime: 0, inProgress: 0, finished: 0 };
+  const stats: DashboardStats = { backlog: 0, backlogMinutes: 0, backlogUnknownTime: 0, backlogPages: 0, inProgress: 0, finished: 0 };
   const addBacklog = (minutes: number | null) => {
     stats.backlog += 1;
     if (minutes === null) stats.backlogUnknownTime += 1;
     else stats.backlogMinutes += minutes;
   };
-  for (const queue of Object.values(view.upNext)) for (const row of queue) addBacklog(row.kind === "item" ? row.minutes : row.runtimeMinutes);
+  for (const queue of Object.values(view.upNext)) {
+    for (const row of queue) {
+      if (row.kind === "item" && row.mediaType === "book" && row.version !== "audio") {
+        // A print book has no time to finish, only pages; it is never "without a time".
+        stats.backlog += 1;
+        stats.backlogPages += row.pages ?? 0;
+      } else addBacklog(row.kind === "item" ? row.minutes : row.runtimeMinutes);
+    }
+  }
   for (const group of view.groups) {
     for (const row of group.rows) {
-      if (row.kind === "item") {
-        if (group.status === "backlog") addBacklog(row.minutes);
-        else if (group.status === "in_progress") stats.inProgress += 1;
-        else if (group.status === "finished") stats.finished += 1;
-      } else {
-        for (const s of row.seasons) {
-          if (group.status === "backlog") addBacklog(s.runtimeMinutes);
-          else if (group.status === "in_progress") stats.inProgress += 1;
-          else if (group.status === "finished") stats.finished += 1;
-        }
-      }
+      const entries = row.kind === "item" ? 1 : row.kind === "show" ? row.seasons.length : row.books.length;
+      if (group.status === "in_progress") stats.inProgress += entries;
+      else if (group.status === "finished") stats.finished += entries;
     }
   }
   return stats;
 }
 
-export function timeLeftLabel(minutes: number, unknown: number): string | null {
+export function timeLeftLabel(minutes: number, unknown: number, pages = 0): string | null {
   const hours = Math.round(minutes / 60);
   const parts: string[] = [];
   if (minutes > 0) parts.push(hours === 0 ? "under 1 h to finish" : `about ${hours} h to finish`);
   if (unknown > 0) parts.push(`${unknown} without a time`);
+  if (pages > 0) parts.push(`${pages.toLocaleString("en-GB")} pages to read`);
   return parts.length ? parts.join(" · ") : null;
 }
 
-/** A Backlog entry that is not out yet. `releaseDate` is YYYY-MM-DD; the title is the show's for a season. */
+/** An Up next entry that is not out yet. `releaseDate` is YYYY-MM-DD; the title is the show's for a season. */
 export type RadarEntry = {
   entryId: string;
   title: string;
   mediaType: MediaType;
+  /** Set for a book entry, so an audiobook's title reads apart. */
+  bookVersion?: "print" | "audio" | null;
   imageUrl: string | null;
   releaseDate: string;
   seasonNumber: number | null;

@@ -1,6 +1,6 @@
 ---
 name: domain
-description: Domain reference for upnext, a backlog and tracker for movies, TV shows and games - library entries and statuses (backlog, up next, in progress, finished, paused, dropped), season progress for TV, time to finish and time to beat, metadata from TMDB and IGDB, public profiles and lists, spoilers, and the invariants that must never be broken. Load it for domain questions, designs, tickets and reviews, and for any change that touches a user's library, visibility, metadata imports, secrets or personal data.
+description: Domain reference for upnext, a backlog and tracker for movies, TV shows, games and books - library entries and statuses (Up next, in progress, finished, paused, dropped), season progress for TV, book versions (print and audiobook) and series progress, time to finish and time to beat, metadata from TMDB, IGDB and Hardcover, public profiles and lists, spoilers, and the invariants that must never be broken. Load it for domain questions, designs, tickets and reviews, and for any change that touches a user's library, visibility, metadata imports, secrets or personal data.
 ---
 
 # domain

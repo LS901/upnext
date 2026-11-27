@@ -5,12 +5,12 @@ import { Poster } from "@/components/poster";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { LibraryView, UpNextRow } from "@/lib/library/queries";
 import { QUEUE_LABELS, QUEUE_TYPES, type QueueType } from "@/lib/library/up-next-order";
-import { entryTitle } from "./titles";
+import { audiobookTitle, entryTitle } from "./titles";
 
 const SHOWN = 3;
 
 function rowTitle(row: UpNextRow): string {
-  return row.kind === "season" ? entryTitle(row.showTitle, row.number) : row.title;
+  return row.kind === "season" ? entryTitle(row.showTitle, row.number) : audiobookTitle(row.title, row.version);
 }
 
 /** The top of each queue the user hasn't hidden in My library and has something in. */

@@ -9,7 +9,8 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { TYPE_LABELS } from "@/lib/format/type-labels";
 import { getCurrentUser } from "@/lib/auth/current-user";
-import { inLibrary, itemKey, type ItemKey } from "@/lib/library/in-library";
+import { bookVersionsInLibrary, inLibrary, itemKey, type BookVersion, type ItemKey } from "@/lib/library/in-library";
+import { searchHardcover } from "@/lib/providers/hardcover";
 import { searchIgdb } from "@/lib/providers/igdb";
 import { searchTmdb } from "@/lib/providers/tmdb";
 import { ProviderError, type MediaType, type Provider, type SearchResult } from "@/lib/providers/types";
@@ -22,7 +23,7 @@ import { logProviderFailure, PROVIDER_NAMES } from "./shared";
 
 export const metadata: Metadata = { title: "Search" };
 
-const HIDE_LABELS: Record<MediaType, string> = { movie: "Movies", show: "TV", game: "Games" };
+const HIDE_LABELS: Record<MediaType, string> = { movie: "Movies", show: "TV", game: "Games", book: "Books" };
 
 export default function SearchPage({ searchParams }: PageProps<"/search">) {
   return (
@@ -36,7 +37,11 @@ export default function SearchPage({ searchParams }: PageProps<"/search">) {
   );
 }
 
-const SEARCHES: Record<Provider, (q: string) => Promise<SearchResult[]>> = { tmdb: searchTmdb, igdb: searchIgdb };
+const SEARCHES: Record<Provider, (q: string) => Promise<SearchResult[]>> = {
+  tmdb: searchTmdb,
+  igdb: searchIgdb,
+  hardcover: searchHardcover,
+};
 
 // Queries only the providers whose types aren't hidden (none when every type
 // is), in parallel. A provider that fails (down, rate-limited) is reported,
@@ -67,14 +72,22 @@ async function SearchContent({ searchParams }: Pick<PageProps<"/search">, "searc
   // Nothing is sent to a provider for an empty query.
   const outcome = state.q ? await runSearch(state) : null;
   const keyOf = (r: SearchResult) => itemKey(r.provider, r.mediaType, r.providerId);
-  const owned = outcome
-    ? await inLibrary(await createClient(), user.id, outcome.results.map(keyOf))
-    : new Set<ItemKey>();
+  // Movies, games and shows are owned or not; a book is owned per version.
+  const supabase = outcome ? await createClient() : null;
+  const isBook = (r: SearchResult) => r.mediaType === "book";
+  const owned =
+    outcome && supabase
+      ? await inLibrary(supabase, user.id, outcome.results.filter((r) => !isBook(r)).map(keyOf))
+      : new Set<ItemKey>();
+  const versions =
+    outcome && supabase
+      ? await bookVersionsInLibrary(supabase, user.id, outcome.results.filter(isBook).map((r) => r.providerId))
+      : new Map<string, Set<BookVersion>>();
 
   // A provider that failed this search, or while adding from the last one.
   const failed = new Set<Provider>(outcome?.failed);
   const addFailed = [params.failed].flat()[0];
-  if (addFailed === "tmdb" || addFailed === "igdb") failed.add(addFailed);
+  if (addFailed === "tmdb" || addFailed === "igdb" || addFailed === "hardcover") failed.add(addFailed);
 
   return (
     <div className="mt-6 grid gap-8 md:grid-cols-[1fr_10rem]">
@@ -102,7 +115,13 @@ async function SearchContent({ searchParams }: Pick<PageProps<"/search">, "searc
         {outcome && outcome.results.length > 0 && (
           <ul className="flex flex-col gap-3">
             {outcome.results.map((r) => (
-              <Result key={keyOf(r)} result={r} owned={owned.has(keyOf(r))} state={state} />
+              <Result
+                key={keyOf(r)}
+                result={r}
+                owned={owned.has(keyOf(r))}
+                versions={versions.get(r.providerId) ?? new Set()}
+                state={state}
+              />
             ))}
           </ul>
         )}
@@ -112,7 +131,7 @@ async function SearchContent({ searchParams }: Pick<PageProps<"/search">, "searc
       <aside>
         <h2 className="text-sm font-medium text-muted-foreground">Hide</h2>
         <div className="mt-2 flex flex-wrap gap-2 md:flex-col">
-          {(Object.keys(HIDE_LABELS) as MediaType[]).map((type) => (
+          {(Object.keys(HIDE_LABELS) as (keyof typeof HIDE_LABELS)[]).map((type) => (
             <label
               key={type}
               className="flex min-h-11 cursor-pointer items-center gap-2 rounded-full border border-input bg-secondary px-4 text-sm transition-[transform,color,background-color,border-color] duration-150 hover:bg-muted has-checked:border-primary has-checked:bg-primary/20 md:rounded-lg lg:min-h-9"
@@ -138,7 +157,48 @@ function resultCount(n: number): string {
   return `${n} ${n === 1 ? "result" : "results"}.`;
 }
 
-function Result({ result: r, owned, state }: { result: SearchResult; owned: boolean; state: SearchState }) {
+// Stays a (disabled) button: e2e and screen readers know it by that role.
+function OwnedButton({ label }: { label: string }) {
+  return (
+    <button
+      type="button"
+      disabled
+      className="inline-flex h-11 items-center gap-1.5 rounded-md border border-input bg-secondary px-3 text-sm font-medium text-accent-text lg:h-9"
+    >
+      <Check aria-hidden="true" className="size-4" />
+      {label}
+    </button>
+  );
+}
+
+// `version` is set for books only: print, or audio.
+function AddForm({ result: r, state, label, version }: { result: SearchResult; state: SearchState; label: string; version?: BookVersion }) {
+  return (
+    <form action={addItem}>
+      <input type="hidden" name="provider" value={r.provider} />
+      <input type="hidden" name="mediaType" value={r.mediaType} />
+      <input type="hidden" name="providerId" value={r.providerId} />
+      {version && <input type="hidden" name="version" value={version} />}
+      <input type="hidden" name="q" value={state.q} />
+      {state.exclude.map((type) => (
+        <input key={type} type="hidden" name="exclude" value={type} />
+      ))}
+      <Button type="submit">{label}</Button>
+    </form>
+  );
+}
+
+function Result({
+  result: r,
+  owned,
+  versions,
+  state,
+}: {
+  result: SearchResult;
+  owned: boolean;
+  versions: ReadonlySet<BookVersion>;
+  state: SearchState;
+}) {
   return (
     <li>
       <Card size="sm" className="flex-row items-center gap-4 px-4">
@@ -150,34 +210,30 @@ function Result({ result: r, owned, state }: { result: SearchResult; owned: bool
             {r.year !== null && <span className="tabular-nums">{r.year}</span>}
           </p>
           <div className="flex flex-wrap items-center gap-2">
-            {owned && (
-              // Stays a (disabled) button: e2e and screen readers know it by that role.
-              <button
-                type="button"
-                disabled
-                className="inline-flex h-11 items-center gap-1.5 rounded-md border border-input bg-secondary px-3 text-sm font-medium text-accent-text lg:h-9"
-              >
-                <Check aria-hidden="true" className="size-4" />
-                In your library
-              </button>
-            )}
-            {r.mediaType === "show" ? (
-              <Link href={`/search/show/${r.providerId}`} className={buttonVariants({ variant: "secondary" })}>
-                Choose seasons
-              </Link>
+            {r.mediaType === "book" ? (
+              <>
+                {versions.has("print") ? (
+                  <OwnedButton label="In your library" />
+                ) : (
+                  <AddForm result={r} state={state} label="Add" version="print" />
+                )}
+                {versions.has("audio") ? (
+                  <OwnedButton label="Audiobook in your library" />
+                ) : (
+                  r.hasAudiobook && <AddForm result={r} state={state} label="Add audiobook" version="audio" />
+                )}
+              </>
             ) : (
-              !owned && (
-                <form action={addItem}>
-                  <input type="hidden" name="provider" value={r.provider} />
-                  <input type="hidden" name="mediaType" value={r.mediaType} />
-                  <input type="hidden" name="providerId" value={r.providerId} />
-                  <input type="hidden" name="q" value={state.q} />
-                  {state.exclude.map((type) => (
-                    <input key={type} type="hidden" name="exclude" value={type} />
-                  ))}
-                  <Button type="submit">Add</Button>
-                </form>
-              )
+              <>
+                {owned && <OwnedButton label="In your library" />}
+                {r.mediaType === "show" ? (
+                  <Link href={`/search/show/${r.providerId}`} className={buttonVariants({ variant: "secondary" })}>
+                    Choose seasons
+                  </Link>
+                ) : (
+                  !owned && <AddForm result={r} state={state} label="Add" />
+                )}
+              </>
             )}
           </div>
         </div>

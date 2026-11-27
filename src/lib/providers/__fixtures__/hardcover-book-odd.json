@@ -1,0 +1,18 @@
+{
+  "data": {
+    "books_by_pk": {
+      "id": 9002,
+      "title": "Quiet Harbour",
+      "pages": null,
+      "rating": null,
+      "ratings_count": null,
+      "release_date": null,
+      "image": null,
+      "default_audio_edition": null,
+      "book_series": [
+        { "position": 2.5, "details": "2.5", "featured": false, "series": { "id": 900, "name": "Harbour Tales", "primary_books_count": 4, "is_completed": false } },
+        { "position": 3, "details": "3", "featured": false, "series": { "id": 500, "name": "Tide Set", "primary_books_count": null, "is_completed": null } }
+      ]
+    }
+  }
+}

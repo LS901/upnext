@@ -1,0 +1,54 @@
+{
+  "data": {
+    "search": {
+      "results": {
+        "hits": [
+          {
+            "document": {
+              "id": 8101,
+              "title": "The Lantern Tide",
+              "release_year": 2018,
+              "image": {
+                "url": "https://assets.hardcover.app/invented/lantern-tide.jpg"
+              },
+              "has_audiobook": true
+            }
+          },
+          {
+            "document": {
+              "id": 8102,
+              "title": "Paper Orchard",
+              "release_year": 2012,
+              "image": {
+                "url": "https://assets.hardcover.app/invented/paper-orchard.jpg"
+              },
+              "has_audiobook": false
+            }
+          },
+          {
+            "document": {
+              "id": 8103,
+              "title": "Salt Meridian",
+              "release_year": 2021,
+              "image": {
+                "url": "https://assets.hardcover.app/invented/salt-meridian.jpg"
+              },
+              "has_audiobook": true
+            }
+          },
+          {
+            "document": {
+              "id": 8104,
+              "title": "Glasswing Signal",
+              "release_year": 2016,
+              "image": {
+                "url": "https://assets.hardcover.app/invented/glasswing-signal.jpg"
+              },
+              "has_audiobook": true
+            }
+          }
+        ]
+      }
+    }
+  }
+}

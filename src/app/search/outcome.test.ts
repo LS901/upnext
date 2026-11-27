@@ -48,7 +48,7 @@ test("nothing queried (every type hidden) is not Nothing found", () => {
 });
 
 test("every type hidden asks no provider and reads as everything hidden", () => {
-  const all = ["movie", "show", "game"] as const;
+  const all = ["movie", "show", "game", "book"] as const;
   expect(providersToAsk(all)).toEqual([]);
   expect(summarise([{ provider: "tmdb", status: "skipped" }, { provider: "igdb", status: "skipped" }], all)).toEqual({
     results: [],
@@ -59,10 +59,12 @@ test("every type hidden asks no provider and reads as everything hidden", () => 
 });
 
 test("a provider is asked unless every one of its types is hidden", () => {
-  expect(providersToAsk([])).toEqual(["tmdb", "igdb"]);
-  expect(providersToAsk(["movie"])).toEqual(["tmdb", "igdb"]);
-  expect(providersToAsk(["movie", "show"])).toEqual(["igdb"]);
-  expect(providersToAsk(["game"])).toEqual(["tmdb"]);
+  expect(providersToAsk([])).toEqual(["tmdb", "igdb", "hardcover"]);
+  expect(providersToAsk(["movie"])).toEqual(["tmdb", "igdb", "hardcover"]);
+  expect(providersToAsk(["movie", "show"])).toEqual(["igdb", "hardcover"]);
+  expect(providersToAsk(["game"])).toEqual(["tmdb", "hardcover"]);
+  expect(providersToAsk(["book"])).toEqual(["tmdb", "igdb"]);
+  expect(providersToAsk(["movie", "show", "game"])).toEqual(["hardcover"]);
   expect(summarise([{ provider: "tmdb", status: "skipped" }, { provider: "igdb", status: "failed" }], []).everythingHidden).toBe(
     false,
   );

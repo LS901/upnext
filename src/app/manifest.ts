@@ -4,7 +4,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "upnext",
     short_name: "upnext",
-    description: "Track the movies, shows and games you're on, what's next, and what you've finished.",
+    description: "Track the movies, shows, games and books you're on, what's next, and what you've finished.",
     start_url: "/",
     display: "standalone",
     background_color: "#0c0b12",

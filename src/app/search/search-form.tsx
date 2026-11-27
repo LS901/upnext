@@ -146,7 +146,7 @@ export function SearchForm({ q, exclude }: { q: string; exclude: MediaType[] }) 
       className="flex items-end gap-3"
     >
       <label className="block min-w-0 flex-1 text-sm text-muted-foreground">
-        Search movies, TV and games
+        Search movies, TV, games and books
         <span className="relative mt-1 block">
           <Search
             aria-hidden="true"

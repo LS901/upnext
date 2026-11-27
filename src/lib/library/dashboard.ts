@@ -12,6 +12,7 @@ export type FinishedEntry = {
   entryId: string;
   title: string;
   mediaType: MediaType;
+  bookVersion: "print" | "audio" | null;
   imageUrl: string | null;
   seasonNumber: number | null;
   finishedAt: string;
@@ -48,7 +49,7 @@ async function getRadar(supabase: Client, userId: string, today: string): Promis
     fetchAll((from, to) =>
       supabase
         .from("library_entries")
-        .select(`id, item:items!inner(${ITEM_COLUMNS})`)
+        .select(`id, book_version, item:items!inner(${ITEM_COLUMNS})`)
         .eq("user_id", userId)
         .eq("status", "backlog")
         .gt("item.release_date", today)
@@ -74,6 +75,7 @@ async function getRadar(supabase: Client, userId: string, today: string): Promis
       entryId: e.id,
       title: e.item.title,
       mediaType: e.item.media_type,
+      bookVersion: e.book_version,
       imageUrl: imageUrl(e.item.provider, e.item.image_ref),
       releaseDate: e.item.release_date,
       seasonNumber: null,
@@ -96,7 +98,7 @@ async function getRadar(supabase: Client, userId: string, today: string): Promis
 async function getRecentlyFinished(supabase: Client, userId: string): Promise<FinishedEntry[]> {
   const { data, error } = await supabase
     .from("library_entries")
-    .select(`id, finished_at, item:items(${ITEM_COLUMNS}), season:seasons(${SEASON_COLUMNS})`)
+    .select(`id, finished_at, book_version, item:items(${ITEM_COLUMNS}), season:seasons(${SEASON_COLUMNS})`)
     .eq("user_id", userId)
     .eq("status", "finished")
     .not("finished_at", "is", null)
@@ -113,6 +115,7 @@ async function getRecentlyFinished(supabase: Client, userId: string): Promise<Fi
           entryId: e.id,
           title: e.item.title,
           mediaType: e.item.media_type,
+          bookVersion: e.book_version,
           imageUrl: imageUrl(e.item.provider, e.item.image_ref),
           seasonNumber: null,
           finishedAt: e.finished_at,
@@ -125,6 +128,7 @@ async function getRecentlyFinished(supabase: Client, userId: string): Promise<Fi
           entryId: e.id,
           title: e.season.show.title,
           mediaType: "show",
+          bookVersion: null,
           imageUrl: imageUrl(e.season.show.provider, e.season.show.image_ref),
           seasonNumber: e.season.season_number,
           finishedAt: e.finished_at,

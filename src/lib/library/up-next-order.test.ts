@@ -1,5 +1,14 @@
 import { describe, expect, test } from "vitest";
-import { hiddenFromShown, parseHidden, placeBefore, queueOf, targetFor, type Placed } from "./up-next-order";
+import {
+  QUEUE_LABELS,
+  QUEUE_TYPES,
+  hiddenFromShown,
+  parseHidden,
+  placeBefore,
+  queueOf,
+  targetFor,
+  type Placed,
+} from "./up-next-order";
 
 const q = (...pairs: [string, number][]): Placed[] => pairs.map(([id, position]) => ({ id, position }));
 
@@ -8,21 +17,31 @@ describe("which queues are hidden", () => {
     expect(parseHidden(undefined)).toEqual([]);
     expect(parseHidden("")).toEqual([]);
     expect(parseHidden("game,movie")).toEqual(["movie", "game"]);
-    expect(parseHidden("game,book,<script>,game")).toEqual(["game"]);
+    expect(parseHidden("game,book,<script>,game")).toEqual(["game", "book"]);
+    expect(parseHidden("book,show,ebook")).toEqual(["show", "book"]);
   });
 
   test("the ticked boxes are what's shown; the rest is hidden", () => {
-    expect(hiddenFromShown(["movie", "show", "game"])).toBe("");
-    expect(hiddenFromShown(["show"])).toBe("movie,game");
-    expect(hiddenFromShown(["show", "nonsense"])).toBe("movie,game");
-    expect(hiddenFromShown([])).toBe("movie,show,game");
+    expect(hiddenFromShown(["movie", "show", "game", "book"])).toBe("");
+    expect(hiddenFromShown(["movie", "show", "game"])).toBe("book");
+    expect(hiddenFromShown(["show"])).toBe("movie,game,book");
+    expect(hiddenFromShown(["show", "nonsense"])).toBe("movie,game,book");
+    expect(hiddenFromShown([])).toBe("movie,show,game,book");
+  });
+});
+
+describe("queue types", () => {
+  test("My library shows Movies, TV, Games, then Books", () => {
+    expect(QUEUE_TYPES).toEqual(["movie", "show", "game", "book"]);
+    expect(QUEUE_TYPES.map((type) => QUEUE_LABELS[type])).toEqual(["Movies", "TV", "Games", "Books"]);
   });
 });
 
 describe("queueOf", () => {
-  test("movies and games queue by their type; seasons queue as TV", () => {
+  test("movies, games and books queue by their type; seasons queue as TV", () => {
     expect(queueOf({ item_media_type: "movie", season_id: null })).toBe("movie");
     expect(queueOf({ item_media_type: "game", season_id: null })).toBe("game");
+    expect(queueOf({ item_media_type: "book", season_id: null })).toBe("book");
     expect(queueOf({ item_media_type: null, season_id: "s-1" })).toBe("show");
   });
 

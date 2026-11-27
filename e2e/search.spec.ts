@@ -53,7 +53,7 @@ function unique(term: string): string {
  * Search button.
  */
 async function search(page: Page, term: string) {
-  await page.getByLabel("Search movies, TV and games").fill(term);
+  await page.getByLabel("Search movies, TV, games and books").fill(term);
   const q = term.trim();
   if (q.length >= 3) {
     await expect(page).toHaveURL((url) => url.searchParams.get("q") === q);
@@ -128,7 +128,7 @@ test("an empty search makes no provider calls", async ({ page }) => {
 
 test("results appear as you type, with one search per pause, not one per letter", async ({ page }) => {
   await page.goto("/search");
-  const box = page.getByLabel("Search movies, TV and games");
+  const box = page.getByLabel("Search movies, TV, games and books");
   // Random first, so no prefix of it is another test's search in the stub's
   // shared log (other specs search "Kestrel"). The stub answers any term.
   const term = `${randomBytes(3).toString("hex")} Kestrel`;
@@ -221,8 +221,9 @@ test("search shows both providers and hides excluded types", async ({ page }) =>
   await expect(result(page, "Kestrel Morning")).toHaveCount(0);
   expect((await stubRequests()).filter((r) => r.term === gamesOnly).map((r) => r.provider)).toEqual(["igdb"]);
 
-  // Hide all three: no provider is asked, and the page says why it's empty.
+  // Hide every type: no provider is asked, and the page says why it's empty.
   await page.getByRole("checkbox", { name: "Games" }).check();
+  await page.getByRole("checkbox", { name: "Books" }).check();
   const nothingShown = unique("Kestrel");
   await search(page, nothingShown);
   await expect(page.getByText("Everything is hidden. Untick a type to search.")).toBeVisible();

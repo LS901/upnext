@@ -15,9 +15,13 @@ const item = (id: string, status: ItemRow["status"], minutes: number | null): It
   entryId: id,
   status,
   mediaType: "movie",
+  version: null,
   title: id,
   imageUrl: null,
   minutes,
+  pages: null,
+  narrators: null,
+  providerName: "tmdb",
   score: null,
   scoreCount: null,
 });
@@ -51,23 +55,80 @@ const queuedSeason = (id: string, runtimeMinutes: number | null): QueuedSeasonRo
 describe("summarise", () => {
   test("counts entries, backlog minutes and unknown times", () => {
     const view: LibraryView = {
-      upNext: { movie: [item("q1", "backlog", 30)], show: [], game: [] },
+      upNext: {
+        movie: [item("q1", "backlog", 30), item("b1", "backlog", 100), item("b2", "backlog", null)],
+        show: [queuedSeason("s1", 60), queuedSeason("s2", 40)],
+        game: [],
+        book: [],
+      },
       groups: [
         { status: "in_progress", label: "In progress", rows: [item("p1", "in_progress", 90), show([season("ps", "in_progress", 50)])] },
-        { status: "backlog", label: "Backlog", rows: [item("b1", "backlog", 100), item("b2", "backlog", null), show([season("s1", "backlog", 60), season("s2", "backlog", 40)])] },
         { status: "finished", label: "Finished", rows: [item("f1", "finished", 10), item("f2", "finished", 20)] },
       ],
     };
-    expect(summarise(view)).toEqual({ backlog: 5, backlogMinutes: 230, backlogUnknownTime: 1, inProgress: 2, finished: 2 });
+    expect(summarise(view)).toEqual({ backlog: 5, backlogMinutes: 230, backlogUnknownTime: 1, backlogPages: 0, inProgress: 2, finished: 2 });
   });
 
   test("a queued season counts as backlog", () => {
-    const view: LibraryView = { upNext: { movie: [], show: [queuedSeason("qs", null)], game: [] }, groups: [] };
-    expect(summarise(view)).toEqual({ backlog: 1, backlogMinutes: 0, backlogUnknownTime: 1, inProgress: 0, finished: 0 });
+    const view: LibraryView = { upNext: { movie: [], show: [queuedSeason("qs", null)], game: [], book: [] }, groups: [] };
+    expect(summarise(view)).toEqual({ backlog: 1, backlogMinutes: 0, backlogUnknownTime: 1, backlogPages: 0, inProgress: 0, finished: 0 });
+  });
+});
+
+const book = (id: string, version: "print" | "audio", extra: Partial<ItemRow>): ItemRow => ({
+  ...item(id, "backlog", null),
+  mediaType: "book",
+  version,
+  providerName: "hardcover",
+  ...extra,
+});
+
+describe("summarise with books", () => {
+  test("print pages add to backlogPages and audio minutes to the time", () => {
+    const view: LibraryView = {
+      upNext: {
+        movie: [],
+        show: [],
+        game: [],
+        book: [
+          book("p1", "print", { pages: 300 }),
+          book("p2", "print", { pages: 940 }),
+          book("a1", "audio", { minutes: 600 }),
+          book("a2", "audio", { minutes: null }),
+        ],
+      },
+      groups: [],
+    };
+    expect(summarise(view)).toEqual({
+      backlog: 4,
+      backlogMinutes: 600,
+      backlogUnknownTime: 1,
+      backlogPages: 1240,
+      inProgress: 0,
+      finished: 0,
+    });
+  });
+
+  test("a print book with no page count never counts as unknown", () => {
+    const view: LibraryView = { upNext: { movie: [], show: [], game: [], book: [book("p", "print", { pages: null })] }, groups: [] };
+    expect(summarise(view)).toEqual({
+      backlog: 1,
+      backlogMinutes: 0,
+      backlogUnknownTime: 0,
+      backlogPages: 0,
+      inProgress: 0,
+      finished: 0,
+    });
   });
 });
 
 describe("timeLeftLabel", () => {
+  test("pages", () => {
+    expect(timeLeftLabel(600, 0, 1240)).toBe("about 10 h to finish · 1,240 pages to read");
+    expect(timeLeftLabel(0, 0, 320)).toBe("320 pages to read");
+    expect(timeLeftLabel(0, 0, 0)).toBeNull();
+  });
+
   test("labels", () => {
     expect(timeLeftLabel(9420, 0)).toBe("about 157 h to finish");
     expect(timeLeftLabel(9420, 2)).toBe("about 157 h to finish · 2 without a time");

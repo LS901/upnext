@@ -1,10 +1,11 @@
-// Up next: one queue per media type (owner said, 2026-11-26), written through the
-// user's own client. Only the user's own Backlog entries can be queued or moved,
-// and an entry never moves into another type's queue (INV-001, INV-002).
+// Up next: one queue per media type (owner said, 2026-11-26) holding every Backlog
+// entry (owner said, 2026-11-27), written through the user's own client. Only the
+// user's own entries can be moved, and an entry never moves into another type's
+// queue (INV-001, INV-002).
 import { randomInt } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
-import { getMyLibrary, setEntryStatus } from "../../src/lib/library/queries";
-import { addToUpNext, placeInUpNext, removeFromUpNext } from "../../src/lib/library/up-next";
+import { deleteEntry, getMyLibrary, setEntryStatus } from "../../src/lib/library/queries";
+import { placeInUpNext } from "../../src/lib/library/up-next";
 import { adminClient, anonClient, createTestUser, deleteTestUsers, type TestUser } from "./helpers";
 
 vi.mock("server-only", () => ({}));
@@ -83,27 +84,25 @@ describe("Up next", () => {
   });
 
   test("each type has its own queue, and adding goes to the bottom of that type's queue", async () => {
-    for (const key of ["m1", "m2", "game", "s1", "m3"]) await addToUpNext(a.client, a.id, entry[key]);
-
+    // Added in beforeAll: m1, m2, m3 (m4 Paused), the game, then seasons 1 and 2.
     expect(await queues()).toEqual({
       movie: [entry.m1, entry.m2, entry.m3],
-      show: [entry.s1],
+      show: [entry.s1, entry.s2],
       game: [entry.game],
+      book: [],
     });
-    // The game and the season start their own queues rather than joining the movies'.
-    expect(await positions(["m1", "m2", "m3", "game", "s1"])).toEqual({ m1: 1, m2: 2, m3: 3, game: 1, s1: 1 });
+    // The game and the seasons start their own queues rather than joining the movies'.
+    expect(await positions(["m1", "m2", "m3", "game", "s1", "s2"])).toEqual({ m1: 1, m2: 2, m3: 3, game: 1, s1: 1, s2: 2 });
 
-    // Queued entries show in their queue, not again under Backlog.
+    // Every Backlog entry is in its queue, so there's no Backlog group.
     const { groups } = await getMyLibrary(a.client, a.id);
-    const backlog = groups.find((g) => g.status === "backlog")!;
-    expect(backlog.rows.map((r) => r.title)).toEqual(["Invented Queue Show"]);
-    expect(backlog.rows[0]).toMatchObject({ seasons: [expect.objectContaining({ entryId: entry.s2 })] });
+    expect(groups.map((g) => g.status)).toEqual(["paused"]);
   });
 
-  test("adding twice keeps one place, and only Backlog entries can be queued", async () => {
-    await addToUpNext(a.client, a.id, entry.m1);
+  test("adding twice keeps one place, and only Backlog entries are queued", async () => {
+    const again = await a.client.from("library_entries").insert({ item_id: item.m1, item_media_type: "movie" });
+    expect(again.error?.code).toBe("23505");
     expect((await queues()).movie).toEqual([entry.m1, entry.m2, entry.m3]);
-    await expect(addToUpNext(a.client, a.id, entry.m4)).rejects.toThrow("Only Backlog entries can go in Up next.");
     expect(await positions(["m4"])).toEqual({ m4: null });
   });
 
@@ -167,35 +166,37 @@ describe("Up next", () => {
     // Before the game, or before b's entry: neither is in a's movie queue, so nothing moves.
     await placeInUpNext(a.client, a.id, entry.m1, entry.game);
     await placeInUpNext(a.client, a.id, entry.m1, entry.bMovie);
-    expect(await queues()).toEqual({ movie: [entry.m1, entry.m2, entry.m3], show: [entry.s1], game: [entry.game] });
+    expect(await queues()).toEqual({
+      movie: [entry.m1, entry.m2, entry.m3],
+      show: [entry.s1, entry.s2],
+      game: [entry.game],
+      book: [],
+    });
   });
 
   test("remove and start take an entry off its queue; a second remove does nothing", async () => {
-    await removeFromUpNext(a.client, a.id, entry.m2);
-    await removeFromUpNext(a.client, a.id, entry.m2);
+    // Remove deletes the entry from the library; a double-click is quiet.
+    await deleteEntry(a.client, a.id, entry.m2);
+    await deleteEntry(a.client, a.id, entry.m2);
     expect((await queues()).movie).toEqual([entry.m1, entry.m3]);
-    const { data: removed } = await adminClient().from("library_entries").select("status").eq("id", entry.m2).single();
-    expect(removed).toEqual({ status: "backlog" });
+    const { data: removed } = await adminClient().from("library_entries").select("status").eq("id", entry.m2);
+    expect(removed).toEqual([]);
 
     await setEntryStatus(a.client, a.id, entry.m1, "in_progress");
     expect((await queues()).movie).toEqual([entry.m3]);
   });
 
-  test("another user's queue never shows in yours, and their entries can't be queued, moved or removed", async () => {
-    expect(await queues(b)).toEqual({ movie: [entry.bMovie, entry.bMovie2], show: [], game: [] });
+  test("another user's queue never shows in yours, and their entries can't be moved", async () => {
+    expect(await queues(b)).toEqual({ movie: [entry.bMovie, entry.bMovie2], show: [], game: [entry.bGame], book: [] });
     expect((await queues()).movie).not.toContain(entry.bMovie);
 
     const refused = "That entry isn't in your library.";
-    await expect(addToUpNext(a.client, a.id, entry.bMovie)).rejects.toThrow(refused);
     await expect(placeInUpNext(a.client, a.id, entry.bMovie, null)).rejects.toThrow(refused);
-    await expect(removeFromUpNext(a.client, a.id, entry.bMovie)).rejects.toThrow(refused);
-    // Even passing b's own id, RLS lets a's client change nothing.
-    await expect(removeFromUpNext(a.client, b.id, entry.bMovie)).rejects.toThrow(refused);
-    // And where the write would really change something: an add, and a move.
-    await expect(addToUpNext(a.client, b.id, entry.bGame)).rejects.toThrow(refused);
+    // Even passing b's own id, where the move would really change something,
+    // RLS lets a's client change nothing.
     await expect(placeInUpNext(a.client, b.id, entry.bMovie2, entry.bMovie)).rejects.toThrow(refused);
 
-    expect(await positions(["bMovie", "bMovie2", "bGame"])).toEqual({ bMovie: 1, bMovie2: 2, bGame: null });
+    expect(await positions(["bMovie", "bMovie2", "bGame"])).toEqual({ bMovie: 1, bMovie2: 2, bGame: 1 });
   });
 
   test("the renumber function only touches the caller's own queued Backlog entries, and only signed in", async () => {
@@ -203,7 +204,7 @@ describe("Up next", () => {
     const { data: theirs, error } = await a.client.rpc("set_up_next_order", { entry_ids: [entry.bMovie2, entry.bMovie] });
     if (error) throw error;
     expect(theirs).toBe(0);
-    // The caller's own, but not queued: m2 was taken off Up next, m4 is Paused.
+    // The caller's own, but not queued: m2 was removed, m4 is Paused.
     const { data: unqueued, error: ownError } = await a.client.rpc("set_up_next_order", { entry_ids: [entry.m2, entry.m4] });
     if (ownError) throw ownError;
     expect(unqueued).toBe(0);
@@ -211,6 +212,6 @@ describe("Up next", () => {
     const { error: anonError } = await anonClient().rpc("set_up_next_order", { entry_ids: [entry.m3] });
     expect(anonError).not.toBeNull();
 
-    expect(await positions(["bMovie", "bMovie2", "m2", "m4"])).toEqual({ bMovie: 1, bMovie2: 2, m2: null, m4: null });
+    expect(await positions(["bMovie", "bMovie2", "m4"])).toEqual({ bMovie: 1, bMovie2: 2, m4: null });
   });
 });

@@ -14,7 +14,7 @@ describe("My library", () => {
   let a: TestUser;
   let b: TestUser;
   const itemIds: string[] = [];
-  const ids = { movie: "", game: "", show: "" };
+  const ids = { movie: "", game: "", show: "", book: "" };
   const season: Record<number, string> = {};
   const entry: Record<string, string> = {};
 
@@ -90,8 +90,9 @@ describe("My library", () => {
     expect(visible?.length).toBe(3); // readable, so the filter is what keeps them out
 
     const { groups } = await getMyLibrary(a.client, a.id);
-    expect(groups.map((g) => g.label)).toEqual(["In progress", "Backlog", "Finished"]);
-    const [playing, backlog, finished] = groups;
+    // Backlog entries are all in Up next, so there's no Backlog group.
+    expect(groups.map((g) => g.label)).toEqual(["In progress", "Finished"]);
+    const [playing, finished] = groups;
 
     expect(playing.rows).toEqual([
       expect.objectContaining({
@@ -104,18 +105,24 @@ describe("My library", () => {
         scoreCount: null,
       }),
     ]);
-    // The film is in Up next, so it shows in the Movies queue, not again under Backlog.
+    // The film and season 1 are in Up next, so they show in their queues.
     const { upNext } = await getMyLibrary(a.client, a.id);
     expect(upNext.movie).toEqual([
       expect.objectContaining({ entryId: entry.aMovie, minutes: 125, score: 71, scoreCount: 321, imageUrl: null }),
     ]);
-    expect(upNext.show).toEqual([]);
-    expect(upNext.game).toEqual([]);
-    expect(backlog.rows.map((r) => r.title)).toEqual(["Invented Libview Show"]);
-    const show = backlog.rows[0] as ShowRow;
-    expect(show.seasons).toEqual([
-      { entryId: entry.aS1, status: "backlog", number: 1, episodeCount: null, airDate: null, runtimeMinutes: 98 },
+    expect(upNext.show).toEqual([
+      expect.objectContaining({
+        kind: "season",
+        showTitle: "Invented Libview Show",
+        entryId: entry.aS1,
+        status: "backlog",
+        number: 1,
+        episodeCount: null,
+        airDate: null,
+        runtimeMinutes: 98,
+      }),
     ]);
+    expect(upNext.game).toEqual([]);
     expect((finished.rows[0] as ShowRow).seasons.map((s) => s.entryId)).toEqual([entry.aS2]);
   });
 
@@ -124,15 +131,13 @@ describe("My library", () => {
     // exclusion of season 2 and b's finished season 1 must not count.
     const { groups } = await getMyLibrary(a.client, a.id);
     const shows = groups.flatMap((g) => g.rows).filter((r): r is ShowRow => r.kind === "show");
-    expect(shows.map((s) => s.progress)).toEqual([
-      { finished: 1, total: 2 },
-      { finished: 1, total: 2 },
-    ]);
+    // One show row: season 1 is in Up next, season 2 under Finished.
+    expect(shows.map((s) => s.progress)).toEqual([{ finished: 1, total: 2 }]);
 
     // b: seasons 1-3 minus b's exclusion of 2 = 2; b finished season 1.
     const other = await getMyLibrary(b.client, b.id);
     expect(other.groups.map((g) => g.label)).toEqual(["Paused", "Finished", "Dropped"]);
-    expect(other.groups.flatMap((g) => g.rows).map((r) => (r.kind === "show" ? r.progress : r.entryId))).toEqual([
+    expect(other.groups.flatMap((g) => g.rows).map((r) => (r.kind === "show" ? r.progress : r.kind === "item" ? r.entryId : r.seriesId))).toEqual([
       { finished: 1, total: 2 },
       { finished: 1, total: 2 },
       entry.bMovie,

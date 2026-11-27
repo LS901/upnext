@@ -1,0 +1,93 @@
+{
+  "8101": {
+    "id": 8101,
+    "title": "The Lantern Tide",
+    "pages": 320,
+    "rating": 4.2,
+    "ratings_count": 1234,
+    "release_date": "2018-05-01",
+    "image": {
+      "url": "https://assets.hardcover.app/invented/lantern-tide.jpg"
+    },
+    "default_audio_edition": {
+      "audio_seconds": 39600,
+      "contributions": [
+        {
+          "author": {
+            "name": "Invented Narrator"
+          },
+          "contributor_role": {
+            "slug": "narrator"
+          }
+        }
+      ]
+    },
+    "book_series": []
+  },
+  "8102": {
+    "id": 8102,
+    "title": "Paper Orchard",
+    "pages": 1,
+    "rating": null,
+    "ratings_count": null,
+    "release_date": "2012-03-09",
+    "image": {
+      "url": "https://assets.hardcover.app/invented/paper-orchard.jpg"
+    },
+    "default_audio_edition": null,
+    "book_series": []
+  },
+  "8103": {
+    "id": 8103,
+    "title": "Salt Meridian",
+    "pages": 410,
+    "rating": 3.9,
+    "ratings_count": 87,
+    "release_date": "2021-09-14",
+    "image": {
+      "url": "https://assets.hardcover.app/invented/salt-meridian.jpg"
+    },
+    "default_audio_edition": {
+      "audio_seconds": 54000,
+      "contributions": []
+    },
+    "book_series": []
+  },
+  "8104": {
+    "id": 8104,
+    "title": "Glasswing Signal",
+    "pages": 288,
+    "rating": 4.0,
+    "ratings_count": 56,
+    "release_date": "2016-02-11",
+    "image": {
+      "url": "https://assets.hardcover.app/invented/glasswing-signal.jpg"
+    },
+    "default_audio_edition": {
+      "audio_seconds": 30000,
+      "contributions": [
+        {
+          "author": {
+            "name": "Invented Voice"
+          },
+          "contributor_role": {
+            "slug": "narrator"
+          }
+        }
+      ]
+    },
+    "book_series": [
+      {
+        "position": 2,
+        "details": "2",
+        "featured": true,
+        "series": {
+          "id": 7101,
+          "name": "The Glasswing Cycle",
+          "primary_books_count": 4,
+          "is_completed": false
+        }
+      }
+    ]
+  }
+}

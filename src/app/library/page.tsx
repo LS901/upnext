@@ -5,12 +5,14 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { ArrowDown, ArrowUp, ArrowUpToLine, type LucideIcon } from "lucide-react";
 import { Poster } from "@/components/poster";
+import { dragName, queuedTitle } from "./drag-name";
 import { StatusChip } from "@/components/status-chip";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { seasonDetails, seasonLabel, seasonName } from "@/app/search/season-label";
+import { seasonDetails, seasonLabel } from "@/app/search/season-label";
 import { TYPE_LABELS } from "@/lib/format/type-labels";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { bookMeta } from "@/lib/format/book";
 import { formatDuration } from "@/lib/format/duration";
 import { formatScore } from "@/lib/format/score";
 import {
@@ -19,6 +21,8 @@ import {
   type LibraryGroup,
   type LibraryView,
   type SeasonRow,
+  type SeriesBookRow,
+  type SeriesRow,
   type ShowRow,
   type UpNextRow,
 } from "@/lib/library/queries";
@@ -33,7 +37,7 @@ import {
   type QueueType,
 } from "@/lib/library/up-next-order";
 import { createClient } from "@/lib/supabase/server";
-import { addUpNext, placeUpNext, removeEntry, removeUpNext, setStatus } from "./actions";
+import { placeUpNext, removeEntry, setStatus } from "./actions";
 import { QueueVisibility } from "./queue-visibility";
 import { SortableQueue } from "./sortable-queue";
 import { StatusSelect } from "./status-select";
@@ -72,29 +76,25 @@ async function Library() {
       </p>
     );
   }
+  // What you're on comes first, so a long Up next never buries it.
+  const inProgress = groups.filter((g) => g.status === "in_progress");
+  const rest = groups.filter((g) => g.status !== "in_progress");
   return (
     <div className="mt-6 flex flex-col gap-10">
-      <UpNext upNext={upNext} hidden={hidden} backlog={groups.find((g) => g.status === "backlog")} />
-      {groups.map((group) => (
+      {inProgress.map((group) => (
+        <Group key={group.status} group={group} />
+      ))}
+      <UpNext upNext={upNext} hidden={hidden} />
+      {rest.map((group) => (
         <Group key={group.status} group={group} />
       ))}
     </div>
   );
 }
 
-// One queue per media type, each in the user's order (owner said, 2026-11-26).
-function UpNext({
-  upNext,
-  hidden,
-  backlog,
-}: {
-  upNext: LibraryView["upNext"];
-  hidden: QueueType[];
-  backlog: LibraryGroup | undefined;
-}) {
-  // Whether Backlog (below) has anything of each type that could be added.
-  const inBacklog = (type: QueueType) =>
-    !!backlog?.rows.some((r) => (r.kind === "show" ? type === "show" : r.mediaType === type));
+// One queue per media type, each in the user's order (owner said, 2026-11-26),
+// holding everything not started yet (owner said, 2026-11-27).
+function UpNext({ upNext, hidden }: { upNext: LibraryView["upNext"]; hidden: QueueType[] }) {
   const counts = Object.fromEntries(QUEUE_TYPES.map((type) => [type, upNext[type].length])) as Record<QueueType, number>;
   return (
     <section aria-labelledby="up-next">
@@ -104,14 +104,14 @@ function UpNext({
       <QueueVisibility hidden={hidden} counts={counts} />
       <div className="mt-4 flex flex-col gap-4">
         {QUEUE_TYPES.filter((type) => !hidden.includes(type)).map((type) => (
-          <Queue key={type} type={type} rows={upNext[type]} hasBacklog={inBacklog(type)} />
+          <Queue key={type} type={type} rows={upNext[type]} />
         ))}
       </div>
     </section>
   );
 }
 
-function Queue({ type, rows, hasBacklog }: { type: QueueType; rows: UpNextRow[]; hasBacklog: boolean }) {
+function Queue({ type, rows }: { type: QueueType; rows: UpNextRow[] }) {
   const id = `queue-${type}`;
   const label = QUEUE_LABELS[type];
   const order = rows.map((r) => r.entryId);
@@ -122,28 +122,20 @@ function Queue({ type, rows, hasBacklog }: { type: QueueType; rows: UpNextRow[];
           {label}
         </h3>
         {rows.length ? (
-        <SortableQueue
-          label={`${label} up next`}
-          items={rows.map((row) => ({
-            entryId: row.entryId,
-            title: queuedTitle(row),
-            row: <QueuedRow row={row} order={order} />,
-          }))}
-        />
-      ) : (
-          <p className={`px-(--card-spacing) ${muted}`}>
-            {hasBacklog ? "Nothing up next. Add something from your Backlog below." : "Nothing up next."}
-          </p>
+          <SortableQueue
+            label={`${label} up next`}
+            items={rows.map((row) => ({
+              entryId: row.entryId,
+              title: dragName(row),
+              row: <QueuedRow row={row} order={order} />,
+            }))}
+          />
+        ) : (
+          <p className={`px-(--card-spacing) ${muted}`}>Nothing up next.</p>
         )}
       </Card>
     </section>
   );
-}
-
-/** A queued season names its show and season, so two seasons of one show read apart. */
-function queuedTitle(row: UpNextRow): string {
-  if (row.kind !== "season") return row.title;
-  return `${row.showTitle} · ${seasonName(row.number)}`;
 }
 
 function QueuedRow({ row, order }: { row: UpNextRow; order: string[] }) {
@@ -167,9 +159,13 @@ function QueuedRow({ row, order }: { row: UpNextRow; order: string[] }) {
         <MoveButton entryId={row.entryId} order={order} direction="up" label="Move up" icon={ArrowUp} />
         <MoveButton entryId={row.entryId} order={order} direction="down" label="Move down" icon={ArrowDown} />
         <MoveButton entryId={row.entryId} order={order} direction="top" label="Move to top" icon={ArrowUpToLine} />
-        <form action={removeUpNext}>
+        <form action={setStatus}>
           <input type="hidden" name="entryId" value={row.entryId} />
-          <SubmitButton>Remove from Up next</SubmitButton>
+          <StatusSelect status={row.status} />
+        </form>
+        <form action={removeEntry}>
+          <input type="hidden" name="entryId" value={row.entryId} />
+          <SubmitButton>Remove</SubmitButton>
         </form>
       </div>
     </div>
@@ -212,7 +208,13 @@ function Group({ group }: { group: LibraryGroup }) {
         </h2>
         <ul className="flex flex-col divide-y divide-border px-(--card-spacing)">
           {group.rows.map((row) =>
-            row.kind === "item" ? <Item key={row.entryId} item={row} /> : <Show key={row.showId} show={row} />,
+            row.kind === "item" ? (
+              <Item key={row.entryId} item={row} />
+            ) : row.kind === "show" ? (
+              <Show key={row.showId} show={row} />
+            ) : (
+              <Series key={row.seriesId} series={row} />
+            ),
           )}
         </ul>
       </Card>
@@ -221,11 +223,12 @@ function Group({ group }: { group: LibraryGroup }) {
 }
 
 function itemMeta(item: ItemRow): string {
+  if (item.mediaType === "book") return bookMeta(item);
   const time =
     item.mediaType === "game"
       ? `Time to beat: ${formatDuration(item.minutes)} (story)`
       : `Time to finish: ${formatDuration(item.minutes)}`;
-  return [TYPE_LABELS[item.mediaType], time, formatScore(item.score, item.scoreCount)].join(" · ");
+  return [TYPE_LABELS[item.mediaType], time, formatScore(item.score, item.scoreCount, item.providerName)].join(" · ");
 }
 
 function Item({ item }: { item: ItemRow }) {
@@ -265,6 +268,43 @@ function Show({ show }: { show: ShowRow }) {
   );
 }
 
+// Like a show: the series' progress counts all the user's books in it, in any
+// status; the rows are only the user's books in this group's status. A series
+// has no score of its own, so its line carries none.
+function Series({ series }: { series: SeriesRow }) {
+  const { read, total } = series.progress;
+  const meta = total ? `Series · ${read} of ${total} read` : "Series";
+  return (
+    <li className="py-3">
+      <div className="flex items-center gap-4">
+        <Poster url={series.books[0]?.imageUrl ?? null} title={series.title} size="md" mediaType="book" />
+        <div className="min-w-0 flex-1">
+          <h3 className="font-medium break-words">{series.title}</h3>
+          <p className={muted}>{meta}</p>
+          {total > 0 && <Progress aria-hidden="true" value={Math.min(100, (read / total) * 100)} className="mt-2 max-w-48" />}
+        </div>
+      </div>
+      <ul className="mt-2 flex flex-col divide-y divide-border sm:pl-24">
+        {series.books.map((book) => (
+          <SeriesBook key={book.entryId} book={book} />
+        ))}
+      </ul>
+    </li>
+  );
+}
+
+function SeriesBook({ book }: { book: SeriesBookRow }) {
+  return (
+    <li className="flex flex-wrap items-center gap-x-4 gap-y-3 py-2">
+      <div className="min-w-0 flex-1 basis-32">
+        <h4 className="break-words">{book.position === null ? book.title : `#${book.position} ${book.title}`}</h4>
+        <p className={muted}>{bookMeta(book)}</p>
+      </div>
+      <EntryControls entryId={book.entryId} status={book.status} />
+    </li>
+  );
+}
+
 function Season({ season }: { season: SeasonRow }) {
   return (
     <li className="flex flex-wrap items-center gap-x-4 gap-y-3 py-2">
@@ -277,17 +317,10 @@ function Season({ season }: { season: SeasonRow }) {
   );
 }
 
-// Only Backlog entries can go in Up next (owner said, 2026-11-26).
 function EntryControls({ entryId, status }: { entryId: string; status: EntryStatus }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
       <StatusChip status={status} />
-      {status === "backlog" && (
-        <form action={addUpNext}>
-          <input type="hidden" name="entryId" value={entryId} />
-          <SubmitButton>Add to Up next</SubmitButton>
-        </form>
-      )}
       <form action={setStatus}>
         <input type="hidden" name="entryId" value={entryId} />
         <StatusSelect status={status} />

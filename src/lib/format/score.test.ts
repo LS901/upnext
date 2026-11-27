@@ -15,3 +15,9 @@ test("no score is No score", () => {
 test("an unknown vote count is left out", () => {
   expect(formatScore(64, null)).toBe("Score 64/100");
 });
+
+test("Hardcover scores use the rating label", () => {
+  expect(formatScore(84.2, 1234, "hardcover")).toBe("Hardcover rating 4.2/5 (1,234)");
+  expect(formatScore(84.2, null, "hardcover")).toBe("Hardcover rating 4.2/5");
+  expect(formatScore(null, null, "hardcover")).toBe("No score");
+});

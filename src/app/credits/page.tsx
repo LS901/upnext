@@ -5,7 +5,7 @@ export const metadata: Metadata = {
   title: "Credits",
 };
 
-// INV-007: the attribution TMDB and IGDB require. Keep the TMDB sentence
+// INV-007: the attribution TMDB, IGDB and Hardcover require. Keep the TMDB sentence
 // word for word; it is fixed by TMDB's API terms.
 export default function CreditsPage() {
   return (
@@ -38,6 +38,14 @@ export default function CreditsPage() {
                 IGDB.com
               </a>
               .
+            </p>
+          </section>
+          <section className="mt-4 space-y-2">
+            <h2 className="text-xl font-medium">Books</h2>
+            <p>
+              <a className="text-accent-text underline" href="https://hardcover.app">
+                Book data from Hardcover
+              </a>
             </p>
           </section>
         </CardContent>

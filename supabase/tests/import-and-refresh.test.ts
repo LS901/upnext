@@ -3,6 +3,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, inject, test, vi } from "vitest";
 import { importItem } from "../../src/lib/catalogue/import";
 import { refreshStaleItems } from "../../src/lib/catalogue/refresh";
+import { resetHardcoverLimiterForTests } from "../../src/lib/providers/hardcover";
 import { resetIgdbTokenForTests } from "../../src/lib/providers/igdb";
 import * as cronRoute from "../../src/app/api/cron/refresh/route";
 import { adminClient, createTestUser, deleteTestUsers, type TestUser } from "./helpers";
@@ -13,6 +14,7 @@ const { POST } = cronRoute;
 
 const TMDB = "http://tmdb.test/3";
 const IGDB = "http://igdb.test/v4";
+const HARDCOVER = "http://hardcover.test/v1/graphql";
 const TWITCH = "http://twitch.test/oauth2/token";
 const CRON_SECRET = "invented-cron-secret";
 const DAY = 24 * 60 * 60 * 1000;
@@ -26,6 +28,7 @@ const fail = (status: number) => ({ __status: status });
 let tmdbRoutes: Record<string, Reply> = {};
 let igdbGames: Record<string, Reply> = {};
 let igdbTtb: Record<string, Reply> = {};
+let hardcoverBooks: Record<string, Reply> = {};
 const providerCalls: string[] = [];
 
 function reply(body: Reply): Response {
@@ -53,6 +56,10 @@ function providerFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Re
     const id = String(init?.body).match(/where (?:id|game_id) = (\d+);/)?.[1] ?? "";
     const table = url.pathname.endsWith("/game_time_to_beats") ? igdbTtb : igdbGames;
     return Promise.resolve(reply(table[id]));
+  }
+  if (url.href.startsWith(HARDCOVER)) {
+    const id = String(init?.body).match(/books_by_pk\(id: (\d+)\)/)?.[1] ?? "";
+    return Promise.resolve(reply(hardcoverBooks[id]));
   }
   // Never let a test reach a real provider.
   return Promise.reject(new Error(`unexpected request to ${url.host}`));
@@ -115,6 +122,50 @@ function stubGame(id: string, name: string, normally: number | null = 54000) {
   ];
   igdbTtb[id] = [{ id: 1, game_id: Number(id), hastily: 36000, normally, completely: 108000, count: 42 }];
 }
+
+type SeriesSpec = { id: number; name: string; position: number; label: string | null; total?: number; completed?: boolean | null };
+
+function stubBook(
+  id: string,
+  title: string,
+  opts: { pages?: number | null; series?: SeriesSpec | null; narrators?: string[]; audioSeconds?: number } = {},
+) {
+  const { pages = 320, series = null, narrators = ["Invented Voice", "Other Voice"], audioSeconds = 58253 } = opts;
+  hardcoverBooks[id] = {
+    data: {
+      books_by_pk: {
+        id: Number(id),
+        title,
+        pages,
+        rating: 4.2,
+        ratings_count: 1234,
+        release_date: "2014-06-01",
+        image: { url: `https://assets.hardcover.app/edition/${id}/cover.jpg` },
+        default_audio_edition: {
+          audio_seconds: audioSeconds,
+          contributions: narrators.map((name) => ({ author: { name }, contributor_role: { slug: "narrator" } })),
+        },
+        book_series: series
+          ? [
+              {
+                position: series.position,
+                details: series.label,
+                featured: true,
+                series: {
+                  id: series.id,
+                  name: series.name,
+                  primary_books_count: series.total ?? 6,
+                  is_completed: series.completed ?? null,
+                },
+              },
+            ]
+          : [],
+      },
+    },
+  };
+}
+
+const seriesIdFor = (bookId: string) => 5_000_000 + (Number(bookId) % 1_000_000);
 
 // ---- Database helpers ---------------------------------------------------------
 
@@ -210,8 +261,12 @@ describe("catalogue import and refresh", () => {
     tmdbRoutes = {};
     igdbGames = {};
     igdbTtb = {};
+    hardcoverBooks = {};
     providerCalls.length = 0;
     resetIgdbTokenForTests();
+    resetHardcoverLimiterForTests();
+    vi.stubEnv("HARDCOVER_API_URL", HARDCOVER);
+    vi.stubEnv("HARDCOVER_API_TOKEN", "hardcover-token");
     const { url, serviceRoleKey } = inject("supabase");
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", url);
     vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", serviceRoleKey);
@@ -309,6 +364,134 @@ describe("catalogue import and refresh", () => {
       ttb_completely_s: 108000,
       ttb_count: 42,
     });
+  });
+
+  test("a book imports with its series, linked", async () => {
+    const id = newId();
+    const seriesId = seriesIdFor(id);
+    stubBook(id, "Invented Book One", {
+      series: { id: seriesId, name: "Invented Cycle", position: 1, label: "1", total: 6, completed: true },
+    });
+    const { itemId, seasons } = await importItem("hardcover", "book", id);
+    track(itemId);
+    expect(seasons).toEqual([]);
+
+    const item = await getItem(itemId);
+    expect(item).toMatchObject({
+      provider: "hardcover",
+      media_type: "book",
+      title: "Invented Book One",
+      image_ref: `https://assets.hardcover.app/edition/${id}/cover.jpg`,
+      release_date: "2014-06-01",
+      score: 84,
+      score_count: 1234,
+      page_count: 320,
+      audio_minutes: 971,
+      has_audiobook: true,
+      narrators: "Invented Voice, Other Voice",
+      series_position: 1,
+      series_position_label: "1",
+    });
+    const { data: series } = await adminClient()
+      .from("book_series")
+      .select("*")
+      .eq("provider", "hardcover")
+      .eq("provider_id", String(seriesId));
+    expect(series).toHaveLength(1);
+    expect(series![0]).toMatchObject({ name: "Invented Cycle", primary_books_count: 6, is_completed: true });
+    expect(item!.series_id).toBe(series![0].id);
+  });
+
+  test("a second book in the same series reuses the series row", async () => {
+    const [one, two] = [newId(), newId()];
+    const seriesId = seriesIdFor(one);
+    stubBook(one, "Invented Book One", { series: { id: seriesId, name: "Invented Cycle", position: 1, label: "1" } });
+    stubBook(two, "Invented Book Two", { series: { id: seriesId, name: "Invented Cycle", position: 2, label: "2" } });
+    const a1 = track((await importItem("hardcover", "book", one)).itemId);
+    resetHardcoverLimiterForTests();
+    const a2 = track((await importItem("hardcover", "book", two)).itemId);
+
+    const [i1, i2] = [await getItem(a1), await getItem(a2)];
+    expect(i1!.series_id).not.toBeNull();
+    expect(i2!.series_id).toBe(i1!.series_id);
+    expect(i2).toMatchObject({ series_position: 2, series_position_label: "2" });
+    const { data } = await adminClient().from("book_series").select("id").eq("provider_id", String(seriesId));
+    expect(data).toHaveLength(1);
+  });
+
+  test("a book without a series has no link, and a re-import clears a stale one", async () => {
+    const id = newId();
+    stubBook(id, "Invented Loner", {
+      narrators: [],
+      series: { id: seriesIdFor(id), name: "Invented Cycle", position: 3, label: null },
+    });
+    const itemId = track((await importItem("hardcover", "book", id)).itemId);
+    expect((await getItem(itemId))!.series_id).not.toBeNull();
+
+    stubBook(id, "Invented Loner", { narrators: [], series: null });
+    resetHardcoverLimiterForTests();
+    await importItem("hardcover", "book", id);
+    expect(await getItem(itemId)).toMatchObject({
+      series_id: null,
+      series_position: null,
+      series_position_label: null,
+      narrators: null,
+    });
+  });
+
+  test("a refresh updates the page count", async () => {
+    const id = newId();
+    stubBook(id, "Invented Book", { pages: 300 });
+    const itemId = track((await importItem("hardcover", "book", id)).itemId);
+    await setItem(itemId, { refreshed_at: daysAgo(8) });
+
+    stubBook(id, "Invented Book", { pages: 344 });
+    resetHardcoverLimiterForTests();
+    expect(await refreshStaleItems()).toMatchObject({ refreshed: 1, failed: 0 });
+    expect((await getItem(itemId))!.page_count).toBe(344);
+  });
+
+  test("a details failure leaves the stored values", async () => {
+    const id = newId();
+    stubBook(id, "Invented Book", { pages: 300 });
+    const itemId = track((await importItem("hardcover", "book", id)).itemId);
+
+    hardcoverBooks[id] = fail(503);
+    resetHardcoverLimiterForTests();
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      await expect(importItem("hardcover", "book", id)).rejects.toMatchObject({ name: "ProviderError" });
+      expect(await getItem(itemId)).toMatchObject({ title: "Invented Book", page_count: 300 });
+    } finally {
+      // Later tests' errors must stay visible.
+      errors.mockRestore();
+    }
+  });
+
+  test("a purge keeps a book's title and series link", async () => {
+    const id = newId();
+    stubBook(id, "Invented Old Book", { series: { id: seriesIdFor(id), name: "Invented Cycle", position: 1, label: "1" } });
+    const itemId = track((await importItem("hardcover", "book", id)).itemId);
+    const before = await getItem(itemId);
+    await setItem(itemId, { refreshed_at: daysAgo(151) });
+
+    hardcoverBooks = {};
+    resetHardcoverLimiterForTests();
+    expect(await refreshStaleItems()).toMatchObject({ failed: 1, purged: 1 });
+    const after = await getItem(itemId);
+    expect(after).toMatchObject({
+      title: "Invented Old Book",
+      series_id: before!.series_id,
+      series_position: 1,
+      series_position_label: "1",
+      image_ref: null,
+      score: null,
+      page_count: null,
+      audio_minutes: null,
+      narrators: null,
+      has_audiobook: null,
+    });
+    expect(after!.provider_data_purged_at).not.toBeNull();
   });
 
   test("INV-003: refresh never touches user data", async () => {

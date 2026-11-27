@@ -1,4 +1,4 @@
-Last reviewed: 2026-11-26
+Last reviewed: 2026-11-27
 
 Sources: owner interview, 2026-11-26 (Lewis); API research, 2026-11-26 (TMDB API terms and FAQ, IGDB API docs, community reports linked in `metadata.md`); owner follow-up, 2026-11-26 (no user ratings, a status per season, one entry per item with a play count, private lists); owner decisions on show progress, sign-in and books, 2026-11-26; owner on audiobooks (a version under books), 2026-11-26; `supabase/migrations/`. The data model, search and My library exist.
 
@@ -8,24 +8,24 @@ Paths below are relative to the named repo. Examples are invented.
 
 | Term | Meaning | Source |
 |---|---|---|
-| **Media type** | One of `movie`, `show` (TV) or `game`. Every item has exactly one. `book` is planned as a fourth, after the TMDB and IGDB import; audiobooks come under `book`, not a fifth type. | owner said (2026-11-26) |
-| **Item** | A movie, show or game in the shared catalogue, described by metadata from a provider (see `metadata.md`). It belongs to no user. | owner said (2026-11-26) |
+| **Media type** | One of `movie`, `show` (TV), `game` or `book`. Every item has exactly one. Audiobooks come under `book`, not a fifth type. | owner said (2026-11-26); `supabase/migrations/20261127110000_book_enums.sql` |
+| **Item** | A movie, show, game or book in the shared catalogue, described by metadata from a provider (see `metadata.md`). It belongs to no user. | owner said (2026-11-26) |
 | **Library** | One user's collection of library entries. | owner said (2026-11-26) |
-| **Library entry** | A user's own record of one item: status (per season for shows), play count, notes and dates. A user has at most one entry per item. The user owns this data, not the provider. | owner said (2026-11-26) |
+| **Library entry** | A user's own record of one item: status (per season for shows), play count, notes and dates. A user has at most one entry per item and version (a book may have a print and an audio entry). The user owns this data, not the provider. | owner said (2026-11-26) |
 | **Play count** | How many times the user has finished an item. A rewatch or replay adds to it on the same entry; it never creates a second entry. | owner said (2026-11-26) |
-| **Status** | Where a library entry is: Backlog, In progress, Finished, Paused or Dropped (see `library-and-status.md`). | owner said (2026-11-26) |
-| **Backlog** | Items the user wants to watch or play and hasn't started. | owner said (2026-11-26) |
+| **Status** | Where a library entry is: Up next, In progress, Finished, Paused or Dropped (see `library-and-status.md`). | owner said (2026-11-26) |
+| **Backlog** | The internal name (`backlog`) of the Up next status. Users never see it: the screen says Up next. | owner said (2026-11-27) |
 | **In progress** | Currently watching or playing. | owner said (2026-11-26) |
 | **Finished** | Completed. | owner said (2026-11-26) |
 | **Paused** | Started, then put on hold, with the intent to return. | owner said (2026-11-26) |
 | **Dropped** | Started, then abandoned. Kept for the record, not deleted. | owner said (2026-11-26) |
-| **Season progress** | For shows, each season has its own status (Backlog, In progress, Finished, Paused or Dropped). Never tracked per episode. Finishing a season marks only that season Finished. | owner said (2026-11-26) |
+| **Season progress** | For shows, each season has its own status (Up next, In progress, Finished, Paused or Dropped). Never tracked per episode. Finishing a season marks only that season Finished. | owner said (2026-11-26) |
 | **Progress exclusion** | A season a user leaves out of a show's progress count, for example the seasons of an anthology they don't plan to watch. It never changes the season's entry, and a user can exclude a season they never added. Stored in `progress_exclusions`. | owner said (2026-11-26); `supabase/migrations/20261126083314_notes_and_exclusions.sql` |
 | **Show progress** | A summary derived from a show's seasons, such as "2 of 4 seasons finished": the Finished season entries that aren't excluded, out of all seasons minus the exclusions. A show has no status of its own. | owner said (2026-11-26) |
 | **Time to finish** | How long an item takes. Movie: its runtime. Show: the sum of episode runtimes, per season and in total. Game: its time to beat. | owner said (2026-11-26) |
 | **Time to beat** | A game's estimated play time from IGDB `game_time_to_beats`: `hastily` (main story), `normally` (story plus some side content) and `completely` (100%), each an average in seconds, with `count` submissions behind it. | research: IGDB API docs (2026-11-26) |
 | **Metadata provider** | The outside source of item data: TMDB for movies and shows, IGDB for games. | owner said (2026-11-26): credentials set up |
-| **Up next** | An ordered shortlist inside the Backlog: what the user plans to start soonest. It is not a separate status. There is one queue per media type (Movies, TV, Games; Books when books land), each ordered on its own. | owner said (2026-11-26) |
+| **Up next** | The ordered list, per media type, of everything the user hasn't started. It is the first status (stored as `backlog`): every not-started entry is in its type's queue, and a new entry goes to the bottom. There is one queue per media type (Movies, TV, Games, Books), each ordered on its own. | owner said (2026-11-27) |
 | **Public library** | The default. Other users, and signed-out visitors, can read a user's library (read-only), but never its notes. | owner said (2026-11-26) |
 | **Private library** | A library its owner opted out of sharing. Nobody else sees it. | owner said (2026-11-26) |
 | **Notes** | A user's free-text notes on a library entry. Always private to the owner. | owner said (2026-11-26) |
@@ -33,7 +33,10 @@ Paths below are relative to the named repo. Examples are invented.
 | **List** | A user-made collection of items, for example "Cosy winter games". Public by default; the owner can make a single list private. | owner said (2026-11-26) |
 | **Review score** | A provider's aggregate score for an item, normalised to 0-100 (TMDB `vote_average × 10`, IGDB `total_rating`) and shown as item info with the vote count behind it. Unknown is "No score", never 0. upnext has no user ratings of its own. | owner said (2026-11-26); normalisation in `metadata.md` (ruling, owner may overrule) |
 | **Spoiler** | Season synopses, episode titles or stills for seasons after the user's current season progress. Hidden unless the user opts in. | owner confirmed INV-004 (2026-11-26) |
-| **Audiobook** | A version of a book, not a media type of its own. When adding a book the user picks the audiobook version with a selector, and it is tracked as its own entry, with its own status and play count. | owner said (2026-11-26) |
+| **Book** | The fourth media type (`book`), imported from Hardcover. It can be tracked in a print version, an audio version, or both. | owner said (2026-11-27); `supabase/migrations/20261127110100_books.sql` |
+| **Book version** | `print` or `audio`: which form of a book a library entry tracks. Print covers paper and ebook ("reading"). Each version is its own entry, with its own status and play count. Set on book entries only. | owner said (2026-11-27); `supabase/migrations/20261127110100_books.sql` |
+| **Audiobook** | The audio version of a book, not a media type of its own. It is a separate entry from the print version, with its own status and play count, and both versions can be tracked at once. The user picks it with a selector when adding a book. | owner said (2026-11-26, 2026-11-27); resolves "Print and audiobook together" |
+| **Series** | A run of books in one series (`book_series`). Progress ("N of M read") is derived like a show's, from the Finished books minus exclusions (`book_exclusions`); a series has no status of its own. | owner said (2026-11-27); `supabase/migrations/20261127110100_books.sql` |
 
 ## Unconfirmed
 
@@ -41,4 +44,3 @@ Guesses that need the owner's word before anyone relies on them.
 
 | Term | Guessed meaning | Source |
 |---|---|---|
-| **Print and audiobook together** | Whether one user can track both the print and the audiobook version of the same book at once, and how that fits one entry per item (INV-008). Where audiobook data comes from is also open. | owner said audiobooks are a version under books (2026-11-26); rest left to the books task |
