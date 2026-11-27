@@ -54,8 +54,9 @@ export type UpNextRow = ItemRow | QueuedSeasonRow;
 
 /**
  * The user's library: the Up next queues, one per media type and each in the
- * user's order, then everything else grouped by status in LIBRARY_ORDER (empty
- * groups left out). A queued entry shows in its queue only, not under Backlog.
+ * user's order, holding every Backlog entry (the database gives each one a
+ * place), then everything else grouped by status in LIBRARY_ORDER (empty
+ * groups left out).
  */
 export type LibraryView = { upNext: Record<QueueType, UpNextRow[]>; groups: LibraryGroup[] };
 
@@ -225,12 +226,12 @@ export async function setEntryStatus(
   entryId: string,
   status: EntryStatus,
 ): Promise<void> {
-  // Up next is a shortlist inside Backlog (the schema allows a position only
-  // there), so an entry leaving Backlog leaves it.
-  const change = status === "backlog" ? { status } : { status, up_next_position: null };
+  // Only the status: the database owns the Up next place, putting an entry
+  // that arrives in Backlog at the bottom of its queue and clearing it when the
+  // entry leaves.
   const { data, error } = await supabase
     .from("library_entries")
-    .update(change)
+    .update({ status })
     .eq("id", entryId)
     .eq("user_id", userId)
     .select("id");

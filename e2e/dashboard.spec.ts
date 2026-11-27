@@ -131,6 +131,8 @@ test("a signed-out visitor sees the landing page", async ({ browser }) => {
   await expect(page.getByRole("main").getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/login");
   await expect(page.getByRole("heading", { name: "Release radar" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Currently on" })).toHaveCount(0);
+  await expect(page.getByText("Keep everything you want to get to in one place, in the order you'll get to it.")).toBeVisible();
+  await expect(page.getByText("Backlog")).toHaveCount(0);
   await context.close();
 });
 
@@ -151,16 +153,19 @@ test("the dashboard shows your numbers, what you're on, Up next, the radar and r
   await page.goto("/");
 
   const numbers = section(page, "Your numbers");
-  await expect(numbers).toContainText(/7\s*Backlog/);
+  await expect(numbers).toContainText(/7\s*Up next/);
+  await expect(numbers).not.toContainText("Backlog");
+  await expect(page.getByText("Backlog")).toHaveCount(0);
   await expect(numbers).toContainText("about 3 h to finish");
   await expect(numbers).toContainText(/1\s*In progress/);
   await expect(numbers).toContainText(/2\s*Finished/);
 
   await expect(rows(section(page, "Currently on"))).toHaveText([new RegExp(BUSY)]);
 
+  // Every not-started movie is queued; the card shows the top of the queue.
   const movies = section(page, "Movies");
   await expect(movies).toContainText(QUEUED);
-  await expect(movies.getByRole("button", { name: "Start" })).toBeVisible();
+  await expect(rows(movies).filter({ hasText: QUEUED }).getByRole("button", { name: "Start" })).toBeVisible();
   await expect(movies.getByRole("link", { name: "See all" })).toHaveAttribute("href", "/library#up-next");
   await expect(section(page, "Games")).toContainText(LONG_GAME);
 
@@ -204,8 +209,8 @@ test("a queue hidden in My library is hidden here too", async ({ page }) => {
 
 test("Start on the dashboard moves an entry to In progress", async ({ page }) => {
   await page.goto("/");
-  await section(page, "Movies").getByRole("button", { name: "Start" }).click();
-  await expect(section(page, "Movies")).toHaveCount(0);
+  await rows(section(page, "Movies")).filter({ hasText: QUEUED }).getByRole("button", { name: "Start" }).click();
+  await expect(section(page, "Movies")).not.toContainText(QUEUED);
   const current = rows(section(page, "Currently on"));
   await expect(current).toHaveCount(2);
   await expect(current.filter({ hasText: QUEUED })).toHaveCount(1);

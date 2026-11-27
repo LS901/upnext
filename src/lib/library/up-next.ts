@@ -4,10 +4,12 @@ import type { Database } from "@/lib/supabase/database.types";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { placeBefore, queueOf, type Placed, type Placement, type QueueType } from "./up-next-order";
 
-// Up next writes, through the user's own client. Every read is filtered to the
-// user (their client can read other users' public entries too) and every write
-// to the user and to Backlog, so RLS and the schema check both back it up
-// (INV-001, INV-002). Pass the signed-in user's id.
+// Up next writes, through the user's own client. Every Backlog entry is in its
+// type's queue: the database puts it at the bottom when it arrives and clears
+// its place when it leaves, so the app only ever reorders. Every read is
+// filtered to the user (their client can read other users' public entries too)
+// and every write to the user and to Backlog, so RLS and the schema check both
+// back it up (INV-001, INV-002). Pass the signed-in user's id.
 
 type Client = SupabaseClient<Database>;
 
@@ -40,55 +42,33 @@ async function loadQueue(supabase: Client, userId: string, type: QueueType): Pro
 }
 
 /**
- * `move`: the entry must still be queued, so a move racing a Remove (another
- * tab) can't put the entry back in its queue.
+ * The entry must still be queued, so a move racing a Remove or a status change
+ * (another tab) can't put it back in its queue.
  */
-async function setPosition(
-  supabase: Client,
-  userId: string,
-  entryId: string,
-  position: number | null,
-  { move = false } = {},
-): Promise<void> {
-  let update = supabase
+async function setPosition(supabase: Client, userId: string, entryId: string, position: number): Promise<void> {
+  const { data, error } = await supabase
     .from("library_entries")
     .update({ up_next_position: position })
     .eq("id", entryId)
     .eq("user_id", userId)
-    .eq("status", "backlog");
-  if (move) update = update.not("up_next_position", "is", null);
-  const { data, error } = await update.select("id");
+    .eq("status", "backlog")
+    .not("up_next_position", "is", null)
+    .select("id");
   if (error) throw error;
   if (data.length) return;
-  // Nothing changed. If it left Backlog, or (for a move) Up next, meanwhile,
-  // there's nothing to do; otherwise RLS refused the write: it isn't the user's.
+  // Nothing changed. If it left Up next meanwhile, there's nothing to do;
+  // otherwise RLS refused the write: it isn't the user's.
   const entry = await ownEntry(supabase, userId, entryId);
-  if (entry.status !== "backlog" || (move && entry.up_next_position === null)) return;
+  if (entry.status !== "backlog" || entry.up_next_position === null) return;
   throw new Error(NOT_YOURS);
 }
 
-async function apply(supabase: Client, userId: string, placement: Placement | null, move: boolean): Promise<void> {
+async function apply(supabase: Client, userId: string, placement: Placement | null): Promise<void> {
   if (!placement) return;
-  if (placement.kind === "one") return setPosition(supabase, userId, placement.id, placement.position, { move });
+  if (placement.kind === "one") return setPosition(supabase, userId, placement.id, placement.position);
   // A renumber is one statement in the database, so it happens in full or not at all.
   const { error } = await supabase.rpc("set_up_next_order", { entry_ids: placement.order });
   if (error) throw error;
-}
-
-/** Adds a Backlog entry to the bottom of its type's queue. Already queued: nothing changes. */
-export async function addToUpNext(supabase: Client, userId: string, entryId: string): Promise<void> {
-  const entry = await ownEntry(supabase, userId, entryId);
-  if (entry.up_next_position !== null) return;
-  if (entry.status !== "backlog") throw new Error("Only Backlog entries can go in Up next.");
-  const queue = await loadQueue(supabase, userId, queueOf(entry));
-  await apply(supabase, userId, placeBefore(queue, entry.id, null), false);
-}
-
-/** Takes an entry off its queue; it stays in Backlog. Not queued (a double-click): nothing changes. */
-export async function removeFromUpNext(supabase: Client, userId: string, entryId: string): Promise<void> {
-  const entry = await ownEntry(supabase, userId, entryId);
-  if (entry.up_next_position === null) return;
-  await setPosition(supabase, userId, entry.id, null);
 }
 
 /**
@@ -108,5 +88,5 @@ export async function placeInUpNext(
   if (entry.up_next_position === null) return;
   const queue = await loadQueue(supabase, userId, queueOf(entry));
   if (beforeId !== null && !queue.some((p) => p.id === beforeId)) return;
-  await apply(supabase, userId, placeBefore(queue, entry.id, beforeId), true);
+  await apply(supabase, userId, placeBefore(queue, entry.id, beforeId));
 }

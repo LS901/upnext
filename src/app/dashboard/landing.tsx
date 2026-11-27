@@ -3,8 +3,7 @@ import { PITCH } from "@/app/pitch";
 import { buttonVariants } from "@/components/ui/button";
 
 const POINTS = [
-  { name: "Backlog", text: "Keep every movie, show and game you want to get to in one place." },
-  { name: "Up next", text: "Queue what's next for each type, in the order you choose." },
+  { name: "Up next", text: "Keep everything you want to get to in one place, in the order you'll get to it." },
   { name: "Progress", text: "See what you're on, season by season, and what you've finished." },
 ];
 

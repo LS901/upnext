@@ -79,13 +79,21 @@ describe("library entries", () => {
     });
 
     test("up next is only for backlog entries", async () => {
-      const { error } = await a.client.from("library_entries").insert({
-        item_id: movieId,
-        item_media_type: "movie",
-        status: "finished",
-        up_next_position: 1,
-      });
-      expect(error?.code).toBe("23514");
+      // The database clears a place sent with any other status...
+      const { data, error } = await a.client
+        .from("library_entries")
+        .insert({ item_id: movieId, item_media_type: "movie", status: "finished", up_next_position: 1 })
+        .select("id, up_next_position")
+        .single();
+      expect(error).toBeNull();
+      expect(data?.up_next_position).toBeNull();
+      // ...and refuses one set on its own.
+      const { error: placed } = await a.client
+        .from("library_entries")
+        .update({ up_next_position: 1 })
+        .eq("id", data!.id);
+      expect(placed?.code).toBe("23514");
+      await clearEntries(a);
     });
 
     test("play count can't be negative", async () => {

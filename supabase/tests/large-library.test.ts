@@ -99,15 +99,16 @@ describe("a large library", () => {
     // The library must span more than max_rows and more than two pages.
     expect(ENTRIES).toBeGreaterThan(1000);
     expect(ENTRIES).toBeGreaterThan(PAGE_SIZE * 2);
-    const { groups } = await getMyLibrary(a.client, a.id);
+    const { groups, upNext } = await getMyLibrary(a.client, a.id);
     const rows = groups.flatMap((g) => g.rows);
 
-    const movies = rows.filter((r) => r.kind === "item");
+    // Backlog entries are all in Up next: the movies, and seasons 0 and 2.
+    const movies = [...rows.filter((r) => r.kind === "item"), ...upNext.movie];
     expect(movies).toHaveLength(MOVIES);
-    const seasonEntries = rows.flatMap((r) => (r.kind === "show" ? r.seasons : []));
+    const seasonEntries = [...rows.flatMap((r) => (r.kind === "show" ? r.seasons : [])), ...upNext.show];
     expect(seasonEntries).toHaveLength(SHOWS * 3);
 
-    // A show appears in Backlog (seasons 0 and 2) and in Finished (season 1).
+    // A show appears in Finished (season 1); its other seasons are in the TV queue.
     const shows = rows.filter((r): r is ShowRow => r.kind === "show");
     const byTitle = new Map(shows.map((s) => [s.title, s]));
     expect(byTitle.size).toBe(SHOWS);

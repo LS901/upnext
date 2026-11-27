@@ -4,10 +4,10 @@ import { refresh } from "next/cache";
 import { cookies } from "next/headers";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { deleteEntry, setEntryStatus } from "@/lib/library/queries";
-import { addToUpNext, placeInUpNext, removeFromUpNext } from "@/lib/library/up-next";
+import { placeInUpNext } from "@/lib/library/up-next";
 import { createClient } from "@/lib/supabase/server";
 import * as actions from "./actions";
-import { addUpNext, placeUpNext, removeEntry, removeUpNext, setStatus, setUpNextVisibility } from "./actions";
+import { placeUpNext, removeEntry, setStatus, setUpNextVisibility } from "./actions";
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ refresh: vi.fn() }));
@@ -19,11 +19,7 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/lib/auth/current-user", () => ({ getCurrentUser: vi.fn() }));
 vi.mock("@/lib/library/queries", () => ({ setEntryStatus: vi.fn(), deleteEntry: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
-vi.mock("@/lib/library/up-next", () => ({
-  addToUpNext: vi.fn(),
-  removeFromUpNext: vi.fn(),
-  placeInUpNext: vi.fn(),
-}));
+vi.mock("@/lib/library/up-next", () => ({ placeInUpNext: vi.fn() }));
 vi.mock("next/headers", () => ({ cookies: vi.fn() }));
 
 const USER = { id: "user-1", username: "user-abcd1234" };
@@ -44,7 +40,7 @@ beforeEach(() => {
   vi.mocked(deleteEntry).mockReset().mockResolvedValue();
   vi.mocked(refresh).mockClear();
   vi.mocked(createClient).mockResolvedValue(client as never);
-  for (const fn of [addToUpNext, removeFromUpNext, placeInUpNext]) vi.mocked(fn).mockReset();
+  vi.mocked(placeInUpNext).mockReset();
   cookieStore.set.mockReset();
   vi.mocked(cookies).mockResolvedValue(cookieStore as never);
 });
@@ -79,16 +75,19 @@ test("signed out goes to sign in", async () => {
   expect(deleteEntry).not.toHaveBeenCalled();
 });
 
-test("the Up next actions write as the signed-in user, then refresh the page", async () => {
-  await addUpNext(form({ entryId: ENTRY }));
-  expect(addToUpNext).toHaveBeenCalledExactlyOnceWith(client, USER.id, ENTRY);
-  await removeUpNext(form({ entryId: ENTRY }));
-  expect(removeFromUpNext).toHaveBeenCalledExactlyOnceWith(client, USER.id, ENTRY);
+test("the Up next action writes as the signed-in user, then refreshes the page", async () => {
   await placeUpNext(form({ entryId: ENTRY, beforeId: OTHER }));
   expect(placeInUpNext).toHaveBeenCalledWith(client, USER.id, ENTRY, OTHER);
   await placeUpNext(form({ entryId: ENTRY, beforeId: "" }));
   expect(placeInUpNext).toHaveBeenLastCalledWith(client, USER.id, ENTRY, null);
-  expect(refresh).toHaveBeenCalledTimes(4);
+  expect(refresh).toHaveBeenCalledTimes(2);
+});
+
+test("there is no action to add to or take off Up next: every Backlog entry is in it, and Remove deletes", async () => {
+  // Leaving Up next is a status change or Remove (removeEntry); nothing can
+  // leave a Backlog entry without a place.
+  expect(actions).not.toHaveProperty("addUpNext");
+  expect(actions).not.toHaveProperty("removeUpNext");
 });
 
 test("the Move buttons post an exact target to placeUpNext; there is no relative move action to repeat", async () => {
@@ -97,18 +96,15 @@ test("the Move buttons post an exact target to placeUpNext; there is no relative
   expect(actions).not.toHaveProperty("moveUpNext");
 });
 
-test("Up next actions refuse a bad entry id or target before anything is written", async () => {
-  await expect(addUpNext(form({ entryId: "nope" }))).rejects.toThrow("Not an Up next change");
-  await expect(removeUpNext(form({ entryId: "" }))).rejects.toThrow("Not an Up next change");
+test("the Up next action refuses a bad entry id or target before anything is written", async () => {
+  await expect(placeUpNext(form({ entryId: "nope", beforeId: "" }))).rejects.toThrow("Not an Up next change");
   await expect(placeUpNext(form({ entryId: ENTRY, beforeId: "1 or 1=1" }))).rejects.toThrow("Not an Up next change");
-  for (const fn of [addToUpNext, removeFromUpNext, placeInUpNext]) expect(fn).not.toHaveBeenCalled();
+  expect(placeInUpNext).not.toHaveBeenCalled();
 });
 
-test("Up next actions send a signed-out visitor to sign in", async () => {
+test("the Up next action sends a signed-out visitor to sign in", async () => {
   vi.mocked(getCurrentUser).mockResolvedValue(null);
-  await expect(addUpNext(form({ entryId: ENTRY }))).rejects.toThrow("redirect:/login");
   await expect(placeUpNext(form({ entryId: ENTRY, beforeId: "" }))).rejects.toThrow("redirect:/login");
-  expect(addToUpNext).not.toHaveBeenCalled();
   expect(placeInUpNext).not.toHaveBeenCalled();
 });
 

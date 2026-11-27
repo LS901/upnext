@@ -13,19 +13,19 @@ Paths below are relative to the named repo. Examples are invented.
 | **Library** | One user's collection of library entries. | owner said (2026-11-26) |
 | **Library entry** | A user's own record of one item: status (per season for shows), play count, notes and dates. A user has at most one entry per item and version (a book may have a print and an audio entry). The user owns this data, not the provider. | owner said (2026-11-26) |
 | **Play count** | How many times the user has finished an item. A rewatch or replay adds to it on the same entry; it never creates a second entry. | owner said (2026-11-26) |
-| **Status** | Where a library entry is: Backlog, In progress, Finished, Paused or Dropped (see `library-and-status.md`). | owner said (2026-11-26) |
-| **Backlog** | Items the user wants to watch or play and hasn't started. | owner said (2026-11-26) |
+| **Status** | Where a library entry is: Up next, In progress, Finished, Paused or Dropped (see `library-and-status.md`). | owner said (2026-11-26) |
+| **Backlog** | The internal name (`backlog`) of the Up next status. Users never see it: the screen says Up next. | owner said (2026-11-27) |
 | **In progress** | Currently watching or playing. | owner said (2026-11-26) |
 | **Finished** | Completed. | owner said (2026-11-26) |
 | **Paused** | Started, then put on hold, with the intent to return. | owner said (2026-11-26) |
 | **Dropped** | Started, then abandoned. Kept for the record, not deleted. | owner said (2026-11-26) |
-| **Season progress** | For shows, each season has its own status (Backlog, In progress, Finished, Paused or Dropped). Never tracked per episode. Finishing a season marks only that season Finished. | owner said (2026-11-26) |
+| **Season progress** | For shows, each season has its own status (Up next, In progress, Finished, Paused or Dropped). Never tracked per episode. Finishing a season marks only that season Finished. | owner said (2026-11-26) |
 | **Progress exclusion** | A season a user leaves out of a show's progress count, for example the seasons of an anthology they don't plan to watch. It never changes the season's entry, and a user can exclude a season they never added. Stored in `progress_exclusions`. | owner said (2026-11-26); `supabase/migrations/20261126083314_notes_and_exclusions.sql` |
 | **Show progress** | A summary derived from a show's seasons, such as "2 of 4 seasons finished": the Finished season entries that aren't excluded, out of all seasons minus the exclusions. A show has no status of its own. | owner said (2026-11-26) |
 | **Time to finish** | How long an item takes. Movie: its runtime. Show: the sum of episode runtimes, per season and in total. Game: its time to beat. | owner said (2026-11-26) |
 | **Time to beat** | A game's estimated play time from IGDB `game_time_to_beats`: `hastily` (main story), `normally` (story plus some side content) and `completely` (100%), each an average in seconds, with `count` submissions behind it. | research: IGDB API docs (2026-11-26) |
 | **Metadata provider** | The outside source of item data: TMDB for movies and shows, IGDB for games. | owner said (2026-11-26): credentials set up |
-| **Up next** | An ordered shortlist inside the Backlog: what the user plans to start soonest. It is not a separate status. There is one queue per media type (Movies, TV, Games; Books), each ordered on its own. | owner said (2026-11-26) |
+| **Up next** | The ordered list, per media type, of everything the user hasn't started. It is the first status (stored as `backlog`): every not-started entry is in its type's queue, and a new entry goes to the bottom. There is one queue per media type (Movies, TV, Games, Books), each ordered on its own. | owner said (2026-11-27) |
 | **Public library** | The default. Other users, and signed-out visitors, can read a user's library (read-only), but never its notes. | owner said (2026-11-26) |
 | **Private library** | A library its owner opted out of sharing. Nobody else sees it. | owner said (2026-11-26) |
 | **Notes** | A user's free-text notes on a library entry. Always private to the owner. | owner said (2026-11-26) |

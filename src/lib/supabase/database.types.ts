@@ -183,7 +183,10 @@ isOneToOne: false
             [_ in never]: never
           }
           Functions: {
-            "set_up_next_order":
+            "backfill_up_next":
+{ Args: Record<PropertyKey, never>; Returns: number
+                           },
+"set_up_next_order":
 { Args: { "entry_ids": (string)[] }; Returns: number
                            }
           }
