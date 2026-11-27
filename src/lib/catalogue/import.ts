@@ -1,6 +1,6 @@
 import "server-only";
 import { getDetails } from "@/lib/providers";
-import type { MediaType, Provider, SeasonDetails } from "@/lib/providers/types";
+import type { BookDetails, MediaType, Provider, SeasonDetails } from "@/lib/providers/types";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Database } from "@/lib/supabase/database.types";
 
@@ -41,6 +41,17 @@ export async function importItem(
     refresh_attempted_at: now,
     provider_data_purged_at: null,
   };
+  if (details.book) {
+    const { book } = details;
+    item.page_count = book.pageCount;
+    item.audio_minutes = book.audioMinutes;
+    item.has_audiobook = book.hasAudiobook;
+    item.narrators = book.narrators.length ? book.narrators.join(", ") : null;
+    // A book with no series clears any earlier link.
+    item.series_id = book.series ? await upsertSeries(admin, book.series) : null;
+    item.series_position = book.series?.position ?? null;
+    item.series_position_label = book.series?.positionLabel ?? null;
+  }
   if (!details.timeToBeatUnavailable) {
     item.ttb_hastily_s = details.timeToBeat?.hastilyS ?? null;
     item.ttb_normally_s = details.timeToBeat?.normallyS ?? null;
@@ -67,6 +78,28 @@ export async function importItem(
     .order("season_number");
   if (seasonsError) throw seasonsError;
   return { itemId: saved.id, seasons: seasons.map((s) => ({ id: s.id, number: s.season_number })) };
+}
+
+async function upsertSeries(
+  admin: ReturnType<typeof createAdminClient>,
+  series: NonNullable<BookDetails["series"]>,
+): Promise<string> {
+  const { data, error } = await admin
+    .from("book_series")
+    .upsert(
+      {
+        provider: "hardcover",
+        provider_id: series.providerId,
+        name: series.name,
+        primary_books_count: series.primaryBooksCount,
+        is_completed: series.isCompleted,
+      },
+      { onConflict: "provider,provider_id" },
+    )
+    .select("id")
+    .single();
+  if (error) throw error;
+  return data.id;
 }
 
 async function upsertSeasons(

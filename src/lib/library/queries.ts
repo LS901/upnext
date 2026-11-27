@@ -60,6 +60,7 @@ export type UpNextRow = ItemRow | QueuedSeasonRow;
 export type LibraryView = { upNext: Record<QueueType, UpNextRow[]>; groups: LibraryGroup[] };
 
 export function imageUrl(provider: Provider, ref: string | null): string | null {
+  if (provider === "hardcover") return ref; // the ref is already the full cover URL
   return provider === "tmdb" ? tmdbImageUrl(ref) : igdbImageUrl(ref);
 }
 
