@@ -4,7 +4,7 @@ import { localSupabase } from "./e2e/local-supabase";
 // Runs against a production build, as the Next.js docs recommend.
 // Port 3100 so a dev server on 3000 is never mistaken for this one.
 const PORT = 3100;
-// e2e/stub-providers.ts stands in for TMDB, IGDB and Twitch.
+// e2e/stub-providers.ts stands in for TMDB, IGDB, Hardcover and Twitch.
 const STUB = "http://127.0.0.1:3101";
 
 // The app under test talks to local Supabase (`npx supabase start`). Its URL and
@@ -46,9 +46,11 @@ export default defineConfig({
         TMDB_API_READ_ACCESS_TOKEN: "SENTINEL_TMDB_7f3a",
         IGDB_CLIENT_ID: "SENTINEL_IGDB_ID_7f3a",
         IGDB_CLIENT_SECRET: "SENTINEL_IGDB_SECRET_7f3a",
+        HARDCOVER_API_TOKEN: "SENTINEL_HARDCOVER_7f3a",
         CRON_SECRET: "SENTINEL_CRON_7f3a",
         TMDB_API_BASE_URL: `${STUB}/tmdb`,
         IGDB_API_BASE_URL: `${STUB}/igdb`,
+        HARDCOVER_API_URL: `${STUB}/hardcover`,
         TWITCH_TOKEN_URL: `${STUB}/twitch/token`,
       },
     },

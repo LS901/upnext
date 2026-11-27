@@ -1,6 +1,6 @@
 import type { MediaType } from "@/lib/providers/types";
 
-export const MEDIA_TYPES: readonly MediaType[] = ["movie", "show", "game"];
+export const MEDIA_TYPES: readonly MediaType[] = ["movie", "show", "game", "book"];
 
 /** Longer queries are cut, so a pasted essay never reaches a provider. */
 export const MAX_QUERY_LENGTH = 100;

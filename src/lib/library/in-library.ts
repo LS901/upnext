@@ -6,6 +6,8 @@ import { fetchAllIn } from "@/lib/supabase/fetch-all";
 
 type Client = SupabaseClient<Database>;
 
+export type BookVersion = Database["public"]["Enums"]["book_version"];
+
 export type ItemKey = `${Provider}:${MediaType}:${string}`;
 
 export function itemKey(provider: Provider, mediaType: MediaType, providerId: string): ItemKey {
@@ -73,6 +75,50 @@ export async function inLibrary(supabase: Client, userId: string, keys: ItemKey[
   for (const e of byItem) found.add(keyOf.get(e.item_id!)!);
   for (const e of bySeason) found.add(keyOf.get(showOf.get(e.season_id!)!)!);
   return found;
+}
+
+/**
+ * The versions (print, audio) of each Hardcover book the user has in their
+ * library, by Hardcover id. A book with no entry has no key. Filtered to
+ * `userId`, like inLibrary.
+ */
+export async function bookVersionsInLibrary(
+  supabase: Client,
+  userId: string,
+  providerIds: string[],
+): Promise<Map<string, Set<BookVersion>>> {
+  const versions = new Map<string, Set<BookVersion>>();
+  if (!providerIds.length) return versions;
+
+  const items = await fetchAllIn(providerIds, (ids, from, to) =>
+    supabase
+      .from("items")
+      .select("id, provider_id")
+      .eq("provider", "hardcover")
+      .eq("media_type", "book")
+      .in("provider_id", ids)
+      .order("id")
+      .range(from, to),
+  );
+  const providerIdOf = new Map(items.map((i) => [i.id, i.provider_id]));
+
+  const entries = await fetchAllIn([...providerIdOf.keys()], (ids, from, to) =>
+    supabase
+      .from("library_entries")
+      .select("item_id, book_version")
+      .eq("user_id", userId)
+      .in("item_id", ids)
+      .order("id")
+      .range(from, to),
+  );
+  for (const e of entries) {
+    if (!e.item_id || !e.book_version) continue;
+    const id = providerIdOf.get(e.item_id)!;
+    const set = versions.get(id) ?? new Set<BookVersion>();
+    set.add(e.book_version);
+    versions.set(id, set);
+  }
+  return versions;
 }
 
 /** Season numbers of a TMDB show that the user already has in their library. */

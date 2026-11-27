@@ -8,25 +8,34 @@ import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
 import { text, texts } from "@/app/form-data";
 import { parseSearch, searchHref } from "./params";
+import type { BookVersion } from "@/lib/library/in-library";
 import { logProviderFailure, PROVIDER_ID } from "./shared";
 
 type NewEntry = Pick<
   Database["public"]["Tables"]["library_entries"]["Insert"],
-  "item_id" | "item_media_type" | "season_id"
+  "item_id" | "item_media_type" | "season_id" | "book_version"
 >;
 
 const SEASON_NUMBER = /^\d{1,4}$/;
 
-// Adds a movie or game to the signed-in user's Backlog. Only the provider and
-// its id come from the form: importItem fetches everything else itself.
+// Adds a movie, game or book to the signed-in user's Backlog. Only the provider,
+// its id and, for a book, the version come from the form: importItem fetches
+// everything else itself.
 export async function addItem(formData: FormData) {
   const provider = text(formData, "provider");
   const mediaType = text(formData, "mediaType");
   const providerId = text(formData, "providerId");
   const valid =
-    ((provider === "tmdb" && mediaType === "movie") || (provider === "igdb" && mediaType === "game")) &&
+    ((provider === "tmdb" && mediaType === "movie") ||
+      (provider === "igdb" && mediaType === "game") ||
+      (provider === "hardcover" && mediaType === "book")) &&
     PROVIDER_ID.test(providerId);
   if (!valid) throw new Error("Not a movie or game that can be added.");
+  // A book is added as print or as an audiobook; other types have no version.
+  const version = text(formData, "version");
+  if (mediaType === "book" && version !== "print" && version !== "audio") {
+    throw new Error("A book needs a version: print or audio.");
+  }
 
   const user = await getCurrentUser();
   if (!user) redirect("/login");
@@ -37,7 +46,11 @@ export async function addItem(formData: FormData) {
     mediaType,
     providerId,
     user.id,
-    (imported) => [{ item_id: imported.itemId, item_media_type: mediaType }],
+    (imported) => [
+      mediaType === "book"
+        ? { item_id: imported.itemId, item_media_type: mediaType, book_version: version as BookVersion }
+        : { item_id: imported.itemId, item_media_type: mediaType },
+    ],
     searchHref(search, { failed: provider }),
   );
   redirect(searchHref(search, { added: "1" }));

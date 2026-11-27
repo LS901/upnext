@@ -174,3 +174,42 @@ test("addSeasons refuses a non-numeric show id", async () => {
   await expect(addSeasons(form({ tmdbId: "abc", season: "1" }))).rejects.toThrow("Not a show");
   expect(importItem).not.toHaveBeenCalled();
 });
+
+const book = (extra: Record<string, string | string[]> = {}) =>
+  form({ provider: "hardcover", mediaType: "book", providerId: "8101", q: "Lantern", ...extra });
+
+test("addItem adds a book as the chosen version", async () => {
+  for (const version of ["print", "audio"]) {
+    insert.mockClear();
+    await expect(addItem(book({ version }))).rejects.toThrow("redirect:/search?q=Lantern&added=1");
+    expect(importItem).toHaveBeenLastCalledWith("hardcover", "book", "8101");
+    expect(insert).toHaveBeenCalledExactlyOnceWith({
+      item_id: "item-1",
+      item_media_type: "book",
+      book_version: version,
+      user_id: USER.id,
+      status: "backlog",
+    });
+  }
+});
+
+test("addItem rejects a book with a missing or invalid version, and ignores a version on other types", async () => {
+  for (const extra of [{} as Record<string, string>, { version: "" }, { version: "ebook" }, { version: "PRINT" }]) {
+    await expect(addItem(book(extra))).rejects.toThrow("A book needs a version");
+  }
+  expect(importItem).not.toHaveBeenCalled();
+  expect(insert).not.toHaveBeenCalled();
+
+  await expect(addItem(movie({ version: "audio" }))).rejects.toThrow("redirect:/search?q=Kestrel&added=1");
+  expect(insert).toHaveBeenCalledExactlyOnceWith({
+    item_id: "item-1",
+    item_media_type: "movie",
+    user_id: USER.id,
+    status: "backlog",
+  });
+});
+
+test("addItem treats an existing version of a book (23505) as success", async () => {
+  insert.mockResolvedValue(pgError("23505"));
+  await expect(addItem(book({ version: "audio" }))).rejects.toThrow("redirect:/search?q=Lantern&added=1");
+});
