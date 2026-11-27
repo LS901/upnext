@@ -119,6 +119,10 @@ async function purgeStaleProviderData(admin: Admin): Promise<number> {
         ttb_normally_s: null,
         ttb_completely_s: null,
         ttb_count: null,
+        page_count: null,
+        audio_minutes: null,
+        has_audiobook: null,
+        narrators: null,
         provider_data_purged_at: new Date().toISOString(),
       })
       .in("id", ids)

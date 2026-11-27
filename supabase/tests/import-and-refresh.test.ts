@@ -474,7 +474,18 @@ describe("catalogue import and refresh", () => {
     resetHardcoverLimiterForTests();
     expect(await refreshStaleItems()).toMatchObject({ failed: 1, purged: 1 });
     const after = await getItem(itemId);
-    expect(after).toMatchObject({ title: "Invented Old Book", series_id: before!.series_id, image_ref: null, score: null });
+    expect(after).toMatchObject({
+      title: "Invented Old Book",
+      series_id: before!.series_id,
+      series_position: 1,
+      series_position_label: "1",
+      image_ref: null,
+      score: null,
+      page_count: null,
+      audio_minutes: null,
+      narrators: null,
+      has_audiobook: null,
+    });
     expect(after!.provider_data_purged_at).not.toBeNull();
   });
 
