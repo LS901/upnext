@@ -192,6 +192,30 @@ for (const size of SIZES) {
   });
 }
 
+test.describe("desktop sidebar", () => {
+  test.use({ viewport: { width: 1280, height: 800 } });
+
+  test("the nav sits in the row beside the content, with no phantom scroll", async ({ page }) => {
+    await page.goto("/credits");
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    const nav = page.getByRole("navigation", { name: "Main" });
+    await expect(nav).toBeVisible();
+    const result = await page.evaluate(() => {
+      const navEl = document.querySelector("nav[aria-label='Main']")!;
+      const main = document.querySelector("main")!;
+      return {
+        position: getComputedStyle(navEl).position,
+        navRight: navEl.getBoundingClientRect().right,
+        mainLeft: main.getBoundingClientRect().left,
+        scrollHeight: document.documentElement.scrollHeight,
+      };
+    });
+    expect(result.position).not.toBe("fixed");
+    expect(result.mainLeft).toBeGreaterThanOrEqual(result.navRight);
+    expect(result.scrollHeight).toBeLessThanOrEqual(800);
+  });
+});
+
 test.describe("phone", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
