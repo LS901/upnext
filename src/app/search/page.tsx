@@ -37,6 +37,7 @@ export default function SearchPage({ searchParams }: PageProps<"/search">) {
   );
 }
 
+// hardcover is a placeholder: Task 4 wires the real Hardcover search here.
 const SEARCHES: Record<Provider, (q: string) => Promise<SearchResult[]>> = { tmdb: searchTmdb, igdb: searchIgdb, hardcover: async () => [] };
 
 // Queries only the providers whose types aren't hidden (none when every type

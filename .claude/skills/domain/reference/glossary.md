@@ -9,7 +9,7 @@ Paths below are relative to the named repo. Examples are invented.
 | Term | Meaning | Source |
 |---|---|---|
 | **Media type** | One of `movie`, `show` (TV), `game` or `book`. Every item has exactly one. Audiobooks come under `book`, not a fifth type. | owner said (2026-11-26); `supabase/migrations/20261127110000_book_enums.sql` |
-| **Item** | A movie, show or game in the shared catalogue, described by metadata from a provider (see `metadata.md`). It belongs to no user. | owner said (2026-11-26) |
+| **Item** | A movie, show, game or book in the shared catalogue, described by metadata from a provider (see `metadata.md`). It belongs to no user. | owner said (2026-11-26) |
 | **Library** | One user's collection of library entries. | owner said (2026-11-26) |
 | **Library entry** | A user's own record of one item: status (per season for shows), play count, notes and dates. A user has at most one entry per item and version (a book may have a print and an audio entry). The user owns this data, not the provider. | owner said (2026-11-26) |
 | **Play count** | How many times the user has finished an item. A rewatch or replay adds to it on the same entry; it never creates a second entry. | owner said (2026-11-26) |
@@ -33,7 +33,10 @@ Paths below are relative to the named repo. Examples are invented.
 | **List** | A user-made collection of items, for example "Cosy winter games". Public by default; the owner can make a single list private. | owner said (2026-11-26) |
 | **Review score** | A provider's aggregate score for an item, normalised to 0-100 (TMDB `vote_average × 10`, IGDB `total_rating`) and shown as item info with the vote count behind it. Unknown is "No score", never 0. upnext has no user ratings of its own. | owner said (2026-11-26); normalisation in `metadata.md` (ruling, owner may overrule) |
 | **Spoiler** | Season synopses, episode titles or stills for seasons after the user's current season progress. Hidden unless the user opts in. | owner confirmed INV-004 (2026-11-26) |
-| **Audiobook** | A version of a book, not a media type of its own. When adding a book the user picks the audiobook version with a selector, and it is tracked as its own entry, with its own status and play count. | owner said (2026-11-26) |
+| **Book** | The fourth media type (`book`), imported from Hardcover. It can be tracked in a print version, an audio version, or both. | owner said (2026-11-27); `supabase/migrations/20261127110100_books.sql` |
+| **Book version** | `print` or `audio`: which form of a book a library entry tracks. Print covers paper and ebook ("reading"). Each version is its own entry, with its own status and play count. Set on book entries only. | owner said (2026-11-27); `supabase/migrations/20261127110100_books.sql` |
+| **Audiobook** | The audio version of a book, not a media type of its own. It is a separate entry from the print version, with its own status and play count, and both versions can be tracked at once. The user picks it with a selector when adding a book. | owner said (2026-11-26, 2026-11-27); resolves "Print and audiobook together" |
+| **Series** | A run of books in one series (`book_series`). Progress ("N of M read") is derived like a show's, from the Finished books minus exclusions (`book_exclusions`); a series has no status of its own. | owner said (2026-11-27); `supabase/migrations/20261127110100_books.sql` |
 
 ## Unconfirmed
 
@@ -41,4 +44,3 @@ Guesses that need the owner's word before anyone relies on them.
 
 | Term | Guessed meaning | Source |
 |---|---|---|
-| **Print and audiobook together** (resolved 2026-11-27: one entry per version, INV-008) | Whether one user can track both the print and the audiobook version of the same book at once, and how that fits one entry per item (INV-008). Where audiobook data comes from is also open. | owner said audiobooks are a version under books (2026-11-26); rest left to the books task |
