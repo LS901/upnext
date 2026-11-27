@@ -1,6 +1,6 @@
 import type { Provider, ProviderError } from "@/lib/providers/types";
 
-export const PROVIDER_NAMES: Record<Provider, string> = { tmdb: "TMDB", igdb: "IGDB" };
+export const PROVIDER_NAMES: Record<Provider, string> = { tmdb: "TMDB", igdb: "IGDB", hardcover: "Hardcover" };
 
 /** A TMDB or IGDB id as the forms and routes accept it. */
 export const PROVIDER_ID = /^\d{1,12}$/;

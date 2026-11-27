@@ -9,7 +9,7 @@ export type Answer =
 export type Outcome = { results: SearchResult[]; failed: Provider[]; nothingFound: boolean; everythingHidden: boolean };
 
 /** The types each provider searches, in the order the providers are asked. */
-export const PROVIDER_TYPES: Record<Provider, readonly MediaType[]> = { tmdb: ["movie", "show"], igdb: ["game"] };
+export const PROVIDER_TYPES: Record<Provider, readonly MediaType[]> = { tmdb: ["movie", "show"], igdb: ["game"], hardcover: [] };
 
 /** The providers a search asks: each one unless every type it searches is hidden. */
 export function providersToAsk(hidden: readonly MediaType[]): Provider[] {

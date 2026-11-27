@@ -1,4 +1,4 @@
-Last reviewed: 2026-11-26
+Last reviewed: 2026-11-27
 
 Sources: owner interview, 2026-11-26 (Lewis); API research, 2026-11-26 (TMDB API terms and FAQ, IGDB API docs, community reports linked in `metadata.md`); owner follow-up, 2026-11-26 (no user ratings, a status per season, one entry per item with a play count, private lists); owner decisions on show progress, sign-in and books, 2026-11-26; owner on audiobooks (a version under books), 2026-11-26; `supabase/migrations/`. The data model, search and My library exist.
 
@@ -8,10 +8,10 @@ Paths below are relative to the named repo. Examples are invented.
 
 | Term | Meaning | Source |
 |---|---|---|
-| **Media type** | One of `movie`, `show` (TV) or `game`. Every item has exactly one. `book` is planned as a fourth, after the TMDB and IGDB import; audiobooks come under `book`, not a fifth type. | owner said (2026-11-26) |
+| **Media type** | One of `movie`, `show` (TV), `game` or `book`. Every item has exactly one. Audiobooks come under `book`, not a fifth type. | owner said (2026-11-26); `supabase/migrations/20261127110000_book_enums.sql` |
 | **Item** | A movie, show or game in the shared catalogue, described by metadata from a provider (see `metadata.md`). It belongs to no user. | owner said (2026-11-26) |
 | **Library** | One user's collection of library entries. | owner said (2026-11-26) |
-| **Library entry** | A user's own record of one item: status (per season for shows), play count, notes and dates. A user has at most one entry per item. The user owns this data, not the provider. | owner said (2026-11-26) |
+| **Library entry** | A user's own record of one item: status (per season for shows), play count, notes and dates. A user has at most one entry per item and version (a book may have a print and an audio entry). The user owns this data, not the provider. | owner said (2026-11-26) |
 | **Play count** | How many times the user has finished an item. A rewatch or replay adds to it on the same entry; it never creates a second entry. | owner said (2026-11-26) |
 | **Status** | Where a library entry is: Backlog, In progress, Finished, Paused or Dropped (see `library-and-status.md`). | owner said (2026-11-26) |
 | **Backlog** | Items the user wants to watch or play and hasn't started. | owner said (2026-11-26) |
@@ -41,4 +41,4 @@ Guesses that need the owner's word before anyone relies on them.
 
 | Term | Guessed meaning | Source |
 |---|---|---|
-| **Print and audiobook together** | Whether one user can track both the print and the audiobook version of the same book at once, and how that fits one entry per item (INV-008). Where audiobook data comes from is also open. | owner said audiobooks are a version under books (2026-11-26); rest left to the books task |
+| **Print and audiobook together** (resolved 2026-11-27: one entry per version, INV-008) | Whether one user can track both the print and the audiobook version of the same book at once, and how that fits one entry per item (INV-008). Where audiobook data comes from is also open. | owner said audiobooks are a version under books (2026-11-26); rest left to the books task |

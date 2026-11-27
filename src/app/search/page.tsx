@@ -22,7 +22,8 @@ import { logProviderFailure, PROVIDER_NAMES } from "./shared";
 
 export const metadata: Metadata = { title: "Search" };
 
-const HIDE_LABELS: Record<MediaType, string> = { movie: "Movies", show: "TV", game: "Games" };
+// Books join the hide list with the Hardcover search.
+const HIDE_LABELS: Record<Exclude<MediaType, "book">, string> = { movie: "Movies", show: "TV", game: "Games" };
 
 export default function SearchPage({ searchParams }: PageProps<"/search">) {
   return (
@@ -36,7 +37,7 @@ export default function SearchPage({ searchParams }: PageProps<"/search">) {
   );
 }
 
-const SEARCHES: Record<Provider, (q: string) => Promise<SearchResult[]>> = { tmdb: searchTmdb, igdb: searchIgdb };
+const SEARCHES: Record<Provider, (q: string) => Promise<SearchResult[]>> = { tmdb: searchTmdb, igdb: searchIgdb, hardcover: async () => [] };
 
 // Queries only the providers whose types aren't hidden (none when every type
 // is), in parallel. A provider that fails (down, rate-limited) is reported,
@@ -112,7 +113,7 @@ async function SearchContent({ searchParams }: Pick<PageProps<"/search">, "searc
       <aside>
         <h2 className="text-sm font-medium text-muted-foreground">Hide</h2>
         <div className="mt-2 flex flex-wrap gap-2 md:flex-col">
-          {(Object.keys(HIDE_LABELS) as MediaType[]).map((type) => (
+          {(Object.keys(HIDE_LABELS) as (keyof typeof HIDE_LABELS)[]).map((type) => (
             <label
               key={type}
               className="flex min-h-11 cursor-pointer items-center gap-2 rounded-full border border-input bg-secondary px-4 text-sm transition-[transform,color,background-color,border-color] duration-150 hover:bg-muted has-checked:border-primary has-checked:bg-primary/20 md:rounded-lg lg:min-h-9"

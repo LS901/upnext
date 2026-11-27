@@ -51,7 +51,7 @@ const queuedSeason = (id: string, runtimeMinutes: number | null): QueuedSeasonRo
 describe("summarise", () => {
   test("counts entries, backlog minutes and unknown times", () => {
     const view: LibraryView = {
-      upNext: { movie: [item("q1", "backlog", 30)], show: [], game: [] },
+      upNext: { movie: [item("q1", "backlog", 30)], show: [], game: [], book: [] },
       groups: [
         { status: "in_progress", label: "In progress", rows: [item("p1", "in_progress", 90), show([season("ps", "in_progress", 50)])] },
         { status: "backlog", label: "Backlog", rows: [item("b1", "backlog", 100), item("b2", "backlog", null), show([season("s1", "backlog", 60), season("s2", "backlog", 40)])] },
@@ -62,7 +62,7 @@ describe("summarise", () => {
   });
 
   test("a queued season counts as backlog", () => {
-    const view: LibraryView = { upNext: { movie: [], show: [queuedSeason("qs", null)], game: [] }, groups: [] };
+    const view: LibraryView = { upNext: { movie: [], show: [queuedSeason("qs", null)], game: [], book: [] }, groups: [] };
     expect(summarise(view)).toEqual({ backlog: 1, backlogMinutes: 0, backlogUnknownTime: 1, inProgress: 0, finished: 0 });
   });
 });

@@ -14,7 +14,7 @@ describe("My library", () => {
   let a: TestUser;
   let b: TestUser;
   const itemIds: string[] = [];
-  const ids = { movie: "", game: "", show: "" };
+  const ids = { movie: "", game: "", show: "", book: "" };
   const season: Record<number, string> = {};
   const entry: Record<string, string> = {};
 

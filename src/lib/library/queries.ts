@@ -92,7 +92,7 @@ export async function getMyLibrary(supabase: Client, userId: string): Promise<Li
   for (const e of entries) {
     if (e.item) {
       const i = e.item;
-      if (i.media_type === "show") continue; // the schema allows only movies and games here
+      if (i.media_type === "show" || i.media_type === "book") continue; // books arrive with the books UI
       const row: ItemRow = {
         kind: "item",
         entryId: e.id,

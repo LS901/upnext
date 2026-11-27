@@ -2,12 +2,12 @@
 // (owner said, 2026-11-26): an entry's `up_next_position` only orders it
 // against the same user's entries of the same type.
 
-export type QueueType = "movie" | "show" | "game";
+export type QueueType = "movie" | "show" | "game" | "book";
 
 /** The queues in the order My library shows them. */
 export const QUEUE_TYPES: readonly QueueType[] = ["movie", "show", "game"];
 
-export const QUEUE_LABELS: Record<QueueType, string> = { movie: "Movies", show: "TV", game: "Games" };
+export const QUEUE_LABELS: Record<QueueType, string> = { movie: "Movies", show: "TV", game: "Games", book: "Books" };
 
 export type Placed = { id: string; position: number };
 
