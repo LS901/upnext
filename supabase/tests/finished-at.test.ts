@@ -32,7 +32,7 @@ describe("finished_at", () => {
   };
 
   beforeAll(async () => {
-    const keys = ["added", "moved", "again", "edited", "check"];
+    const keys = ["added", "moved", "again", "edited", "check", "forgeA", "forgeB", "forgeC", "forgeD"];
     const { data, error } = await adminClient()
       .from("items")
       .insert(keys.map((k) => ({ provider: "tmdb" as const, media_type: "movie" as const, provider_id: invented(), title: `Invented Finish Film ${k}` })))
@@ -85,6 +85,41 @@ describe("finished_at", () => {
     // Saving the same status again isn't a new finish either.
     await setStatus(id, "finished");
     expect(await finishedAt(id)).toBe(before);
+  });
+
+  const forged = "2001-01-01T00:00:00.000Z";
+
+  test("a user can't write finished_at directly on a Finished entry", async () => {
+    const id = await add("forgeA", "finished");
+    const before = await finishedAt(id);
+    const { error } = await user.client.from("library_entries").update({ finished_at: forged }).eq("id", id);
+    expect(error).toBeNull();
+    expect(await finishedAt(id)).toBe(before);
+  });
+
+  test("sending Finished again with an explicit finished_at keeps the old time", async () => {
+    const id = await add("forgeB", "finished");
+    const before = await finishedAt(id);
+    const { error } = await user.client
+      .from("library_entries")
+      .update({ status: "finished", finished_at: forged })
+      .eq("id", id);
+    expect(error).toBeNull();
+    expect(await finishedAt(id)).toBe(before);
+  });
+
+  test("a user writing finished_at on a Backlog entry leaves it null, with no error", async () => {
+    const id = await add("forgeC");
+    const { error } = await user.client.from("library_entries").update({ finished_at: forged }).eq("id", id);
+    expect(error).toBeNull();
+    expect(await finishedAt(id)).toBeNull();
+  });
+
+  test("the service role can set finished_at on a Finished entry", async () => {
+    const id = await add("forgeD", "finished");
+    const { error } = await adminClient().from("library_entries").update({ finished_at: forged }).eq("id", id);
+    expect(error).toBeNull();
+    expect(new Date((await finishedAt(id))!).toISOString()).toBe(forged);
   });
 
   test("finished_at can't be set on an entry that isn't Finished", async () => {
