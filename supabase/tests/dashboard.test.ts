@@ -37,6 +37,7 @@ describe("Dashboard data", () => {
         movie("Dash Other Film", day(4)),
         movie("Dash Finished One", day(-300)),
         movie("Dash Finished Two", day(-200)),
+        movie("Dash Other Finished", day(-100)),
         { provider: "igdb", media_type: "game", provider_id: invented(), title: "Dash Undated Game", release_date: null },
         { provider: "tmdb", media_type: "show", provider_id: invented(), title: "Dash Future Show", release_date: day(-50) },
       ])
@@ -68,6 +69,13 @@ describe("Dashboard data", () => {
     await add(a, "finB", movieEntry("Dash Finished Two"));
     // b's library is public by default, so a's client can read this entry.
     await add(b, "bFuture", movieEntry("Dash Other Film"));
+    // b's Finished entry is stamped newer than everything (other tests leave public Finished rows behind), so it would head a's list if it leaked.
+    await add(b, "bFinished", movieEntry("Dash Other Finished", { status: "finished" }));
+    const { error: stampError } = await admin
+      .from("library_entries")
+      .update({ finished_at: "2099-01-01T00:00:00Z" })
+      .eq("id", entry.bFinished);
+    if (stampError) throw stampError;
   });
 
   afterAll(async () => {
@@ -103,6 +111,17 @@ describe("Dashboard data", () => {
     expect(recentlyFinished.map((e) => e.entryId)).toEqual([entry.finB, entry.finA]);
     expect(recentlyFinished[0]).toMatchObject({ title: "Dash Finished Two", mediaType: "movie", seasonNumber: null });
     expect(new Date(recentlyFinished[0].finishedAt).toISOString()).toBe("2026-11-20T12:00:00.000Z");
+  });
+
+  test("recently finished holds only the caller's entries (INV-001)", async () => {
+    // Control: b's library is public, so a's client can read b's Finished row. Only the user_id filter keeps it out.
+    const { data: visible, error } = await a.client.from("library_entries").select("id").eq("id", entry.bFinished);
+    if (error) throw error;
+    expect(visible).toHaveLength(1);
+
+    const { recentlyFinished } = await getDashboard(a.client, a.id, TODAY);
+    expect(recentlyFinished.map((e) => e.entryId)).not.toContain(entry.bFinished);
+    expect(recentlyFinished.map((e) => e.title)).not.toContain("Dash Other Finished");
   });
 
   test("stats match summarise of the same library", async () => {

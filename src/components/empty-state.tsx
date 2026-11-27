@@ -13,7 +13,7 @@ export function EmptyState({
   action?: { href: string; label: string };
 }) {
   return (
-    <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border px-4 py-10 text-center">
+    <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-border px-4 py-10 text-center">
       <Icon aria-hidden="true" className="size-8 text-muted-foreground" />
       <p className="text-muted-foreground">{text}</p>
       {action ? (

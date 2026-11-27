@@ -5,7 +5,7 @@ export function PosterRail({ label, children }: { label: string; children: React
   return (
     <ul
       aria-label={label}
-      className="flex gap-4 overflow-x-auto pb-2 lg:grid lg:grid-cols-[repeat(auto-fill,minmax(8rem,1fr))] lg:overflow-visible"
+      className="-m-1 flex gap-4 overflow-x-auto p-1 pb-3 lg:grid lg:grid-cols-[repeat(auto-fill,minmax(8rem,1fr))] lg:overflow-visible"
     >
       {children}
     </ul>

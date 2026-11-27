@@ -16,7 +16,15 @@ export async function AccountMenu() {
 
   return (
     <div className="flex items-center gap-4">
-      <span>{user.username}</span>
+      <span className="flex items-center gap-2">
+        <span
+          aria-hidden="true"
+          className="flex size-7 items-center justify-center rounded-full bg-secondary text-xs font-semibold uppercase"
+        >
+          {Array.from(user.username)[0]}
+        </span>
+        <span>{user.username}</span>
+      </span>
       <form action={signOut}>
         <button type="submit" className="min-h-11 text-accent-text underline">
           Sign out

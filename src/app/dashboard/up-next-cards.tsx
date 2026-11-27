@@ -16,6 +16,7 @@ function rowTitle(row: UpNextRow): string {
 /** The top of each queue the user hasn't hidden in My library and has something in. */
 export function UpNextCards({ upNext, hidden }: { upNext: LibraryView["upNext"]; hidden: QueueType[] }) {
   const queues = QUEUE_TYPES.filter((type) => !hidden.includes(type) && upNext[type].length > 0);
+  const allHidden = queues.length === 0 && QUEUE_TYPES.some((type) => upNext[type].length > 0);
   return (
     <section aria-labelledby="up-next" className="flex flex-col gap-3">
       <h2 id="up-next" className="text-xl font-semibold">
@@ -29,7 +30,7 @@ export function UpNextCards({ upNext, hidden }: { upNext: LibraryView["upNext"];
         </div>
       ) : (
         <p className="text-muted-foreground">
-          Nothing up next.{" "}
+          {allHidden ? "Your Up next queues are hidden in My library." : "Nothing up next."}{" "}
           <Link href="/library" className="inline-flex min-h-11 items-center text-accent-text underline lg:min-h-0">
             My library
           </Link>

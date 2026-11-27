@@ -9,7 +9,7 @@ export async function MainNav() {
   return (
     <nav
       aria-label="Main"
-      className="fixed inset-x-0 bottom-0 z-40 border-t bg-card pb-[env(safe-area-inset-bottom)] lg:sticky lg:top-0 lg:inset-x-auto lg:bottom-auto lg:h-dvh lg:w-60 lg:shrink-0 lg:self-start lg:border-t-0 lg:border-r lg:pb-0"
+      className="fixed inset-x-0 bottom-0 z-40 border-t bg-card pb-[env(safe-area-inset-bottom)] lg:inset-x-auto lg:bottom-auto lg:w-60 lg:shrink-0 lg:self-stretch lg:border-t-0 lg:border-r lg:pb-0"
     >
       <NavLinks />
     </nav>

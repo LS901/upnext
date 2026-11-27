@@ -16,7 +16,7 @@ export function Landing() {
       <p className="mt-4 text-lg text-muted-foreground">{PITCH}</p>
       <ul className="mt-8 flex flex-col gap-4">
         {POINTS.map((point) => (
-          <li key={point.name} className="rounded-xl border border-border bg-card p-4">
+          <li key={point.name} className="rounded-lg border border-border bg-card p-4">
             <strong className="font-semibold">{point.name}</strong>
             <span className="text-muted-foreground"> · {point.text}</span>
           </li>

@@ -46,7 +46,7 @@ export function Poster({
         aria-hidden="true"
         style={style}
         className={cn(
-          "flex shrink-0 flex-col items-center justify-center gap-1 rounded-lg bg-secondary text-muted-foreground transition-[transform,color,background-color,border-color] duration-150 hover:-translate-y-0.5",
+          "flex shrink-0 flex-col items-center justify-center gap-1 rounded-sm bg-secondary text-muted-foreground transition-[transform,color,background-color,border-color] duration-150 hover:-translate-y-0.5",
           className,
         )}
       >
@@ -65,7 +65,7 @@ export function Poster({
       unoptimized
       style={style}
       className={cn(
-        "shrink-0 rounded-lg object-cover transition-[transform,color,background-color,border-color] duration-150 hover:-translate-y-0.5",
+        "shrink-0 rounded-sm object-cover transition-[transform,color,background-color,border-color] duration-150 hover:-translate-y-0.5",
         className,
       )}
     />

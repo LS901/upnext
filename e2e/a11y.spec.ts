@@ -183,6 +183,11 @@ for (const size of SIZES) {
       await page.goto("/credits");
       await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
       await scan(page);
+      // A short page fits the viewport: the sidebar must not add a phantom scroll below the header.
+      if (size.name === "1280") {
+        const scrollHeight = await page.evaluate(() => document.documentElement.scrollHeight);
+        expect(scrollHeight).toBeLessThanOrEqual(size.height);
+      }
     });
   });
 }

@@ -14,7 +14,7 @@ const links = [
 export function NavLinks() {
   const pathname = usePathname();
   return (
-    <ul className="flex lg:flex-col lg:gap-1 lg:p-3">
+    <ul className="flex lg:sticky lg:top-0 lg:flex-col lg:gap-1 lg:p-3">
       {links.map(({ href, label, icon: Icon, match }) => {
         const current = match(pathname);
         return (
