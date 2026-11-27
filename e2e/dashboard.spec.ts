@@ -131,6 +131,8 @@ test("a signed-out visitor sees the landing page", async ({ browser }) => {
   await expect(page.getByRole("main").getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/login");
   await expect(page.getByRole("heading", { name: "Release radar" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Currently on" })).toHaveCount(0);
+  await expect(page.getByText("Keep everything you want to get to in one place, in the order you'll get to it.")).toBeVisible();
+  await expect(page.getByText("Backlog")).toHaveCount(0);
   await context.close();
 });
 
@@ -151,7 +153,9 @@ test("the dashboard shows your numbers, what you're on, Up next, the radar and r
   await page.goto("/");
 
   const numbers = section(page, "Your numbers");
-  await expect(numbers).toContainText(/7\s*Backlog/);
+  await expect(numbers).toContainText(/7\s*Up next/);
+  await expect(numbers).not.toContainText("Backlog");
+  await expect(page.getByText("Backlog")).toHaveCount(0);
   await expect(numbers).toContainText("about 3 h to finish");
   await expect(numbers).toContainText(/1\s*In progress/);
   await expect(numbers).toContainText(/2\s*Finished/);

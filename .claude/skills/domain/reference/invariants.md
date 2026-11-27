@@ -96,3 +96,11 @@ Rules for this file (the team-workflow session-start check enforces them):
 ## Unconfirmed
 
 <!-- New rules go here until the owner confirms them. -->
+
+### INV-010 — A not-started entry is always in its type's Up next queue
+- **Never:** a library entry with the status Up next (`backlog`) has no queue position, or an entry in any other status keeps one.
+- **Why:** Up next and Backlog are one list (owner design, 2026-11-27); an entry with no position would vanish from My library, which shows only queued entries for that status.
+- **Enforced by:** upnext (the `library_entries_queue_backlog` trigger assigns the bottom position and clears it on leaving, and a check requires `(status = 'backlog') = (up_next_position is not null)`).
+- **Code today:** `supabase/migrations/20261127120000_up_next_is_backlog.sql` adds the trigger, the check and the backfill of older entries. Tests: `supabase/tests/up-next-merge.test.ts` (insert by the user's client and by admin, return from Paused, Dropped, In progress and Finished, the right queue per type, other users unaffected, the backfill).
+- **Test at the boundary:** as an invented user, add an item of each type and move entries between statuses through the real handlers and direct writes. Expect every Up next entry to have a position, and every other entry none.
+- **Status:** Unconfirmed
