@@ -30,9 +30,11 @@ const partial = (text: string) => {
  * Without JavaScript it's a plain GET form.
  *
  * `q` and `exclude` are the search on screen, from the URL. What counts as
- * "already searched" is that, or the search on its way, never a memory of what
- * this form once sent: Back, the header's Search link or an Add can change the
- * URL without it.
+ * "already searched" is the newest search on its way, or else that one; never
+ * a memory of what this form once sent, because Back, the header's Search link
+ * or an Add can change the URL without it. A search landing that this form
+ * didn't send is shown in the form; one it did send (even an older one landing
+ * before a newer one) never touches what's being typed.
  */
 export function SearchForm({ q, exclude }: { q: string; exclude: MediaType[] }) {
   const router = useRouter();
@@ -43,16 +45,18 @@ export function SearchForm({ q, exclude }: { q: string; exclude: MediaType[] }) 
 
   const shown = searchHref({ q, exclude });
   const onScreen = useRef({ href: shown, q });
-  // The search on its way, until its transition ends.
+  // The newest search on its way, until the searches' transition ends.
   const inFlight = useRef<string | null>(null);
-  // The last search this form sent: a new search on screen that isn't it came from elsewhere.
-  const lastSent = useRef(shown);
+  // Every search this form sent that hasn't finished: when one lands, it's ours.
+  const sent = useRef(new Set<string>());
+  const lastShown = useRef(shown);
 
   useEffect(() => {
     onScreen.current = { href: shown, q };
-    if (shown === lastSent.current) return;
+    if (shown === lastShown.current) return;
+    lastShown.current = shown;
+    if (sent.current.has(shown)) return;
     // Back, the header link or a redirect: show that search in the form.
-    lastSent.current = shown;
     cancel();
     if (box.current) box.current.value = q;
     for (const el of Array.from(form.current?.elements ?? [])) {
@@ -60,9 +64,17 @@ export function SearchForm({ q, exclude }: { q: string; exclude: MediaType[] }) 
     }
   }, [shown, q, exclude]);
 
+  // Declared after the effect above on purpose: a search's results and the end
+  // of its transition commit together, and effects run in order, so the landing
+  // search is checked against `sent` before `sent` is cleared.
   useEffect(() => {
-    if (!searching) inFlight.current = null;
+    if (searching) return;
+    inFlight.current = null;
+    sent.current.clear();
   }, [searching]);
+
+  /** What a new search is compared with: the newest on its way, or else the one on screen. */
+  const latest = () => inFlight.current ?? onScreen.current.href;
 
   /** The search the form describes now; with `keepQuery`, the one on screen's query. */
   function current(keepQuery = false): string {
@@ -78,16 +90,15 @@ export function SearchForm({ q, exclude }: { q: string; exclude: MediaType[] }) 
 
   function send(href: string) {
     inFlight.current = href;
-    lastSent.current = href;
+    sent.current.add(href);
     startSearch(() => router.replace(href, { scroll: false }));
   }
 
   /** Enter, the Search button or a Hide box: search now. The search on screen again re-runs it (a retry). */
   function searchNow(href: string) {
     cancel();
-    if (href === inFlight.current) return;
-    if (href === onScreen.current.href) startSearch(() => router.refresh());
-    else send(href);
+    if (href !== latest()) send(href);
+    else if (!inFlight.current) startSearch(() => router.refresh());
   }
 
   function onType(e: ChangeEvent<HTMLInputElement>) {
@@ -96,7 +107,7 @@ export function SearchForm({ q, exclude }: { q: string; exclude: MediaType[] }) 
     timer.current = setTimeout(() => {
       timer.current = null;
       const href = current();
-      if (href !== onScreen.current.href && href !== inFlight.current) send(href);
+      if (href !== latest()) send(href);
     }, SEARCH_DELAY_MS);
   }
 

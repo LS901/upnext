@@ -133,6 +133,33 @@ test("after the header's Search link empties the page, the same title can be sea
   expect(router.replace).toHaveBeenCalledExactlyOnceWith("/search?q=kestrel", { scroll: false });
 });
 
+test("an older search landing while a newer one is on its way never resets the box", () => {
+  // Searches stay on their way until the test lets them land.
+  router.replace.mockImplementation(() => new Promise<void>(() => {}));
+  const { box, show } = renderForm();
+  type(box, "kest", 0);
+  act(() => vi.advanceTimersByTime(300)); // sent
+  type(box, "rel", 0);
+  act(() => vi.advanceTimersByTime(300)); // sent too
+  type(box, " m", 0); // still typing
+  show("kest"); // the older search's results land first
+  expect(box.value).toBe("kestrel m");
+});
+
+test("typing back to the search on screen while another is on its way searches it again", () => {
+  router.replace.mockImplementation(() => new Promise<void>(() => {}));
+  const { box } = renderForm("kestrel");
+  type(box, "s", 0);
+  act(() => vi.advanceTimersByTime(300));
+  expect(router.replace).toHaveBeenLastCalledWith("/search?q=kestrels", { scroll: false });
+
+  fireEvent.change(box, { target: { value: "kestrel" } });
+  act(() => vi.advanceTimersByTime(300));
+  // Otherwise "kestrels" would land under a box that says "kestrel".
+  expect(router.replace).toHaveBeenLastCalledWith("/search?q=kestrel", { scroll: false });
+  expect(router.replace).toHaveBeenCalledTimes(2);
+});
+
 test("results arriving while you keep typing never overwrite the box", () => {
   const { box, show } = renderForm();
   type(box, "kestrel", 0);
