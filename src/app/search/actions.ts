@@ -30,7 +30,7 @@ export async function addItem(formData: FormData) {
       (provider === "igdb" && mediaType === "game") ||
       (provider === "hardcover" && mediaType === "book")) &&
     PROVIDER_ID.test(providerId);
-  if (!valid) throw new Error("Not a movie or game that can be added.");
+  if (!valid) throw new Error("Not an item that can be added.");
   // A book is added as print or as an audiobook; other types have no version.
   const version = text(formData, "version");
   if (mediaType === "book" && version !== "print" && version !== "audio") {

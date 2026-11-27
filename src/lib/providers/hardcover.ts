@@ -4,24 +4,40 @@ import { ProviderError, type BookDetails, type ItemDetails, type SearchResult } 
 const DEFAULT_URL = "https://api.hardcover.app/v1/graphql";
 const USER_AGENT = "upnext (https://github.com/LS901/upnext)";
 const MIN_GAP_MS = 1000;
+/** Every request gives up after this long, so a slow Hardcover never holds a page up. */
+const REQUEST_TIMEOUT_MS = 5000;
+/** A search gives up rather than wait longer than this for its turn. */
+const SEARCH_MAX_WAIT_MS = 3000;
 
 type Json = Record<string, unknown>;
 
 // ---- Limiter: requests start at least 1 second apart -------------------------
+//
+// FIFO: each request books its turn when it joins (the earliest start 1 second
+// after the turn before it), so its wait is known at once. A search that would
+// wait too long gives up before booking, so it never delays the requests behind it.
 
-let lastStart = 0;
+let lastStart = -Infinity;
+let nextTurn = -Infinity;
 let gate: Promise<void> = Promise.resolve();
 
 export function resetHardcoverLimiterForTests(): void {
-  lastStart = 0;
+  lastStart = -Infinity;
+  nextTurn = -Infinity;
   gate = Promise.resolve();
 }
 
-function throttle(): Promise<void> {
+function throttle(maxWaitMs: number): Promise<void> {
+  const now = Date.now();
+  const turn = Math.max(now, nextTurn);
+  if (turn - now > maxWaitMs) return Promise.reject(new ProviderError("hardcover", null));
+  nextTurn = turn + MIN_GAP_MS;
   const next = gate.then(async () => {
-    const wait = lastStart + MIN_GAP_MS - Date.now();
+    // A late timer can't bring two starts closer than the gap.
+    const wait = Math.max(turn, lastStart + MIN_GAP_MS) - Date.now();
     if (wait > 0) await new Promise((r) => setTimeout(r, wait));
     lastStart = Date.now();
+    nextTurn = Math.max(nextTurn, lastStart + MIN_GAP_MS);
   });
   gate = next.catch(() => undefined);
   return next;
@@ -34,9 +50,13 @@ function authHeader(): string {
   return `Bearer ${raw.replace(/^Bearer\s+/i, "")}`;
 }
 
-/** One GraphQL request with exactly one top-level field. Errors carry the status only (INV-006). */
-async function hardcoverQuery(query: string): Promise<Json> {
-  await throttle();
+/**
+ * One GraphQL request with exactly one top-level field. Errors carry the status only (INV-006).
+ * `maxWaitMs` caps the wait for a turn; any request gives up after REQUEST_TIMEOUT_MS.
+ */
+async function hardcoverQuery(query: string, maxWaitMs = Infinity): Promise<Json> {
+  await throttle(maxWaitMs);
+  const signal = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
   let res: Response;
   try {
     res = await fetch(process.env.HARDCOVER_API_URL || DEFAULT_URL, {
@@ -49,8 +69,11 @@ async function hardcoverQuery(query: string): Promise<Json> {
       },
       body: JSON.stringify({ query }),
       cache: "no-store",
+      signal,
     });
   } catch {
+    // A timeout or abort, like a network failure, has no status.
+    if (signal.aborted) throw new ProviderError("hardcover", null);
     throw new ProviderError("hardcover", null, "hardcover request failed (network)");
   }
   if (!res.ok) throw new ProviderError("hardcover", res.status);
@@ -58,6 +81,8 @@ async function hardcoverQuery(query: string): Promise<Json> {
   try {
     body = (await res.json()) as Json;
   } catch {
+    // The timeout also covers reading the body.
+    if (signal.aborted) throw new ProviderError("hardcover", null);
     throw new ProviderError("hardcover", res.status, "hardcover returned invalid JSON");
   }
   if (Array.isArray(body.errors) && body.errors.length > 0) {
@@ -83,16 +108,24 @@ const positive = (v: unknown): number | null => {
   return n !== null && n > 0 ? n : null;
 };
 
-/** The image field is an object with a url; tolerate a bare string. */
-const imageUrl = (v: unknown): string | null => str(v) ?? str(obj(v)?.url);
+/** Covers render unoptimized, so remotePatterns can't police them: only Hardcover's own CDN is kept. */
+const COVER_ORIGIN = "https://assets.hardcover.app/";
+
+/** The image field is an object with a url; tolerate a bare string. Any other host gives the placeholder. */
+const imageUrl = (v: unknown): string | null => {
+  const url = str(v) ?? str(obj(v)?.url);
+  return url !== null && url.startsWith(COVER_ORIGIN) ? url : null;
+};
 
 const escapeLiteral = (s: string) => s.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 
 // ---- Public API ----------------------------------------------------------------
 
 export async function searchHardcover(query: string): Promise<SearchResult[]> {
+  // A search gives up rather than queue behind Add imports and the refresh for long.
   const data = await hardcoverQuery(
     `{ search(query: "${escapeLiteral(query)}", query_type: "book", per_page: 10) { results } }`,
+    SEARCH_MAX_WAIT_MS,
   );
   const hits = obj(obj(data.search)?.results)?.hits;
   const out: SearchResult[] = [];

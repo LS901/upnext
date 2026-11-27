@@ -57,9 +57,44 @@ beforeEach(() => {
 });
 afterEach(() => {
   vi.useRealTimers();
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
 });
+
+/** Tracks a promise without awaiting it, so a test can check it under fake timers. */
+function settle(p: Promise<unknown>) {
+  const s: { done: boolean; value: unknown } = { done: false, value: undefined };
+  p.then(
+    (v) => Object.assign(s, { done: true, value: v }),
+    (e: unknown) => Object.assign(s, { done: true, value: e }),
+  );
+  return s;
+}
+
+/** Node's AbortSignal.timeout runs on its own timers; run it on the fake clock instead. */
+function fakeAbortSignalTimeout() {
+  vi.spyOn(AbortSignal, "timeout").mockImplementation((ms: number) => {
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(new DOMException("The operation was aborted due to timeout", "TimeoutError")), ms);
+    return controller.signal;
+  });
+}
+
+/** A fetch that never answers, and rejects only when its signal aborts, as fetch does. */
+function hangingFetch() {
+  const fn = vi.fn(
+    (input: RequestInfo | URL, init?: RequestInit) =>
+      new Promise<Response>((_, reject) => {
+        void input;
+        init?.signal?.addEventListener("abort", () => reject(init.signal!.reason));
+      }),
+  );
+  vi.stubGlobal("fetch", fn);
+  return fn;
+}
+
+const queries = (fn: ReturnType<typeof vi.fn>) => fn.mock.calls.map((_, i) => sent(fn, i).body.query);
 
 test("search maps books, image url, year and hasAudiobook, and never maps description", async () => {
   const fn = stub(search);
@@ -184,4 +219,96 @@ test("the limiter starts requests at least 1000 ms apart", async () => {
   await vi.advanceTimersByTimeAsync(1);
   expect(fn).toHaveBeenCalledTimes(2);
   await Promise.all([a, b]);
+});
+
+test.each([
+  ["search", () => searchHardcover("x")],
+  ["details", () => getHardcoverDetails("9001")],
+])("a %s request that hangs fails with ProviderError (no status) after 5 s", async (_, call) => {
+  vi.useFakeTimers();
+  fakeAbortSignalTimeout();
+  hangingFetch();
+  const result = settle(call());
+  await vi.advanceTimersByTimeAsync(4999);
+  expect(result.done).toBe(false);
+  await vi.advanceTimersByTimeAsync(1);
+  expect(result.done).toBe(true);
+  expect(result.value).toBeInstanceOf(ProviderError);
+  expect(result.value).toMatchObject({ provider: "hardcover", status: null });
+  expect((result.value as Error).message).not.toMatch(/x|Bearer|timeout/i);
+});
+
+test("a search that would wait more than 3 s for its turn gives up at once, makes no request and holds no slot", async () => {
+  vi.useFakeTimers();
+  const fn = stub(book);
+  // Four details requests take the turns at 0, 1, 2 and 3 s.
+  const queued = [1, 2, 3, 4].map(() => getHardcoverDetails("9001"));
+  // A search now would start at 4 s: more than 3 s away.
+  const late = settle(searchHardcover("late"));
+  await vi.advanceTimersByTimeAsync(0);
+  expect(late.done).toBe(true);
+  expect(late.value).toBeInstanceOf(ProviderError);
+  expect(late.value).toMatchObject({ provider: "hardcover", status: null });
+
+  // The search left the queue: the next request gets the 4 s turn, not 5 s.
+  const next = getHardcoverDetails("9001");
+  await vi.advanceTimersByTimeAsync(3999);
+  expect(fn).toHaveBeenCalledTimes(4);
+  await vi.advanceTimersByTimeAsync(1);
+  expect(fn).toHaveBeenCalledTimes(5);
+  await Promise.all([...queued, next]);
+  expect(queries(fn).every((q) => q.includes("books_by_pk") && !q.includes("search("))).toBe(true);
+});
+
+test("a search whose turn is exactly 3 s away still waits for it", async () => {
+  vi.useFakeTimers();
+  const fn = stub(book);
+  const queued = [1, 2, 3].map(() => getHardcoverDetails("9001"));
+  const s = settle(searchHardcover("on time"));
+  await vi.advanceTimersByTimeAsync(2999);
+  expect(fn).toHaveBeenCalledTimes(3);
+  expect(s.done).toBe(false);
+  await vi.advanceTimersByTimeAsync(1);
+  expect(fn).toHaveBeenCalledTimes(4);
+  expect(sent(fn, 3).body.query).toContain("search(");
+  await Promise.all(queued);
+});
+
+test("a details request waits its turn however long the queue", async () => {
+  vi.useFakeTimers();
+  const fn = stub(book);
+  const all = [1, 2, 3, 4, 5, 6].map(() => getHardcoverDetails("9001"));
+  await vi.advanceTimersByTimeAsync(4999);
+  expect(fn).toHaveBeenCalledTimes(5);
+  await vi.advanceTimersByTimeAsync(1);
+  expect(fn).toHaveBeenCalledTimes(6);
+  const details = await Promise.all(all);
+  expect(details.every((d) => d.title === "The Glass Orchard")).toBe(true);
+});
+
+// Covers render unoptimized, so remotePatterns can't police them: only Hardcover's CDN is kept.
+const searchHit = (url: string) => ({
+  data: { search: { results: { hits: [{ document: { id: 9100, title: "Invented Cover Test", image: { url } } }] } } },
+});
+const bookWithCover = (url: string) => ({ data: { books_by_pk: { ...book.data.books_by_pk, image: { url } } } });
+const foreignCovers = [
+  "https://example.test/cover.jpg",
+  "http://assets.hardcover.app/edition/1/cover.jpg",
+  "https://assets.hardcover.app.example.test/cover.jpg",
+  "//assets.hardcover.app/edition/1/cover.jpg",
+];
+
+test("a search result keeps a cover on https://assets.hardcover.app/", async () => {
+  stub(searchHit("https://assets.hardcover.app/edition/9100/cover.jpg"));
+  expect((await searchHardcover("cover"))[0].imageUrl).toBe("https://assets.hardcover.app/edition/9100/cover.jpg");
+});
+
+test.each(foreignCovers)("a search result's cover %s becomes null", async (url) => {
+  stub(searchHit(url));
+  expect((await searchHardcover("cover"))[0].imageUrl).toBeNull();
+});
+
+test.each(foreignCovers)("a book's cover %s becomes null", async (url) => {
+  stub(bookWithCover(url));
+  expect((await getHardcoverDetails("9001")).imageRef).toBeNull();
 });

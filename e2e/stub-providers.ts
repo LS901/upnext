@@ -5,7 +5,8 @@
 //
 // Search terms with special meaning (anything else returns every fixture):
 //   "tmdb-down" → TMDB answers 429; "igdb-down" → IGDB answers 500;
-//   "hardcover-down" → Hardcover answers 503;
+//   "hardcover-down" → Hardcover answers 503; "hardcover-slow" → Hardcover answers
+//   only after HARDCOVER_SLOW_MS, past the app's 5 s request timeout;
 //   "nothing" → all providers return no results.
 //
 // GET /__requests lists every TMDB, IGDB and Twitch request received, with its
@@ -35,6 +36,8 @@ const hardcoverSearch = load("hardcover-search.json");
 const hardcoverBooks = load("hardcover-books.json") as Record<string, Json>;
 
 const requests: Logged[] = [];
+
+const HARDCOVER_SLOW_MS = 6500;
 
 function send(res: ServerResponse, status: number, body: Json) {
   res.writeHead(status, { "Content-Type": "application/json" });
@@ -98,6 +101,13 @@ function hardcover(body: string, res: ServerResponse) {
     const term = query.match(/search\(query: "((?:[^"\\]|\\.)*)"/)?.[1] ?? "";
     requests.push({ provider: "hardcover", path: "/graphql", term });
     if (term.includes("hardcover-down")) return send(res, 503, { error: "stub outage" });
+    if (term.includes("hardcover-slow")) {
+      // The app gives up first; answer anyway unless it has already hung up.
+      setTimeout(() => {
+        if (!res.destroyed) send(res, 200, hardcoverSearch);
+      }, HARDCOVER_SLOW_MS);
+      return;
+    }
     if (term.includes("nothing")) return send(res, 200, { data: { search: { results: { hits: [] } } } });
     return send(res, 200, hardcoverSearch);
   }

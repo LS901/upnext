@@ -34,7 +34,7 @@ test.beforeEach(async ({ context }) => {
 });
 
 async function search(page: Page, term: string) {
-  await page.getByLabel("Search movies, TV and games").fill(term);
+  await page.getByLabel("Search movies, TV, games and books").fill(term);
   await page.getByRole("button", { name: "Search", exact: true }).click();
   await expect(page).toHaveURL(/[?&]q=/);
 }

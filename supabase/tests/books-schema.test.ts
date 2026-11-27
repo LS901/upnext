@@ -12,6 +12,8 @@ describe("books schema", () => {
   let b: TestUser;
   let bookId: string;
   let movieId: string;
+  let showId: string;
+  let seasonId: string;
   let seriesId: string;
 
   beforeAll(async () => {
@@ -37,11 +39,21 @@ describe("books schema", () => {
           series_position: 1,
         },
         { provider: "tmdb", media_type: "movie", provider_id: invented(), title: "Invented Book Film" },
+        { provider: "tmdb", media_type: "show", provider_id: invented(), title: "Invented Book Show" },
       ])
       .select("id, media_type");
     if (error) throw error;
     bookId = items.find((i) => i.media_type === "book")!.id;
     movieId = items.find((i) => i.media_type === "movie")!.id;
+    showId = items.find((i) => i.media_type === "show")!.id;
+
+    const { data: season, error: seasonError } = await admin
+      .from("seasons")
+      .insert({ show_id: showId, season_number: 1 })
+      .select("id")
+      .single();
+    if (seasonError) throw seasonError;
+    seasonId = season.id;
 
     a = await createTestUser("books-a");
     b = await createTestUser("books-b");
@@ -51,7 +63,8 @@ describe("books schema", () => {
     const admin = adminClient();
     await admin.from("book_exclusions").delete().eq("item_id", bookId);
     await deleteTestUsers([a, b].filter(Boolean));
-    await admin.from("items").delete().in("id", [bookId, movieId].filter(Boolean));
+    // The show's season goes with it (on delete cascade).
+    await admin.from("items").delete().in("id", [bookId, movieId, showId].filter(Boolean));
     if (seriesId) await admin.from("book_series").delete().eq("id", seriesId);
   });
 
@@ -80,6 +93,23 @@ describe("books schema", () => {
       .from("library_entries")
       .insert({ item_id: movieId, item_media_type: "movie", book_version: "print" });
     expect(movie.error?.code).toBe("23514");
+  });
+
+  test("a season entry can't carry a book version, on insert or on update (23514)", async () => {
+    const withVersion = await b.client.from("library_entries").insert({ season_id: seasonId, book_version: "print" });
+    expect(withVersion.error?.code).toBe("23514");
+
+    const plain = await b.client.from("library_entries").insert({ season_id: seasonId }).select("id").single();
+    expect(plain.error).toBeNull();
+    const update = await b.client
+      .from("library_entries")
+      .update({ book_version: "audio" })
+      .eq("id", plain.data!.id)
+      .select("book_version");
+    expect(update.error?.code).toBe("23514");
+
+    const { data } = await adminClient().from("library_entries").select("book_version").eq("id", plain.data!.id).single();
+    expect(data?.book_version).toBeNull();
   });
 
   test("book_series is readable by a user's client and not writable", async () => {

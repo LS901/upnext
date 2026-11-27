@@ -25,7 +25,7 @@ function renderForm(q = "", exclude: MediaType[] = []) {
     </>
   );
   const { rerender } = render(page(q, exclude));
-  const box = screen.getByLabelText("Search movies, TV and games") as HTMLInputElement;
+  const box = screen.getByLabelText("Search movies, TV, games and books") as HTMLInputElement;
   return { box, show: (q: string, exclude: MediaType[] = []) => rerender(page(q, exclude)) };
 }
 

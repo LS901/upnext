@@ -458,9 +458,14 @@ describe("catalogue import and refresh", () => {
 
     hardcoverBooks[id] = fail(503);
     resetHardcoverLimiterForTests();
-    vi.spyOn(console, "error").mockImplementation(() => {});
-    await expect(importItem("hardcover", "book", id)).rejects.toMatchObject({ name: "ProviderError" });
-    expect(await getItem(itemId)).toMatchObject({ title: "Invented Book", page_count: 300 });
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      await expect(importItem("hardcover", "book", id)).rejects.toMatchObject({ name: "ProviderError" });
+      expect(await getItem(itemId)).toMatchObject({ title: "Invented Book", page_count: 300 });
+    } finally {
+      // Later tests' errors must stay visible.
+      errors.mockRestore();
+    }
   });
 
   test("a purge keeps a book's title and series link", async () => {

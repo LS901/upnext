@@ -109,7 +109,7 @@ test("form fields that aren't text are ignored, never cast", async () => {
 
   const file = form({ provider: "tmdb", mediaType: "movie" });
   file.append("providerId", new Blob(["9001"]), "9001");
-  await expect(addItem(file)).rejects.toThrow("Not a movie or game");
+  await expect(addItem(file)).rejects.toThrow("Not an item that can be added.");
 
   const seasons = form({ tmdbId: "9101" });
   seasons.append("season", new Blob(["1"]), "1");
@@ -124,7 +124,7 @@ test("addItem refuses anything but a TMDB movie or an IGDB game with a numeric i
     { provider: "tmdb", mediaType: "movie", providerId: "../9001" },
     { provider: "other", mediaType: "game", providerId: "1" },
   ]) {
-    await expect(addItem(form(bad))).rejects.toThrow("Not a movie or game");
+    await expect(addItem(form(bad))).rejects.toThrow("Not an item that can be added.");
   }
   expect(importItem).not.toHaveBeenCalled();
 });

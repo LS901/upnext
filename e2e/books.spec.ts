@@ -54,7 +54,7 @@ function unique(term: string): string {
 }
 
 async function search(page: Page, term: string) {
-  await page.getByLabel("Search movies, TV and games").fill(term);
+  await page.getByLabel("Search movies, TV, games and books").fill(term);
   await expect(page).toHaveURL((url) => url.searchParams.get("q") === term.trim());
 }
 
@@ -166,6 +166,18 @@ test("Hardcover down shows its notice while TMDB and IGDB results still show", a
   await expect(page.getByText("Couldn't reach TMDB right now.")).toHaveCount(0);
   await expect(result(page, "Kestrel Morning")).toBeVisible();
   await expect(result(page, "Clockwork Lighthouse")).toBeVisible();
+  await expect(result(page, "The Lantern Tide")).toHaveCount(0);
+});
+
+test("a slow Hardcover times out with its notice while TMDB and IGDB results still show", async ({ page }) => {
+  // The stub answers this term only after the app's 5 s timeout. Opened by URL: the
+  // search box's URL update would wait for the whole search.
+  await page.goto(`/search?q=${encodeURIComponent(unique("Kestrel hardcover-slow"))}`);
+  await expect(page.getByRole("alert").filter({ hasText: "Couldn't reach Hardcover right now." })).toBeVisible(SLOW);
+  await expect(page.getByText("Couldn't reach TMDB right now.")).toHaveCount(0);
+  await expect(page.getByText("Couldn't reach IGDB right now.")).toHaveCount(0);
+  await expect(result(page, "Kestrel Morning")).toBeVisible(SLOW);
+  await expect(result(page, "Clockwork Lighthouse")).toBeVisible(SLOW);
   await expect(result(page, "The Lantern Tide")).toHaveCount(0);
 });
 
