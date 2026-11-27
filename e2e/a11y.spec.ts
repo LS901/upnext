@@ -194,14 +194,17 @@ test.describe("phone", () => {
     await page.goto("/library");
     await expect(page.getByRole("list", { name: "Games up next", exact: true })).toBeVisible();
     const result = await page.evaluate(() => {
+      // The last control on the page outside the bar: the footer's Credits link sits after `main`,
+      // so it is what the bar would cover first.
       const focusable = [
         ...document.querySelectorAll<HTMLElement>(
-          'main a[href], main button:not([disabled]), main input:not([disabled]), main select:not([disabled]), main [tabindex]:not([tabindex="-1"])',
+          'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
         ),
-      ].filter((el) => el.getClientRects().length > 0);
+      ].filter((el) => !el.closest("nav") && el.getClientRects().length > 0);
       const last = focusable[focusable.length - 1];
       last.focus();
-      last.scrollIntoView({ block: "nearest" });
+      // The worst case: scrolled as far down as the page goes, where the bar sits over whatever is last.
+      window.scrollTo(0, document.documentElement.scrollHeight);
       const box = last.getBoundingClientRect();
       const top = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
       return {

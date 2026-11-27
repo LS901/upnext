@@ -155,7 +155,7 @@ function Result({ result: r, owned, state }: { result: SearchResult; owned: bool
               <button
                 type="button"
                 disabled
-                className="inline-flex h-11 items-center gap-1.5 rounded-md border border-border bg-secondary px-3 text-sm font-medium text-accent-text lg:h-9"
+                className="inline-flex h-11 items-center gap-1.5 rounded-md border border-input bg-secondary px-3 text-sm font-medium text-accent-text lg:h-9"
               >
                 <Check aria-hidden="true" className="size-4" />
                 In your library
