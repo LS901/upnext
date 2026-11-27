@@ -3,7 +3,7 @@ import { TYPE_LABELS } from "@/lib/format/type-labels";
 import { formatDay, untilLabel, type RadarEntry } from "@/lib/library/dashboard-summary";
 import { audiobookTitle, entryTitle } from "./titles";
 
-/** Backlog entries that are not out yet, soonest first. Only rendered when there are some. */
+/** Up next entries that are not out yet, soonest first. Only rendered when there are some. */
 export function ReleaseRadar({ radar, today }: { radar: RadarEntry[]; today: string }) {
   if (!radar.length) return null;
   return (

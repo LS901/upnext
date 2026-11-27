@@ -9,7 +9,7 @@ import { dragName, queuedTitle } from "./drag-name";
 import { StatusChip } from "@/components/status-chip";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { seasonDetails, seasonLabel, seasonName } from "@/app/search/season-label";
+import { seasonDetails, seasonLabel } from "@/app/search/season-label";
 import { TYPE_LABELS } from "@/lib/format/type-labels";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { bookMeta } from "@/lib/format/book";

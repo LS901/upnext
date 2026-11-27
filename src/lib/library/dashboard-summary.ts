@@ -46,7 +46,7 @@ export function timeLeftLabel(minutes: number, unknown: number, pages = 0): stri
   return parts.length ? parts.join(" · ") : null;
 }
 
-/** A Backlog entry that is not out yet. `releaseDate` is YYYY-MM-DD; the title is the show's for a season. */
+/** An Up next entry that is not out yet. `releaseDate` is YYYY-MM-DD; the title is the show's for a season. */
 export type RadarEntry = {
   entryId: string;
   title: string;

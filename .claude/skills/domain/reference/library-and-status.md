@@ -1,6 +1,6 @@
 Last reviewed: 2026-11-27
 
-Sources: owner interview and follow-up, 2026-11-26 (Lewis); owner decisions on show progress and books, 2026-11-26; owner on audiobooks (a version under books, picked with a selector), 2026-11-26; schema in `supabase/migrations/20261126082919_library_entries.sql`, `20261126083314_notes_and_exclusions.sql` and `20261126200000_up_next_order.sql` and `20261127090000_finished_at.sql`. The data model and its row-level security exist, and the My library page (`src/app/library/`, `src/lib/library/`) shows status and show progress; there are no lists or public profile pages yet.
+Sources: owner interview and follow-up, 2026-11-26 (Lewis); owner decisions on show progress and books, 2026-11-26; owner on audiobooks (a version under books, picked with a selector), 2026-11-26; owner decisions on books and Hardcover, 2026-11-27; schema in `supabase/migrations/20261127110000_book_enums.sql` and `20261127110100_books.sql`, and in `supabase/migrations/20261126082919_library_entries.sql`, `20261126083314_notes_and_exclusions.sql` and `20261126200000_up_next_order.sql` and `20261127090000_finished_at.sql`. The data model and its row-level security exist, and the My library page (`src/app/library/`, `src/lib/library/`) shows status and show progress; there are no lists or public profile pages yet.
 
 # Library and status
 
@@ -12,7 +12,7 @@ Terms are defined in `glossary.md`. Examples are invented.
 - For **movies and games**: one **status** for the item: Up next, In progress, Finished, Paused or Dropped. No progress below the item (owner said). A game's progress is its status.
 - For **shows**: a status **per season**, from the same five. Never per-episode progress. Finishing a season marks only that season Finished, so finishing the last season does not finish anything else (owner said, 2026-11-26). A season is its own entity with its own entry; an entry points at a movie, a game or a season, never at a show (`library_entries` in the migration).
 - A **play count**: rewatches and replays add to it on the same entry (owner said, 2026-11-26). For shows it is **per season**: a rewatch adds to that season's play count (owner said, 2026-11-26).
-- For **books** (planned, see below): tracked like movies. One status for the item, and the play count counts rereads (owner said, 2026-11-26).
+- For **books** (see Books below): tracked like movies. One status per version, and the play count counts rereads (owner said, 2026-11-26).
 - The user's own fields: status, play count, notes, dates. These belong to the user and must survive any metadata refresh (see `invariants.md`).
 - **No user ratings.** upnext shows the providers' review scores as item info instead (owner said, 2026-11-26; see `metadata.md`).
 
@@ -61,18 +61,21 @@ A show has **no status of its own**. Its seasons carry the statuses, and a **pro
 
 The summary is computed by `showProgress` (`src/lib/library/progress.ts`) and shown on My library. **Specials (TMDB season 0) are left out of the count** (ruling, owner may overrule): only seasons numbered 1 or more count. There is no UI to set exclusions yet; the maths honours them.
 
-## Books (planned)
+## Books
 
-Books become a **fourth media type**, planned for after the TMDB and IGDB import (owner said, 2026-11-26). The database has no `book` value yet; adding it is a later migration, together with the book provider.
+Books are the **fourth media type**, from Hardcover (`metadata.md`). Owner said, 2026-11-26 and 2026-11-27, except where marked as a ruling.
 
-- A book is tracked like a movie: one status for the item, and a play count for rereads.
-- A **book series works like a show**: each book is its own entity with its own status, and a series progress such as "3 of 7 read" is derived, with the same exclusions (owner said, 2026-11-26).
-- **Audiobooks live under books**, not as a media type of their own. When a user adds a book, a selector lets them pick the audiobook version, and that version is tracked as its own entry, with its own status and play count (owner said, 2026-11-26).
-- The provider is proposed in `metadata.md` (still unconfirmed; the books task starts by comparing free sources).
+- A book is tracked like a movie: one status per version, and a play count for rereads.
+- **Versions:** each book entry is **print** (paper and ebook, no label) or **audio** (labelled `Audiobook`). Print and audio are separate entries with their own status and play count, and a user can track both at once. INV-008 holds per item and version. The audiobook is added with a selector when adding a book, and a double-click or a repeat add leaves one entry.
+- **Queue:** books sit in the **Books** Up next queue; print and audio entries share it and are ordered together.
+- **A book series works like a show**: each book is its own entity with its own status, and series progress such as "3 of 7 read" is derived, with exclusions (`book_exclusions`). A series has no status of its own.
+- **Series progress rule** (`seriesProgress`, `src/lib/library/series-progress.ts`): the total is the series' primary book count (Hardcover's main-line count) minus the user's excluded main-line books, and the read count is the distinct main-line books the user has Finished in either version, not excluded. **A book finished in both versions counts once**, and removing the print entry keeps the audio entry.
+- **Half positions are not main-line** (ruling, 2026-11-27; owner may overrule): a book at a fractional position, such as 2.5, is a novella or interlude, and does not count toward a series' progress.
+- **On My library**, series rows appear only in the status groups (a not-started book shows in the Books queue under its own title). A series row shows the series name as its heading and `Series · {read} of {total} read` on the meta line. A series with an unknown or zero total reads just `Series` (ruling, 2026-11-27; owner may overrule). A book's position inside a series row reads `#{position}`.
+- A book listed in two series uses the featured one; with none featured, the one with the lowest id.
+- **On Home**, a print book adds its pages to the Up next time (`1,240 pages to read`) and never counts as being without a time; an audio entry adds its minutes. Audio titles end ` · Audiobook`.
 
 ## Unconfirmed
 
 - **Transitions**: probably any status can move to any other. Is there anything that should be blocked, for example Up next straight to Finished? Owner to confirm.
-- **Print and audiobook of one book**: whether one user can track both versions of the same book at once, and how that squares with one entry per item (INV-008). Left to the books task.
-- **Audiobook data**: where audiobook editions, narrators and lengths come from. Left to the books task.
 - **Dates**: a finish time is kept as `finished_at`, set when an entry moves into Finished and cleared when it leaves, so finishing again after a rewatch stamps a newer time (owner said, 2026-11-27). Whether added and started times are kept, and whether any date can be edited, is still open. Owner to confirm.
