@@ -5,7 +5,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { seasonDetails, seasonLabel, seasonName } from "@/app/search/season-label";
-import { TYPE_LABELS } from "@/app/ui";
+import { TYPE_LABELS } from "@/lib/format/type-labels";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { formatDuration } from "@/lib/format/duration";
 import { formatScore } from "@/lib/format/score";

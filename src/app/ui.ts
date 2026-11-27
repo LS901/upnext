@@ -1,8 +1,4 @@
-import type { MediaType } from "@/lib/providers/types";
-
 // Shared by the search and library pages.
-
-export const TYPE_LABELS: Record<MediaType, string> = { movie: "Movie", show: "TV", game: "Game" };
 
 export const primaryButton =
   "rounded-md bg-zinc-900 px-4 py-2 font-medium text-white dark:bg-zinc-100 dark:text-zinc-900";
