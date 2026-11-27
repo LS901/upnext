@@ -3,7 +3,7 @@ import { TYPE_LABELS } from "@/lib/format/type-labels";
 import type { LibraryView } from "@/lib/library/queries";
 import type { MediaType } from "@/lib/providers/types";
 import { PosterCard } from "./poster-card";
-import { entryTitle } from "./titles";
+import { audiobookTitle, entryTitle } from "./titles";
 
 type Card = { key: string; title: string; imageUrl: string | null; mediaType: MediaType };
 
@@ -11,9 +11,9 @@ type Card = { key: string; title: string; imageUrl: string | null; mediaType: Me
 export function CurrentlyOn({ groups }: { groups: LibraryView["groups"] }) {
   const cards = (groups.find((g) => g.status === "in_progress")?.rows ?? []).flatMap((row): Card[] =>
     row.kind === "item"
-      ? [{ key: row.entryId, title: row.title, imageUrl: row.imageUrl, mediaType: row.mediaType }]
+      ? [{ key: row.entryId, title: audiobookTitle(row.title, row.version), imageUrl: row.imageUrl, mediaType: row.mediaType }]
       : row.kind === "series"
-        ? row.books.map((b) => ({ key: b.entryId, title: b.title, imageUrl: b.imageUrl, mediaType: b.mediaType }))
+        ? row.books.map((b) => ({ key: b.entryId, title: audiobookTitle(b.title, b.version), imageUrl: b.imageUrl, mediaType: b.mediaType }))
         : row.seasons.map((s) => ({
           key: s.entryId,
           title: entryTitle(row.title, s.number),

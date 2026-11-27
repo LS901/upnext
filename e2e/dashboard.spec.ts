@@ -215,3 +215,55 @@ test("Start on the dashboard moves an entry to In progress", async ({ page }) =>
   await expect(current).toHaveCount(2);
   await expect(current.filter({ hasText: QUEUED })).toHaveCount(1);
 });
+
+test("books show on the Up next tile as pages, and in a Books Up next card, the radar and Currently on", async ({
+  page,
+  account,
+}) => {
+  const admin = adminClient();
+  const id = () => String(randomInt(10_000_000, 99_999_999));
+  const PRINT = "Marrow Lantern Atlas";
+  const AUDIO = "Quiet Tern Archive";
+  const SOON = "Vesper Ledger";
+  const book = (title: string, extra: object) => ({
+    provider: "hardcover" as const,
+    media_type: "book" as const,
+    provider_id: id(),
+    title,
+    ...extra,
+  });
+  const { data: items, error } = await admin
+    .from("items")
+    .insert([
+      book(PRINT, { page_count: 1240 }),
+      book(AUDIO, { audio_minutes: 600 }),
+      book(SOON, { audio_minutes: 120, release_date: day(9) }),
+    ])
+    .select("id, title");
+  if (error) throw error;
+  const item = Object.fromEntries(items.map((i) => [i.title, i.id]));
+  const entry = (title: string, version: "print" | "audio", status: "backlog" | "in_progress" = "backlog") => ({
+    user_id: account.userId,
+    item_id: item[title],
+    item_media_type: "book" as const,
+    book_version: version,
+    status,
+  });
+  const { error: entriesError } = await admin
+    .from("library_entries")
+    .insert([entry(PRINT, "print"), entry(AUDIO, "audio"), entry(SOON, "audio")]);
+  if (entriesError) throw entriesError;
+
+  await page.goto("/");
+  await expect(section(page, "Your numbers")).toContainText("1,240 pages to read");
+  await expect(section(page, "Your numbers")).toContainText(/about \d+ h to finish/);
+  const books = section(page, "Books");
+  await expect(rows(books)).toHaveCount(3);
+  await expect(rows(books).filter({ hasText: PRINT })).not.toContainText("Audiobook");
+  await expect(rows(books).filter({ hasText: `${AUDIO} · Audiobook` })).toHaveCount(1);
+  const radar = section(page, "Release radar");
+  await expect(rows(radar).filter({ hasText: `${SOON} · Audiobook` })).toContainText("Book");
+
+  await rows(books).filter({ hasText: AUDIO }).getByRole("button", { name: "Start" }).click();
+  await expect(rows(section(page, "Currently on")).filter({ hasText: `${AUDIO} · Audiobook` })).toHaveCount(1);
+});

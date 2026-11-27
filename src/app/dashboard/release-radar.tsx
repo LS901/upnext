@@ -1,7 +1,7 @@
 import { Poster } from "@/components/poster";
 import { TYPE_LABELS } from "@/lib/format/type-labels";
 import { formatDay, untilLabel, type RadarEntry } from "@/lib/library/dashboard-summary";
-import { entryTitle } from "./titles";
+import { audiobookTitle, entryTitle } from "./titles";
 
 /** Backlog entries that are not out yet, soonest first. Only rendered when there are some. */
 export function ReleaseRadar({ radar, today }: { radar: RadarEntry[]; today: string }) {
@@ -13,7 +13,7 @@ export function ReleaseRadar({ radar, today }: { radar: RadarEntry[]; today: str
       </h2>
       <ul className="flex flex-col gap-3">
         {radar.map((e) => {
-          const title = entryTitle(e.title, e.seasonNumber);
+          const title = audiobookTitle(entryTitle(e.title, e.seasonNumber), e.bookVersion);
           return (
             <li key={e.entryId} className="flex items-center gap-3">
               <Poster url={e.imageUrl} title={title} size="sm" mediaType={e.mediaType} />

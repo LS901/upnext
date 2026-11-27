@@ -22,3 +22,9 @@ test("shows the TMDB logo linking to themoviedb.org", () => {
   const logo = screen.getByRole("img", { name: "TMDB" });
   expect(logo.closest("a")?.getAttribute("href")).toBe("https://www.themoviedb.org");
 });
+
+test("credits Hardcover with a link to hardcover.app", () => {
+  render(<CreditsPage />);
+  const link = screen.getByRole("link", { name: "Book data from Hardcover" });
+  expect(link.getAttribute("href")).toBe("https://hardcover.app");
+});

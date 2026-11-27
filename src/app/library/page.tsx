@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { ArrowDown, ArrowUp, ArrowUpToLine, type LucideIcon } from "lucide-react";
 import { Poster } from "@/components/poster";
+import { dragName, queuedTitle } from "./drag-name";
 import { StatusChip } from "@/components/status-chip";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -135,20 +136,6 @@ function Queue({ type, rows }: { type: QueueType; rows: UpNextRow[] }) {
       </Card>
     </section>
   );
-}
-
-/**
- * A queued season names its show and season, so two seasons of one show read
- * apart. A queued book is its own title, print or audio alike (ruling B5-a).
- */
-function queuedTitle(row: UpNextRow): string {
-  if (row.kind !== "season") return row.title;
-  return `${row.showTitle} · ${seasonName(row.number)}`;
-}
-
-/** What a drag names the row, so a book's print and audio entries are told apart when heard. */
-function dragName(row: UpNextRow): string {
-  return row.kind === "item" && row.version === "audio" ? `${row.title}, audiobook` : queuedTitle(row);
 }
 
 function QueuedRow({ row, order }: { row: UpNextRow; order: string[] }) {

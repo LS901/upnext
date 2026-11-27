@@ -4,7 +4,7 @@ import { timeLeftLabel, type DashboardStats } from "@/lib/library/dashboard-summ
 export function Numbers({ stats }: { stats: DashboardStats }) {
   return (
     <section aria-label="Your numbers" className="grid grid-cols-3 gap-2 sm:gap-4">
-      <StatTile label="Up next" value={stats.backlog} detail={timeLeftLabel(stats.backlogMinutes, stats.backlogUnknownTime)} />
+      <StatTile label="Up next" value={stats.backlog} detail={timeLeftLabel(stats.backlogMinutes, stats.backlogUnknownTime, stats.backlogPages)} />
       <StatTile label="In progress" value={stats.inProgress} />
       <StatTile label="Finished" value={stats.finished} />
     </section>

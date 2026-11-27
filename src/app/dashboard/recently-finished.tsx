@@ -2,7 +2,7 @@ import { PosterRail } from "@/components/poster-rail";
 import type { FinishedEntry } from "@/lib/library/dashboard";
 import { formatDay } from "@/lib/library/dashboard-summary";
 import { PosterCard } from "./poster-card";
-import { entryTitle } from "./titles";
+import { audiobookTitle, entryTitle } from "./titles";
 
 export function RecentlyFinished({ finished, today }: { finished: FinishedEntry[]; today: string }) {
   if (!finished.length) return null;
@@ -15,7 +15,7 @@ export function RecentlyFinished({ finished, today }: { finished: FinishedEntry[
         {finished.map((e) => (
           <PosterCard
             key={e.entryId}
-            title={entryTitle(e.title, e.seasonNumber)}
+            title={audiobookTitle(entryTitle(e.title, e.seasonNumber), e.bookVersion)}
             imageUrl={e.imageUrl}
             mediaType={e.mediaType}
             detail={`Finished ${formatDay(e.finishedAt.slice(0, 10), today)}`}
