@@ -174,9 +174,9 @@ test("results appear as you type, with one search per pause, not one per letter"
 
 test("search shows both providers and hides excluded types", async ({ page }) => {
   await page.goto("/search");
-  const header = page.getByRole("banner");
-  await expect(header.getByRole("link", { name: "Search" })).toHaveAttribute("href", "/search");
-  await expect(header.getByRole("link", { name: "My library" })).toHaveAttribute("href", "/library");
+  const nav = page.getByRole("navigation", { name: "Main" });
+  await expect(nav.getByRole("link", { name: "Search" })).toHaveAttribute("href", "/search");
+  await expect(nav.getByRole("link", { name: "My library" })).toHaveAttribute("href", "/library");
 
   await search(page, unique("Kestrel"));
   await expect(result(page, "Kestrel Morning")).toContainText("Movie");

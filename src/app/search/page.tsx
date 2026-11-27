@@ -1,9 +1,13 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
-import { quietButton, TYPE_LABELS } from "@/app/ui";
+import { Check } from "lucide-react";
+import { Poster } from "@/components/poster";
+import { Badge } from "@/components/ui/badge";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { TYPE_LABELS } from "@/lib/format/type-labels";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { inLibrary, itemKey, type ItemKey } from "@/lib/library/in-library";
 import { searchIgdb } from "@/lib/providers/igdb";
@@ -22,7 +26,7 @@ const HIDE_LABELS: Record<MediaType, string> = { movie: "Movies", show: "TV", ga
 
 export default function SearchPage({ searchParams }: PageProps<"/search">) {
   return (
-    <main className="mx-auto w-full max-w-4xl flex-1 px-6 py-10">
+    <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-8 sm:px-6 sm:py-10">
       <h1 className="text-3xl font-semibold tracking-tight">Search</h1>
       {/* Reads the session and searchParams, so it renders at request time. */}
       <Suspense>
@@ -83,20 +87,20 @@ async function SearchContent({ searchParams }: Pick<PageProps<"/search">, "searc
         </p>
 
         {[...failed].map((provider) => (
-          <p key={provider} role="alert" className="text-red-700 dark:text-red-400">
+          <p key={provider} role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-foreground">
             Couldn&apos;t reach {PROVIDER_NAMES[provider]} right now.
           </p>
         ))}
 
-        {!outcome && <p className="text-zinc-600 dark:text-zinc-400">Type a title to search.</p>}
+        {!outcome && <p className="text-muted-foreground">Type a title to search.</p>}
         {outcome?.everythingHidden && (
-          <p className="text-zinc-600 dark:text-zinc-400">Everything is hidden. Untick a type to search.</p>
+          <p className="text-muted-foreground">Everything is hidden. Untick a type to search.</p>
         )}
         {outcome?.nothingFound && (
-          <p className="text-zinc-600 dark:text-zinc-400">Nothing found.</p>
+          <p className="text-muted-foreground">Nothing found.</p>
         )}
         {outcome && outcome.results.length > 0 && (
-          <ul className="flex flex-col divide-y divide-black/10 dark:divide-white/10">
+          <ul className="flex flex-col gap-3">
             {outcome.results.map((r) => (
               <Result key={keyOf(r)} result={r} owned={owned.has(keyOf(r))} state={state} />
             ))}
@@ -106,16 +110,20 @@ async function SearchContent({ searchParams }: Pick<PageProps<"/search">, "searc
 
       {/* The checkboxes belong to the search form through form="search"; ticking one searches again. */}
       <aside>
-        <h2 className="font-medium">Hide</h2>
-        <div className="mt-2 flex flex-wrap gap-4 md:flex-col md:gap-2">
+        <h2 className="text-sm font-medium text-muted-foreground">Hide</h2>
+        <div className="mt-2 flex flex-wrap gap-2 md:flex-col">
           {(Object.keys(HIDE_LABELS) as MediaType[]).map((type) => (
-            <label key={type} className="flex items-center gap-2">
+            <label
+              key={type}
+              className="flex min-h-11 cursor-pointer items-center gap-2 rounded-full border border-input bg-secondary px-4 text-sm transition-[transform,color,background-color,border-color] duration-150 hover:bg-muted has-checked:border-primary has-checked:bg-primary/20 md:rounded-lg lg:min-h-9"
+            >
               <input
                 type="checkbox"
                 name="exclude"
                 value={type}
                 form="search"
                 defaultChecked={state.exclude.includes(type)}
+                className="size-4 accent-primary"
               />
               {HIDE_LABELS[type]}
             </label>
@@ -132,46 +140,48 @@ function resultCount(n: number): string {
 
 function Result({ result: r, owned, state }: { result: SearchResult; owned: boolean; state: SearchState }) {
   return (
-    <li className="flex items-center gap-4 py-3">
-      {r.imageUrl ? (
-        <Image src={r.imageUrl} alt="" width={48} height={72} unoptimized className="h-18 w-12 rounded object-cover" />
-      ) : (
-        <div className="h-18 w-12 shrink-0 rounded bg-zinc-200 dark:bg-zinc-800" />
-      )}
-      <div className="flex-1">
-        <h2 className="font-medium">{r.title}</h2>
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">
-          {TYPE_LABELS[r.mediaType]}
-          {r.year !== null && ` · ${r.year}`}
-        </p>
-      </div>
-      <div className="flex items-center gap-3">
-        {owned && (
-          <button type="button" disabled className={`${quietButton} opacity-60`}>
-            In your library
-          </button>
-        )}
-        {r.mediaType === "show" ? (
-          <Link href={`/search/show/${r.providerId}`} className="text-sm underline">
-            Choose seasons
-          </Link>
-        ) : (
-          !owned && (
-            <form action={addItem}>
-              <input type="hidden" name="provider" value={r.provider} />
-              <input type="hidden" name="mediaType" value={r.mediaType} />
-              <input type="hidden" name="providerId" value={r.providerId} />
-              <input type="hidden" name="q" value={state.q} />
-              {state.exclude.map((type) => (
-                <input key={type} type="hidden" name="exclude" value={type} />
-              ))}
-              <button type="submit" className={quietButton}>
-                Add
+    <li>
+      <Card size="sm" className="flex-row items-center gap-4 px-4">
+        <Poster url={r.imageUrl} title={r.title} size="md" mediaType={r.mediaType} />
+        <div className="flex min-w-0 flex-1 flex-col gap-2">
+          <h2 className="text-base font-medium [overflow-wrap:anywhere]">{r.title}</h2>
+          <p className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+            <Badge variant="secondary">{TYPE_LABELS[r.mediaType]}</Badge>
+            {r.year !== null && <span className="tabular-nums">{r.year}</span>}
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            {owned && (
+              // Stays a (disabled) button: e2e and screen readers know it by that role.
+              <button
+                type="button"
+                disabled
+                className="inline-flex h-11 items-center gap-1.5 rounded-md border border-input bg-secondary px-3 text-sm font-medium text-accent-text lg:h-9"
+              >
+                <Check aria-hidden="true" className="size-4" />
+                In your library
               </button>
-            </form>
-          )
-        )}
-      </div>
+            )}
+            {r.mediaType === "show" ? (
+              <Link href={`/search/show/${r.providerId}`} className={buttonVariants({ variant: "secondary" })}>
+                Choose seasons
+              </Link>
+            ) : (
+              !owned && (
+                <form action={addItem}>
+                  <input type="hidden" name="provider" value={r.provider} />
+                  <input type="hidden" name="mediaType" value={r.mediaType} />
+                  <input type="hidden" name="providerId" value={r.providerId} />
+                  <input type="hidden" name="q" value={state.q} />
+                  {state.exclude.map((type) => (
+                    <input key={type} type="hidden" name="exclude" value={type} />
+                  ))}
+                  <Button type="submit">Add</Button>
+                </form>
+              )
+            )}
+          </div>
+        </div>
+      </Card>
     </li>
   );
 }

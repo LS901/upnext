@@ -19,6 +19,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { GripVertical } from "lucide-react";
 import {
   useEffect,
   useId,
@@ -118,7 +119,7 @@ export function SortableQueue({ label, items }: { label: string; items: QueueIte
           onBlur={onBlur}
           aria-label={label}
           aria-busy={saving}
-          className="mt-2 flex flex-col divide-y divide-black/10 dark:divide-white/10">
+          className="flex flex-col divide-y divide-border px-(--card-spacing)">
           {order.map((entryId, i) => {
             const item = byId.get(entryId);
             return item ? (
@@ -168,7 +169,7 @@ function SortableRow(props: { item: QueueItem; place: number; hydrated: boolean;
     <li
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={`flex items-center gap-3 bg-white py-3 dark:bg-black ${isDragging ? "relative z-10 shadow-lg" : ""}`}
+      className={`flex items-center gap-2 bg-card py-3 sm:gap-3 ${isDragging ? "relative z-10 shadow-lg" : ""}`}
     >
       <button
         type="button"
@@ -177,11 +178,11 @@ function SortableRow(props: { item: QueueItem; place: number; hydrated: boolean;
         {...listeners}
         aria-label={`Drag to reorder ${item.title}`}
         disabled={!hydrated}
-        className="cursor-grab touch-none rounded px-1 text-lg leading-none text-zinc-500 disabled:cursor-default disabled:opacity-40 aria-disabled:cursor-default aria-disabled:opacity-40"
+        className="inline-flex size-11 shrink-0 cursor-grab touch-none items-center justify-center rounded-md text-muted-foreground transition-[transform,color,background-color,border-color] duration-150 hover:text-foreground disabled:cursor-default disabled:opacity-40 aria-disabled:cursor-default aria-disabled:opacity-40 lg:size-9"
       >
-        ⠿
+        <GripVertical aria-hidden="true" className="size-5" />
       </button>
-      <span className="w-6 shrink-0 text-right text-sm tabular-nums text-zinc-500">{place}.</span>
+      <span className="w-6 shrink-0 text-right text-sm tabular-nums text-muted-foreground">{place}.</span>
       {item.row}
     </li>
   );

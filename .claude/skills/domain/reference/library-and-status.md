@@ -1,6 +1,6 @@
 Last reviewed: 2026-11-27
 
-Sources: owner interview and follow-up, 2026-11-26 (Lewis); owner decisions on show progress and books, 2026-11-26; owner on audiobooks (a version under books, picked with a selector), 2026-11-26; schema in `supabase/migrations/20261126082919_library_entries.sql`, `20261126083314_notes_and_exclusions.sql` and `20261126200000_up_next_order.sql`. The data model and its row-level security exist, and the My library page (`src/app/library/`, `src/lib/library/`) shows status and show progress; there are no lists or public profile pages yet.
+Sources: owner interview and follow-up, 2026-11-26 (Lewis); owner decisions on show progress and books, 2026-11-26; owner on audiobooks (a version under books, picked with a selector), 2026-11-26; schema in `supabase/migrations/20261126082919_library_entries.sql`, `20261126083314_notes_and_exclusions.sql` and `20261126200000_up_next_order.sql` and `20261127090000_finished_at.sql`. The data model and its row-level security exist, and the My library page (`src/app/library/`, `src/lib/library/`) shows status and show progress; there are no lists or public profile pages yet.
 
 # Library and status
 
@@ -42,6 +42,15 @@ Owner said, 2026-11-26, except where marked as a ruling.
   - A **Show** row of checkboxes displays or hides each type's queue. The choice is remembered on that device. Each checkbox shows its queue's count, so a hidden queue still says what's in it (ruling, 2026-11-27, from review; owner may overrule).
   - A queued entry shows in its queue, not again under Backlog.
 
+## Home dashboard
+
+Owner said, 2026-11-27.
+
+- Signed in, Home is a **view of the user's own library** and nothing else: their numbers (entries per status and the Backlog's time to finish), what they're on, their Up next queues, a release radar and what they recently finished. It never shows another user's entries. Signed out, Home is a landing page that points to Sign in.
+- **Release radar:** Backlog entries only, whose movie or game release date, or season air date, is after today (in UTC), soonest first, at most 8. Entries with no date are left out. IGDB dates for unreleased games can be placeholders, and are shown as given.
+- **Recently finished** lists Finished entries, newest `finished_at` first.
+- A queue the user hides in My library is hidden on Home too.
+
 ## Shows have no status of their own
 
 A show has **no status of its own**. Its seasons carry the statuses, and a **progress summary** such as "2 of 4 seasons finished" is derived from them (owner said, 2026-11-26):
@@ -67,4 +76,4 @@ Books become a **fourth media type**, planned for after the TMDB and IGDB import
 - **Transitions**: probably any status can move to any other. Is there anything that should be blocked, for example Backlog straight to Finished? Owner to confirm.
 - **Print and audiobook of one book**: whether one user can track both versions of the same book at once, and how that squares with one entry per item (INV-008). Left to the books task.
 - **Audiobook data**: where audiobook editions, narrators and lengths come from. Left to the books task.
-- **Dates**: which dates are kept (added, started, finished), and whether they can be edited. Owner to confirm.
+- **Dates**: a finish time is kept as `finished_at`, set when an entry moves into Finished and cleared when it leaves, so finishing again after a rewatch stamps a newer time (owner said, 2026-11-27). Whether added and started times are kept, and whether any date can be edited, is still open. Owner to confirm.

@@ -59,14 +59,14 @@ isOneToOne: false
                   ]
                 },"library_entries": {
                   Row: {
-                    "created_at": string,"id": string,"item_id": string | null,"item_media_type": Database["public"]['Enums']["media_type"] | null,"play_count": number,"season_id": string | null,"status": Database["public"]['Enums']["entry_status"],"up_next_position": number | null,"updated_at": string,"user_id": string
+                    "created_at": string,"finished_at": string | null,"id": string,"item_id": string | null,"item_media_type": Database["public"]['Enums']["media_type"] | null,"play_count": number,"season_id": string | null,"status": Database["public"]['Enums']["entry_status"],"up_next_position": number | null,"updated_at": string,"user_id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "created_at"?: string,"id"?: string,"item_id"?: string | null,"item_media_type"?: Database["public"]['Enums']["media_type"] | null,"play_count"?: number,"season_id"?: string | null,"status"?: Database["public"]['Enums']["entry_status"],"up_next_position"?: number | null,"updated_at"?: string,"user_id"?: string
+                    "created_at"?: string,"finished_at"?: string | null,"id"?: string,"item_id"?: string | null,"item_media_type"?: Database["public"]['Enums']["media_type"] | null,"play_count"?: number,"season_id"?: string | null,"status"?: Database["public"]['Enums']["entry_status"],"up_next_position"?: number | null,"updated_at"?: string,"user_id"?: string
                   }
                   Update: {
-                    "created_at"?: string,"id"?: string,"item_id"?: string | null,"item_media_type"?: Database["public"]['Enums']["media_type"] | null,"play_count"?: number,"season_id"?: string | null,"status"?: Database["public"]['Enums']["entry_status"],"up_next_position"?: number | null,"updated_at"?: string,"user_id"?: string
+                    "created_at"?: string,"finished_at"?: string | null,"id"?: string,"item_id"?: string | null,"item_media_type"?: Database["public"]['Enums']["media_type"] | null,"play_count"?: number,"season_id"?: string | null,"status"?: Database["public"]['Enums']["entry_status"],"up_next_position"?: number | null,"updated_at"?: string,"user_id"?: string
                   }
                   Relationships: [
                     {

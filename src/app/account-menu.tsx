@@ -8,7 +8,7 @@ export async function AccountMenu() {
 
   if (!user) {
     return (
-      <Link href="/login" className="underline">
+      <Link href="/login" className="inline-flex min-h-11 items-center text-accent-text underline">
         Sign in
       </Link>
     );
@@ -16,15 +16,17 @@ export async function AccountMenu() {
 
   return (
     <div className="flex items-center gap-4">
-      <Link href="/search" className="underline">
-        Search
-      </Link>
-      <Link href="/library" className="underline">
-        My library
-      </Link>
-      <span>{user.username}</span>
+      <span className="flex items-center gap-2">
+        <span
+          aria-hidden="true"
+          className="flex size-7 items-center justify-center rounded-full bg-secondary text-xs font-semibold uppercase"
+        >
+          {Array.from(user.username)[0]}
+        </span>
+        <span>{user.username}</span>
+      </span>
       <form action={signOut}>
-        <button type="submit" className="underline">
+        <button type="submit" className="min-h-11 text-accent-text underline">
           Sign out
         </button>
       </form>

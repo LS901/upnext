@@ -59,7 +59,7 @@ export type UpNextRow = ItemRow | QueuedSeasonRow;
  */
 export type LibraryView = { upNext: Record<QueueType, UpNextRow[]>; groups: LibraryGroup[] };
 
-function imageUrl(provider: Provider, ref: string | null): string | null {
+export function imageUrl(provider: Provider, ref: string | null): string | null {
   return provider === "tmdb" ? tmdbImageUrl(ref) : igdbImageUrl(ref);
 }
 

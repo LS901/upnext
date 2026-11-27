@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { sendSignInEmail, verifyCode } from "./actions";
 
 export const metadata: Metadata = { title: "Sign in" };
@@ -11,18 +13,20 @@ const ERRORS: Record<string, string> = {
 };
 
 const input =
-  "mt-1 block w-full rounded-md border border-black/20 bg-transparent px-3 py-2 dark:border-white/20";
-const button =
-  "rounded-md bg-zinc-900 px-4 py-2 font-medium text-white dark:bg-zinc-100 dark:text-zinc-900";
+  "mt-1 block h-11 w-full rounded-md border border-input bg-secondary px-3 text-foreground placeholder:text-muted-foreground lg:h-10";
 
 export default function LoginPage({ searchParams }: PageProps<"/login">) {
   return (
-    <main className="mx-auto w-full max-w-sm flex-1 px-6 py-16">
+    <main className="mx-auto w-full max-w-sm flex-1 px-4 py-12 sm:px-6 sm:py-16">
       <h1 className="text-3xl font-semibold tracking-tight">Sign in</h1>
-      {/* Reads searchParams, so it renders at request time. */}
-      <Suspense>
-        <SignInForms searchParams={searchParams} />
-      </Suspense>
+      <Card className="mt-6">
+        <CardContent className="gap-8">
+          {/* Reads searchParams, so it renders at request time. */}
+          <Suspense>
+            <SignInForms searchParams={searchParams} />
+          </Suspense>
+        </CardContent>
+      </Card>
     </main>
   );
 }
@@ -37,9 +41,9 @@ async function SignInForms({ searchParams }: Pick<PageProps<"/login">, "searchPa
   const error = ERRORS[firstValue(params.error) ?? ""];
 
   return (
-    <div className="mt-8 flex flex-col gap-8">
+    <>
       {error && (
-        <p role="alert" className="text-red-700 dark:text-red-400">
+        <p role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-foreground">
           {error}
         </p>
       )}
@@ -56,9 +60,7 @@ async function SignInForms({ searchParams }: Pick<PageProps<"/login">, "searchPa
             className={input}
           />
         </label>
-        <button type="submit" className={button}>
-          Email me a sign-in link
-        </button>
+        <Button type="submit">Email me a sign-in link</Button>
       </form>
 
       {sent !== undefined && (
@@ -77,11 +79,9 @@ async function SignInForms({ searchParams }: Pick<PageProps<"/login">, "searchPa
               className={input}
             />
           </label>
-          <button type="submit" className={button}>
-            Sign in with code
-          </button>
+          <Button type="submit">Sign in with code</Button>
         </form>
       )}
-    </div>
+    </>
   );
 }
