@@ -3,7 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
-import { primaryButton, quietButton, TYPE_LABELS } from "@/app/ui";
+import { quietButton, TYPE_LABELS } from "@/app/ui";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { inLibrary, itemKey, type ItemKey } from "@/lib/library/in-library";
 import { searchIgdb } from "@/lib/providers/igdb";
@@ -12,15 +12,13 @@ import { ProviderError, type MediaType, type Provider, type SearchResult } from 
 import { createClient } from "@/lib/supabase/server";
 import { addItem } from "./actions";
 import { PROVIDER_TYPES, providersToAsk, summarise, type Answer, type Outcome } from "./outcome";
-import { MAX_QUERY_LENGTH, parseSearch, type SearchState } from "./params";
+import { parseSearch, type SearchState } from "./params";
+import { SearchForm } from "./search-form";
 import { logProviderFailure, PROVIDER_NAMES } from "./shared";
 
 export const metadata: Metadata = { title: "Search" };
 
 const HIDE_LABELS: Record<MediaType, string> = { movie: "Movies", show: "TV", game: "Games" };
-
-const input =
-  "mt-1 block w-full rounded-md border border-black/20 bg-transparent px-3 py-2 dark:border-white/20";
 
 export default function SearchPage({ searchParams }: PageProps<"/search">) {
   return (
@@ -77,15 +75,12 @@ async function SearchContent({ searchParams }: Pick<PageProps<"/search">, "searc
   return (
     <div className="mt-6 grid gap-8 md:grid-cols-[1fr_10rem]">
       <div className="flex flex-col gap-6">
-        <form id="search" action="/search" role="search" className="flex items-end gap-3">
-          <label className="block flex-1">
-            Search movies, TV and games
-            <input name="q" type="search" defaultValue={state.q} maxLength={MAX_QUERY_LENGTH} className={input} />
-          </label>
-          <button type="submit" className={primaryButton}>
-            Search
-          </button>
-        </form>
+        <SearchForm q={state.q} exclude={state.exclude} />
+
+        {/* Results now change without a page load, so say so to screen readers. */}
+        <p role="status" className="sr-only">
+          {outcome && !outcome.everythingHidden && (outcome.results.length ? resultCount(outcome.results.length) : "No results.")}
+        </p>
 
         {[...failed].map((provider) => (
           <p key={provider} role="alert" className="text-red-700 dark:text-red-400">
@@ -109,7 +104,7 @@ async function SearchContent({ searchParams }: Pick<PageProps<"/search">, "searc
         )}
       </div>
 
-      {/* The checkboxes belong to the search form through form="search". */}
+      {/* The checkboxes belong to the search form through form="search"; ticking one searches again. */}
       <aside>
         <h2 className="font-medium">Hide</h2>
         <div className="mt-2 flex flex-wrap gap-4 md:flex-col md:gap-2">
@@ -129,6 +124,10 @@ async function SearchContent({ searchParams }: Pick<PageProps<"/search">, "searc
       </aside>
     </div>
   );
+}
+
+function resultCount(n: number): string {
+  return `${n} ${n === 1 ? "result" : "results"}.`;
 }
 
 function Result({ result: r, owned, state }: { result: SearchResult; owned: boolean; state: SearchState }) {
