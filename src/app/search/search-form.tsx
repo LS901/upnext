@@ -14,7 +14,7 @@ export const SEARCH_DELAY_MS = 300;
 export const MIN_AUTO_LENGTH = 3;
 
 const input =
-  "block h-11 w-full rounded-md border border-border bg-secondary pr-3 pl-10 text-foreground placeholder:text-muted-foreground lg:h-10";
+  "block h-11 w-full rounded-md border border-input bg-secondary pr-3 pl-10 text-foreground placeholder:text-muted-foreground lg:h-10";
 
 /** Whether the box holds a partial title: 1-2 letters, too short to search on its own. */
 const partial = (text: string) => {

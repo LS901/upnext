@@ -42,6 +42,15 @@ Owner said, 2026-11-26, except where marked as a ruling.
   - A **Show** row of checkboxes displays or hides each type's queue. The choice is remembered on that device. Each checkbox shows its queue's count, so a hidden queue still says what's in it (ruling, 2026-11-27, from review; owner may overrule).
   - A queued entry shows in its queue, not again under Backlog.
 
+## Home dashboard
+
+Owner said, 2026-11-27.
+
+- Signed in, Home is a **view of the user's own library** and nothing else: their numbers (entries per status and the Backlog's time to finish), what they're on, their Up next queues, a release radar and what they recently finished. It never shows another user's entries. Signed out, Home is a landing page that points to Sign in.
+- **Release radar:** Backlog entries only, whose movie or game release date, or season air date, is after today (in UTC), soonest first, at most 8. Entries with no date are left out. IGDB dates for unreleased games can be placeholders, and are shown as given.
+- **Recently finished** lists Finished entries, newest `finished_at` first.
+- A queue the user hides in My library is hidden on Home too.
+
 ## Shows have no status of their own
 
 A show has **no status of its own**. Its seasons carry the statuses, and a **progress summary** such as "2 of 4 seasons finished" is derived from them (owner said, 2026-11-26):

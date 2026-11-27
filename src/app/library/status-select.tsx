@@ -24,7 +24,7 @@ export function StatusSelect({ status }: { status: EntryStatus }) {
       defaultValue={status}
       disabled={!hydrated || pending}
       onChange={(e) => e.currentTarget.form?.requestSubmit()}
-      className="h-11 rounded-md border border-border bg-secondary px-2 text-sm text-foreground transition-[transform,color,background-color,border-color] duration-150 disabled:opacity-60 lg:h-9"
+      className="h-11 rounded-md border border-input bg-secondary px-2 text-sm text-foreground transition-[transform,color,background-color,border-color] duration-150 disabled:opacity-60 lg:h-9"
     >
       {ENTRY_STATUSES.map((s) => (
         <option key={s} value={s}>

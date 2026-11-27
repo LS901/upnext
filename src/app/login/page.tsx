@@ -13,7 +13,7 @@ const ERRORS: Record<string, string> = {
 };
 
 const input =
-  "mt-1 block h-11 w-full rounded-md border border-border bg-secondary px-3 text-foreground placeholder:text-muted-foreground lg:h-10";
+  "mt-1 block h-11 w-full rounded-md border border-input bg-secondary px-3 text-foreground placeholder:text-muted-foreground lg:h-10";
 
 export default function LoginPage({ searchParams }: PageProps<"/login">) {
   return (

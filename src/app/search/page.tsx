@@ -115,7 +115,7 @@ async function SearchContent({ searchParams }: Pick<PageProps<"/search">, "searc
           {(Object.keys(HIDE_LABELS) as MediaType[]).map((type) => (
             <label
               key={type}
-              className="flex min-h-11 cursor-pointer items-center gap-2 rounded-full border border-border bg-secondary px-4 text-sm transition-[transform,color,background-color,border-color] duration-150 hover:bg-muted has-checked:border-primary has-checked:bg-primary/20 md:rounded-lg lg:min-h-9"
+              className="flex min-h-11 cursor-pointer items-center gap-2 rounded-full border border-input bg-secondary px-4 text-sm transition-[transform,color,background-color,border-color] duration-150 hover:bg-muted has-checked:border-primary has-checked:bg-primary/20 md:rounded-lg lg:min-h-9"
             >
               <input
                 type="checkbox"

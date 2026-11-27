@@ -26,7 +26,7 @@ export function QueueVisibility({ hidden, counts }: { hidden: QueueType[]; count
         {QUEUE_TYPES.map((type) => (
           <label
             key={type}
-            className="flex min-h-11 cursor-pointer items-center gap-2 rounded-full border border-border bg-secondary px-4 transition-[transform,color,background-color,border-color] duration-150 hover:bg-muted has-checked:border-primary has-checked:bg-primary/20 lg:min-h-9"
+            className="flex min-h-11 cursor-pointer items-center gap-2 rounded-full border border-input bg-secondary px-4 transition-[transform,color,background-color,border-color] duration-150 hover:bg-muted has-checked:border-primary has-checked:bg-primary/20 lg:min-h-9"
           >
             <input
               type="checkbox"
