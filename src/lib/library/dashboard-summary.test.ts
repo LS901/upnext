@@ -51,10 +51,14 @@ const queuedSeason = (id: string, runtimeMinutes: number | null): QueuedSeasonRo
 describe("summarise", () => {
   test("counts entries, backlog minutes and unknown times", () => {
     const view: LibraryView = {
-      upNext: { movie: [item("q1", "backlog", 30)], show: [], game: [], book: [] },
+      upNext: {
+        movie: [item("q1", "backlog", 30), item("b1", "backlog", 100), item("b2", "backlog", null)],
+        show: [queuedSeason("s1", 60), queuedSeason("s2", 40)],
+        game: [],
+        book: [],
+      },
       groups: [
         { status: "in_progress", label: "In progress", rows: [item("p1", "in_progress", 90), show([season("ps", "in_progress", 50)])] },
-        { status: "backlog", label: "Backlog", rows: [item("b1", "backlog", 100), item("b2", "backlog", null), show([season("s1", "backlog", 60), season("s2", "backlog", 40)])] },
         { status: "finished", label: "Finished", rows: [item("f1", "finished", 10), item("f2", "finished", 20)] },
       ],
     };

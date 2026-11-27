@@ -72,10 +72,16 @@ async function Library() {
       </p>
     );
   }
+  // What you're on comes first, so a long Up next never buries it.
+  const inProgress = groups.filter((g) => g.status === "in_progress");
+  const rest = groups.filter((g) => g.status !== "in_progress");
   return (
     <div className="mt-6 flex flex-col gap-10">
+      {inProgress.map((group) => (
+        <Group key={group.status} group={group} />
+      ))}
       <UpNext upNext={upNext} hidden={hidden} />
-      {groups.map((group) => (
+      {rest.map((group) => (
         <Group key={group.status} group={group} />
       ))}
     </div>

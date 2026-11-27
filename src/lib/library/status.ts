@@ -13,7 +13,7 @@ export const STATUS_LABELS: Record<EntryStatus, string> = {
   dropped: "Dropped",
 };
 
-/** The order of the groups on My library, after Up next (which holds every Backlog entry). */
+/** The order of the status groups on My library. The page shows Up next (every Backlog entry) after In progress. */
 export const LIBRARY_ORDER: readonly EntryStatus[] = ["in_progress", "paused", "finished", "dropped"];
 
 export function isEntryStatus(value: string): value is EntryStatus {

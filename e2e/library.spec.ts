@@ -110,7 +110,7 @@ test("add a movie and two seasons, then finish a season", async ({ page }) => {
   await page.goto("/library");
   await expect(page).toHaveTitle("My library · upnext");
   await expect(page.getByText("Nothing here yet.")).toHaveCount(0);
-  // Up next always comes first, holding everything added; no status group yet.
+  // Up next holds everything added; no status group yet.
   await expect(page.getByRole("heading", { level: 2 })).toHaveText(["Up next"]);
 
   const movie = queued(queue(page, "Movies"), "Kestrel Morning");
@@ -158,9 +158,9 @@ test("a game shows its time to beat, and Remove takes it out", async ({ page, ac
   await expect(game).toContainText("Time to beat: 12 h (story)");
   await expect(game).toContainText("Score 82/100 (44 votes)");
 
-  // In progress comes first of the status groups (after Up next).
+  // In progress comes first, before Up next, so a long queue never buries it.
   await game.getByRole("combobox", { name: "Status" }).selectOption("In progress");
-  await expect(page.getByRole("heading", { level: 2 }).nth(1)).toHaveText("In progress");
+  await expect(page.getByRole("heading", { level: 2 })).toHaveText(["In progress", "Up next", "Finished"]);
   const playing = row(group(page, "In progress"), "Clockwork Lighthouse");
   await expect(playing).toBeVisible();
 

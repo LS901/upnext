@@ -164,6 +164,19 @@ describe("one queue per type", () => {
     expect(await positions(["m3"])).toEqual({ m3: 3 });
   });
 
+  test("a place must be a finite number: NaN and ±Infinity are refused (23514)", async () => {
+    // One would poison max() and so every later add to that queue.
+    // JSON can't carry them as numbers, so they go as the text Postgres reads.
+    for (const bad of ["NaN", "Infinity", "-Infinity"]) {
+      const { error } = await a.client
+        .from("library_entries")
+        .update({ up_next_position: bad as unknown as number })
+        .eq("id", entry.m3);
+      expect(error?.code, bad).toBe("23514");
+    }
+    expect(await positions(["m3"])).toEqual({ m3: 3 });
+  });
+
   test("an admin insert into Up next also gets the bottom place", async () => {
     const { data, error } = await adminClient()
       .from("library_entries")
