@@ -1,3 +1,4 @@
+import { randomInt } from "node:crypto";
 import { expect, test as base, type BrowserContext, type Locator, type Page } from "@playwright/test";
 import { adminClient } from "./local-supabase";
 import { newEmail, signInByLink, usernameInHeader } from "./sign-in-helpers";
@@ -219,4 +220,28 @@ test("a double-click on Remove removes the entry once, with no error page", asyn
     .eq("user_id", await userId(account.username))
     .eq("season_id", season3!.id);
   expect(count).toBe(0);
+});
+
+test("a very long title wraps and never scrolls the page sideways at 390px", async ({ page, account }) => {
+  const title = `Quillfeather ${"Moonlit".repeat(6)} and the Unreasonably Extended Chronicle of the Wandering Cartographers Guild`;
+  expect(title.length).toBeGreaterThanOrEqual(120);
+  const admin = adminClient();
+  const { data: item, error } = await admin
+    .from("items")
+    .insert({ provider: "tmdb", media_type: "movie", provider_id: String(randomInt(10_000_000, 99_999_999)), title })
+    .select("id")
+    .single();
+  if (error) throw error;
+  const { error: entryError } = await admin
+    .from("library_entries")
+    .insert({ user_id: await userId(account.username), item_id: item.id, item_media_type: "movie" });
+  if (entryError) throw entryError;
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/library");
+  await expect(row(group(page, "Backlog"), title)).toBeVisible();
+  await row(group(page, "Backlog"), title).getByRole("button", { name: "Add to Up next" }).click();
+  await expect(page.getByRole("list", { name: "Movies up next" }).getByRole("heading", { level: 4, name: title })).toBeVisible();
+  const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+  expect(scrollWidth).toBeLessThanOrEqual(390);
 });

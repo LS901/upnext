@@ -1,9 +1,13 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
-import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
+import { ArrowDown, ArrowUp, ArrowUpToLine, type LucideIcon } from "lucide-react";
+import { Poster } from "@/components/poster";
+import { StatusChip } from "@/components/status-chip";
+import { Card } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import { seasonDetails, seasonLabel, seasonName } from "@/app/search/season-label";
 import { TYPE_LABELS } from "@/lib/format/type-labels";
 import { getCurrentUser } from "@/lib/auth/current-user";
@@ -37,11 +41,11 @@ import { SubmitButton } from "./submit-button";
 
 export const metadata: Metadata = { title: "My library" };
 
-const muted = "text-sm text-zinc-600 dark:text-zinc-400";
+const muted = "text-sm text-muted-foreground break-words";
 
 export default function LibraryPage() {
   return (
-    <main className="mx-auto w-full max-w-4xl flex-1 px-6 py-10">
+    <main className="mx-auto w-full max-w-4xl min-w-0 flex-1 px-4 py-10 sm:px-6">
       <h1 className="text-3xl font-semibold tracking-tight">My library</h1>
       {/* Reads the session, so it renders at request time. */}
       <Suspense>
@@ -59,9 +63,9 @@ async function Library() {
   const hidden = parseHidden((await cookies()).get(HIDDEN_COOKIE)?.value);
   if (!groups.length && QUEUE_TYPES.every((type) => !upNext[type].length)) {
     return (
-      <p className="mt-6 text-zinc-600 dark:text-zinc-400">
+      <p className="mt-6 rounded-xl border border-dashed border-border px-4 py-10 text-center text-muted-foreground">
         Nothing here yet.{" "}
-        <Link href="/search" className="underline">
+        <Link href="/search" className="inline-flex min-h-11 items-center text-accent-text underline lg:min-h-0">
           Search
         </Link>{" "}
         to add something.
@@ -94,11 +98,11 @@ function UpNext({
   const counts = Object.fromEntries(QUEUE_TYPES.map((type) => [type, upNext[type].length])) as Record<QueueType, number>;
   return (
     <section aria-labelledby="up-next">
-      <h2 id="up-next" className="text-xl font-semibold">
+      <h2 id="up-next" className="text-2xl font-semibold tracking-tight">
         Up next
       </h2>
       <QueueVisibility hidden={hidden} counts={counts} />
-      <div className="mt-4 flex flex-col gap-6">
+      <div className="mt-4 flex flex-col gap-4">
         {QUEUE_TYPES.filter((type) => !hidden.includes(type)).map((type) => (
           <Queue key={type} type={type} rows={upNext[type]} hasBacklog={inBacklog(type)} />
         ))}
@@ -113,10 +117,11 @@ function Queue({ type, rows, hasBacklog }: { type: QueueType; rows: UpNextRow[];
   const order = rows.map((r) => r.entryId);
   return (
     <section aria-labelledby={id}>
-      <h3 id={id} className="font-semibold">
-        {label}
-      </h3>
-      {rows.length ? (
+      <Card className="min-w-0 gap-3" size="sm">
+        <h3 id={id} className="px-(--card-spacing) text-base font-semibold">
+          {label}
+        </h3>
+        {rows.length ? (
         <SortableQueue
           label={`${label} up next`}
           items={rows.map((row) => ({
@@ -126,10 +131,11 @@ function Queue({ type, rows, hasBacklog }: { type: QueueType; rows: UpNextRow[];
           }))}
         />
       ) : (
-        <p className={`mt-1 ${muted}`}>
-          {hasBacklog ? "Nothing up next. Add something from your Backlog below." : "Nothing up next."}
-        </p>
-      )}
+          <p className={`px-(--card-spacing) ${muted}`}>
+            {hasBacklog ? "Nothing up next. Add something from your Backlog below." : "Nothing up next."}
+          </p>
+        )}
+      </Card>
     </section>
   );
 }
@@ -146,21 +152,21 @@ function QueuedRow({ row, order }: { row: UpNextRow; order: string[] }) {
     ? [...seasonDetails(row), `Time to finish: ${formatDuration(row.runtimeMinutes)}`, formatScore(row.score, row.scoreCount)]
     : [itemMeta(row)];
   return (
-    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-4">
-      <Poster url={row.imageUrl} />
-      <div className="min-w-0 flex-1">
-        <h4 className="font-medium">{queuedTitle(row)}</h4>
+    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-3">
+      <Poster url={row.imageUrl} title={queuedTitle(row)} size="md" mediaType={season ? "show" : row.mediaType} />
+      <div className="min-w-0 flex-1 basis-32">
+        <h4 className="font-medium break-words">{queuedTitle(row)}</h4>
         <p className={muted}>{meta.join(" · ")}</p>
       </div>
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex w-full flex-wrap items-center gap-2">
         <form action={setStatus}>
           <input type="hidden" name="entryId" value={row.entryId} />
           <input type="hidden" name="status" value="in_progress" />
-          <SubmitButton>Start</SubmitButton>
+          <SubmitButton variant="default">Start</SubmitButton>
         </form>
-        <MoveButton entryId={row.entryId} order={order} direction="up" label="Move up" />
-        <MoveButton entryId={row.entryId} order={order} direction="down" label="Move down" />
-        <MoveButton entryId={row.entryId} order={order} direction="top" label="Move to top" />
+        <MoveButton entryId={row.entryId} order={order} direction="up" label="Move up" icon={ArrowUp} />
+        <MoveButton entryId={row.entryId} order={order} direction="down" label="Move down" icon={ArrowDown} />
+        <MoveButton entryId={row.entryId} order={order} direction="top" label="Move to top" icon={ArrowUpToLine} />
         <form action={removeUpNext}>
           <input type="hidden" name="entryId" value={row.entryId} />
           <SubmitButton>Remove from Up next</SubmitButton>
@@ -176,13 +182,22 @@ function QueuedRow({ row, order }: { row: UpNextRow; order: string[] }) {
  * moving again. Disabled when the move would do nothing; it then targets the
  * entry itself, which moves nothing, in case it's sent before hydration.
  */
-function MoveButton(props: { entryId: string; order: string[]; direction: Direction; label: string }) {
+function MoveButton(props: {
+  entryId: string;
+  order: string[];
+  direction: Direction;
+  label: string;
+  icon: LucideIcon;
+}) {
+  const Icon = props.icon;
   const target = targetFor(props.order, props.entryId, props.direction);
   return (
     <form action={placeUpNext}>
       <input type="hidden" name="entryId" value={props.entryId} />
       <input type="hidden" name="beforeId" value={target ? (target.beforeId ?? "") : props.entryId} />
-      <SubmitButton disabled={!target}>{props.label}</SubmitButton>
+      <SubmitButton disabled={!target} size="icon" variant="ghost" label={props.label}>
+        <Icon aria-hidden="true" />
+      </SubmitButton>
     </form>
   );
 }
@@ -191,23 +206,17 @@ function Group({ group }: { group: LibraryGroup }) {
   const id = `status-${group.status}`;
   return (
     <section aria-labelledby={id}>
-      <h2 id={id} className="text-xl font-semibold">
-        {group.label}
-      </h2>
-      <ul className="mt-2 flex flex-col divide-y divide-black/10 dark:divide-white/10">
-        {group.rows.map((row) =>
-          row.kind === "item" ? <Item key={row.entryId} item={row} /> : <Show key={row.showId} show={row} />,
-        )}
-      </ul>
+      <Card className="min-w-0 gap-3" size="sm">
+        <h2 id={id} className="px-(--card-spacing) text-xl font-semibold">
+          {group.label}
+        </h2>
+        <ul className="flex flex-col divide-y divide-border px-(--card-spacing)">
+          {group.rows.map((row) =>
+            row.kind === "item" ? <Item key={row.entryId} item={row} /> : <Show key={row.showId} show={row} />,
+          )}
+        </ul>
+      </Card>
     </section>
-  );
-}
-
-function Poster({ url }: { url: string | null }) {
-  return url ? (
-    <Image src={url} alt="" width={48} height={72} unoptimized className="h-18 w-12 shrink-0 rounded object-cover" />
-  ) : (
-    <div className="h-18 w-12 shrink-0 rounded bg-zinc-200 dark:bg-zinc-800" />
   );
 }
 
@@ -221,10 +230,10 @@ function itemMeta(item: ItemRow): string {
 
 function Item({ item }: { item: ItemRow }) {
   return (
-    <li className="flex flex-wrap items-center gap-4 py-3">
-      <Poster url={item.imageUrl} />
-      <div className="min-w-0 flex-1">
-        <h3 className="font-medium">{item.title}</h3>
+    <li className="flex flex-wrap items-center gap-x-4 gap-y-3 py-3">
+      <Poster url={item.imageUrl} title={item.title} size="md" mediaType={item.mediaType} />
+      <div className="min-w-0 flex-1 basis-32">
+        <h3 className="font-medium break-words">{item.title}</h3>
         <p className={muted}>{itemMeta(item)}</p>
       </div>
       <EntryControls entryId={item.entryId} status={item.status} />
@@ -240,13 +249,14 @@ function Show({ show }: { show: ShowRow }) {
   return (
     <li className="py-3">
       <div className="flex items-center gap-4">
-        <Poster url={show.imageUrl} />
+        <Poster url={show.imageUrl} title={show.title} size="md" mediaType="show" />
         <div className="min-w-0 flex-1">
-          <h3 className="font-medium">{show.title}</h3>
+          <h3 className="font-medium break-words">{show.title}</h3>
           <p className={muted}>{[TYPE_LABELS.show, progress, formatScore(show.score, show.scoreCount)].join(" · ")}</p>
+          {total > 0 && <Progress aria-hidden="true" value={(finished / total) * 100} className="mt-2 max-w-48" />}
         </div>
       </div>
-      <ul className="mt-2 flex flex-col divide-y divide-black/5 pl-16 dark:divide-white/5">
+      <ul className="mt-2 flex flex-col divide-y divide-border sm:pl-24">
         {show.seasons.map((season) => (
           <Season key={season.entryId} season={season} />
         ))}
@@ -257,9 +267,9 @@ function Show({ show }: { show: ShowRow }) {
 
 function Season({ season }: { season: SeasonRow }) {
   return (
-    <li className="flex flex-wrap items-center gap-4 py-2">
-      <div className="min-w-0 flex-1">
-        <h4>{seasonLabel(season)}</h4>
+    <li className="flex flex-wrap items-center gap-x-4 gap-y-3 py-2">
+      <div className="min-w-0 flex-1 basis-32">
+        <h4 className="break-words">{seasonLabel(season)}</h4>
         <p className={muted}>Time to finish: {formatDuration(season.runtimeMinutes)}</p>
       </div>
       <EntryControls entryId={season.entryId} status={season.status} />
@@ -270,7 +280,8 @@ function Season({ season }: { season: SeasonRow }) {
 // Only Backlog entries can go in Up next (owner said, 2026-11-26).
 function EntryControls({ entryId, status }: { entryId: string; status: EntryStatus }) {
   return (
-    <div className="flex flex-wrap items-center gap-3">
+    <div className="flex flex-wrap items-center gap-2">
+      <StatusChip status={status} />
       {status === "backlog" && (
         <form action={addUpNext}>
           <input type="hidden" name="entryId" value={entryId} />

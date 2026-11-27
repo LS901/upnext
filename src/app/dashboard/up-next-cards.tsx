@@ -57,7 +57,7 @@ function QueueCard({ type, rows }: { type: QueueType; rows: UpNextRow[] }) {
               <form action={setStatus}>
                 <input type="hidden" name="entryId" value={row.entryId} />
                 <input type="hidden" name="status" value="in_progress" />
-                <SubmitButton>Start</SubmitButton>
+                <SubmitButton variant="default">Start</SubmitButton>
               </form>
             </li>
           ))}
