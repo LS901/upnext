@@ -122,8 +122,11 @@ Email only: a magic link plus a 6-digit code in the same email (owner said, 2026
 - **Required check names are the jobs' `name:` values:** `check`, `e2e`, `domain`, `secrets`, `audit`, `codeql-js`, `codeql-actions`, each tied to the GitHub Actions app. Renaming a job leaves the old required check pending forever, so update branch protection in the same change.
 - **Only PR runs cancel older runs** (`cancel-in-progress` on `pull_request` only), so every commit on `main` keeps its result.
 - **`audit` can go red without a code change:** a new advisory on any dependency fails every PR until it's bumped (Dependabot usually opens that PR). Admins can bypass in an emergency.
-- **Watch the first Dependabot PR:** Dependabot-triggered runs get a restricted token. If `codeql-*` fails there on the upload step, keep the analysis but skip the upload for `github.actor == 'dependabot[bot]'`.
-- **`.github/dependabot.yml`** opens weekly update PRs for npm and GitHub Actions. Minor and patch updates are grouped; each major gets its own PR.
+- **CodeQL passes on Dependabot PRs** (checked on the first ones, 2026-11-26), despite their restricted token.
+- **`.github/dependabot.yml`** opens weekly update PRs for npm and GitHub Actions. Minor and patch updates are grouped; each major gets its own PR. `@types/node` majors are ignored: the types follow the Node runtime (22), so bump them with Node.
+- **Dependabot patch and minor PRs merge themselves** (owner said, 2026-11-27): `.github/workflows/dependabot-auto-merge.yml` reads `dependabot/fetch-metadata` and, when the PR's highest change is patch or minor, runs `gh pr merge --auto --squash`. GitHub merges once every required check passes. Majors, and groups containing one, stay for the owner. It needs the repo's "Allow auto-merge" setting on.
+  - It runs on `pull_request_target`, because Dependabot's `pull_request` runs get a read-only token. That's safe only because it never checks out or runs PR code. Never add a checkout or a build step to it.
+  - Merges made with the workflow's token don't start other workflows, so an auto-merged commit on `main` gets no push run of CI or CodeQL. The PR's own checks ran on its merge with `main`, and the weekly CodeQL run covers `main`.
 - **Actions are pinned to commit SHAs** with the version in a comment, and the gitleaks image is pinned by digest. Dependabot bumps the action SHAs. Bump the gitleaks image by hand.
 - **Branch protection on `main`:**
   - every CI job and both CodeQL jobs must pass;
