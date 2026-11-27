@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { cache, Suspense } from "react";
-import { primaryButton } from "@/app/ui";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { seasonsInLibrary } from "@/lib/library/in-library";
 import { getTmdbShowSeasons } from "@/lib/providers/tmdb";
@@ -30,7 +31,7 @@ export async function generateMetadata({ params }: PageProps<"/search/show/[tmdb
 
 export default function SeasonPickerPage({ params, searchParams }: PageProps<"/search/show/[tmdbId]">) {
   return (
-    <main className="mx-auto w-full max-w-2xl flex-1 px-6 py-10">
+    <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-8 sm:px-6 sm:py-10">
       {/* Reads the session, params and searchParams, so it renders at request time. */}
       <Suspense>
         <SeasonPicker params={params} searchParams={searchParams} />
@@ -68,8 +69,15 @@ async function SeasonPicker({ params, searchParams }: PageProps<"/search/show/[t
         const have = owned.has(season.number);
         return (
           <li key={season.number}>
-            <label className="flex items-center gap-3">
-              <input type="checkbox" name="season" value={season.number} defaultChecked={have} disabled={have} />
+            <label className="flex min-h-11 items-center gap-3 [overflow-wrap:anywhere]">
+              <input
+                type="checkbox"
+                name="season"
+                value={season.number}
+                defaultChecked={have}
+                disabled={have}
+                className="size-4 shrink-0 accent-primary"
+              />
               {seasonLabel(season)}
             </label>
           </li>
@@ -80,21 +88,27 @@ async function SeasonPicker({ params, searchParams }: PageProps<"/search/show/[t
 
   return (
     <>
-      <h1 className="text-3xl font-semibold tracking-tight">{show.title}</h1>
+      <h1 className="text-3xl font-semibold tracking-tight [overflow-wrap:anywhere]">{show.title}</h1>
       {addFailed && <Unreachable />}
       {seasons.length === 0 ? (
-        <p className="mt-6 text-zinc-600 dark:text-zinc-400">No seasons yet.</p>
+        <p className="mt-6 text-muted-foreground">No seasons yet.</p>
       ) : addable ? (
-        <form action={addSeasons} className="mt-6 flex flex-col gap-6">
-          <input type="hidden" name="tmdbId" value={tmdbId} />
-          {list}
-          <button type="submit" className={`${primaryButton} self-start`}>
-            Add seasons
-          </button>
+        <form action={addSeasons} className="mt-6">
+          <Card>
+            <CardContent className="gap-6">
+              <input type="hidden" name="tmdbId" value={tmdbId} />
+              {list}
+              <Button type="submit" className="self-start">
+                Add seasons
+              </Button>
+            </CardContent>
+          </Card>
         </form>
       ) : (
         // Every season is already in the library: nothing to add.
-        <div className="mt-6">{list}</div>
+        <Card className="mt-6">
+          <CardContent>{list}</CardContent>
+        </Card>
       )}
     </>
   );
@@ -102,7 +116,7 @@ async function SeasonPicker({ params, searchParams }: PageProps<"/search/show/[t
 
 function Unreachable() {
   return (
-    <p role="alert" className="mt-6 text-red-700 dark:text-red-400">
+    <p role="alert" className="mt-6 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-foreground">
       Couldn&apos;t reach {PROVIDER_NAMES.tmdb} right now.
     </p>
   );

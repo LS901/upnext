@@ -2,7 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useTransition, type ChangeEvent, type FormEvent } from "react";
-import { primaryButton } from "@/app/ui";
+import { Search } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import type { MediaType } from "@/lib/providers/types";
 import { MAX_QUERY_LENGTH, parseSearch, searchHref } from "./params";
 
@@ -13,7 +14,7 @@ export const SEARCH_DELAY_MS = 300;
 export const MIN_AUTO_LENGTH = 3;
 
 const input =
-  "mt-1 block w-full rounded-md border border-black/20 bg-transparent px-3 py-2 dark:border-white/20";
+  "block h-11 w-full rounded-md border border-border bg-secondary pr-3 pl-10 text-foreground placeholder:text-muted-foreground lg:h-10";
 
 /** Whether the box holds a partial title: 1-2 letters, too short to search on its own. */
 const partial = (text: string) => {
@@ -144,21 +145,25 @@ export function SearchForm({ q, exclude }: { q: string; exclude: MediaType[] }) 
       aria-busy={searching}
       className="flex items-end gap-3"
     >
-      <label className="block flex-1">
+      <label className="block min-w-0 flex-1 text-sm text-muted-foreground">
         Search movies, TV and games
-        <input
-          ref={box}
-          name="q"
-          type="search"
-          defaultValue={q}
-          maxLength={MAX_QUERY_LENGTH}
-          onChange={onType}
-          className={input}
-        />
+        <span className="relative mt-1 block">
+          <Search
+            aria-hidden="true"
+            className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+          />
+          <input
+            ref={box}
+            name="q"
+            type="search"
+            defaultValue={q}
+            maxLength={MAX_QUERY_LENGTH}
+            onChange={onType}
+            className={input}
+          />
+        </span>
       </label>
-      <button type="submit" className={primaryButton}>
-        Search
-      </button>
+      <Button type="submit">Search</Button>
     </form>
   );
 }
