@@ -168,3 +168,46 @@ test("Hardcover down shows its notice while TMDB and IGDB results still show", a
   await expect(result(page, "Clockwork Lighthouse")).toBeVisible();
   await expect(result(page, "The Lantern Tide")).toHaveCount(0);
 });
+
+test("print and audiobook queue under Books, and a started book sits under its series", async ({ page }) => {
+  await page.goto("/search");
+  await search(page, unique("Glasswing"));
+  const glass = result(page, "Glasswing Signal");
+  await glass.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(glass.getByRole("button", { name: "In your library", exact: true })).toBeDisabled(SLOW);
+  await glass.getByRole("button", { name: "Add audiobook" }).click();
+  await expect(glass.getByRole("button", { name: "Audiobook in your library" })).toBeDisabled(SLOW);
+
+  await page.goto("/library");
+  await expect(page.getByRole("group", { name: "Show" }).getByRole("checkbox", { name: /^Books \(\d+\)$/ })).toBeChecked();
+  // Both versions are in the Books queue under the book's own title; nothing joins Movies.
+  const books = page.getByRole("list", { name: "Books up next", exact: true });
+  const queued = books
+    .getByRole("listitem")
+    .filter({ has: page.getByRole("heading", { level: 4, name: "Glasswing Signal", exact: true }) });
+  await expect(queued).toHaveCount(2);
+  await expect(queued.nth(0)).toContainText("Book · 288 pages · Hardcover rating 4.0/5 (56)");
+  await expect(queued.nth(1)).toContainText("Audiobook · 8 h 20 min · Narrated by Invented Voice");
+  await expect(queued.filter({ hasText: "Audiobook" })).toHaveCount(1);
+  await expect(page.getByRole("region", { name: "Movies", exact: true })).toContainText("Nothing up next.");
+
+  // Start the print book: it moves under its series in In progress.
+  await queued.nth(0).getByRole("button", { name: "Start" }).click();
+  const series = (status: string) =>
+    page
+      .getByRole("region", { name: status, exact: true })
+      .getByRole("listitem")
+      .filter({ has: page.getByRole("heading", { level: 3, name: "The Glasswing Cycle", exact: true }) });
+  await expect(series("In progress")).toContainText(/The Glasswing Cycle\s*Series · 0 of 4 read/);
+  await expect(series("In progress").getByRole("heading", { level: 4, name: "#2 Glasswing Signal", exact: true })).toBeVisible();
+  await expect(series("In progress")).toContainText("Book · 288 pages");
+  await expect(queued).toHaveCount(1);
+  await expect(queued).toContainText("Audiobook");
+
+  // Finishing the audiobook counts the book as read, in every status's series row.
+  await queued.getByRole("combobox", { name: "Status" }).selectOption("finished");
+  await expect(series("Finished")).toContainText(/The Glasswing Cycle\s*Series · 1 of 4 read/);
+  await expect(series("Finished")).toContainText("Audiobook · 8 h 20 min");
+  await expect(series("In progress")).toContainText("Series · 1 of 4 read");
+  await expect(queued).toHaveCount(0);
+});

@@ -26,7 +26,7 @@ Terms are defined in `glossary.md`. Examples are invented.
 | Paused | On hold, intending to return |
 | Dropped | Abandoned, kept for the record |
 
-**Up next** is the first status and the ordered queue of everything not started: there is no separate Backlog list and no shortlist inside it (owner said, 2026-11-27, merging the two). The enum value stays `backlog`. The user orders it. There is **one queue per media type**: Movies, TV (single seasons) and Games, and Books when books land. Each queue is ordered on its own, and an entry never moves into another type's queue (owner said, 2026-11-26). It holds items and single seasons: one season of a show can be up next, and someone can track only season 5 of a show, for example an anthology (owner said, 2026-11-26). In the database it is `up_next_position`, set exactly while the status is `backlog` (a check), and given by the `library_entries_queue_backlog` trigger, so the app never sets it on add.
+**Up next** is the first status and the ordered queue of everything not started: there is no separate Backlog list and no shortlist inside it (owner said, 2026-11-27, merging the two). The enum value stays `backlog`. The user orders it. There is **one queue per media type**: Movies, TV (single seasons), Games and Books (a book's print and audio entries queue together under Books). Each queue is ordered on its own, and an entry never moves into another type's queue (owner said, 2026-11-26). It holds items and single seasons: one season of a show can be up next, and someone can track only season 5 of a show, for example an anthology (owner said, 2026-11-26). In the database it is `up_next_position`, set exactly while the status is `backlog` (a check), and given by the `library_entries_queue_backlog` trigger, so the app never sets it on add.
 
 ## Up next
 
@@ -35,7 +35,7 @@ Owner said, 2026-11-26, except where marked as a ruling.
 - **Leaving Up next**: an entry drops off its queue when it moves to any status other than Up next. The trigger clears `up_next_position`, which the schema check also requires. No old position is stored.
 - **Adding and putting back**: a new entry, and an entry moved back to Up next from Paused, Dropped or any other status, goes to the bottom of its type's queue (the trigger does this).
 - **Reordering is free**: the user can move any Up next entry to any position in its queue, at any time, as often as they like; nothing is fixed in place.
-- **The Up next screen** sits at the top of My library:
+- **The Up next screen** sits on My library after In progress, so a long queue never buries what you're on, and before Paused, Finished and Dropped (ruling, 2026-11-27, M2-b; owner may overrule):
   - Every Up next entry is in it; there is no Add to Up next. Each row has a status select, **Start**, which moves it to In progress and so off the queue, and **Remove**, which deletes the entry from the library.
   - A queue is reordered with **Move up**, **Move down** and **Move to top** buttons, and by **drag and drop**. A queued TV season is titled with its show and season, such as "Example Show · Season 2" (ruling, 2026-11-27, from review; owner may overrule).
   - A **Show** row of checkboxes displays or hides each type's queue. The choice is remembered on that device. Each checkbox shows its queue's count, so a hidden queue still says what's in it (ruling, 2026-11-27, from review; owner may overrule).

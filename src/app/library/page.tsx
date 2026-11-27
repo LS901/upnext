@@ -11,6 +11,7 @@ import { Progress } from "@/components/ui/progress";
 import { seasonDetails, seasonLabel, seasonName } from "@/app/search/season-label";
 import { TYPE_LABELS } from "@/lib/format/type-labels";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { bookMeta } from "@/lib/format/book";
 import { formatDuration } from "@/lib/format/duration";
 import { formatScore } from "@/lib/format/score";
 import {
@@ -19,6 +20,8 @@ import {
   type LibraryGroup,
   type LibraryView,
   type SeasonRow,
+  type SeriesBookRow,
+  type SeriesRow,
   type ShowRow,
   type UpNextRow,
 } from "@/lib/library/queries";
@@ -122,7 +125,7 @@ function Queue({ type, rows }: { type: QueueType; rows: UpNextRow[] }) {
             label={`${label} up next`}
             items={rows.map((row) => ({
               entryId: row.entryId,
-              title: queuedTitle(row),
+              title: dragName(row),
               row: <QueuedRow row={row} order={order} />,
             }))}
           />
@@ -134,10 +137,18 @@ function Queue({ type, rows }: { type: QueueType; rows: UpNextRow[] }) {
   );
 }
 
-/** A queued season names its show and season, so two seasons of one show read apart. */
+/**
+ * A queued season names its show and season, so two seasons of one show read
+ * apart. A queued book is its own title, print or audio alike (ruling B5-a).
+ */
 function queuedTitle(row: UpNextRow): string {
   if (row.kind !== "season") return row.title;
   return `${row.showTitle} · ${seasonName(row.number)}`;
+}
+
+/** What a drag names the row, so a book's print and audio entries are told apart when heard. */
+function dragName(row: UpNextRow): string {
+  return row.kind === "item" && row.version === "audio" ? `${row.title}, audiobook` : queuedTitle(row);
 }
 
 function QueuedRow({ row, order }: { row: UpNextRow; order: string[] }) {
@@ -210,7 +221,13 @@ function Group({ group }: { group: LibraryGroup }) {
         </h2>
         <ul className="flex flex-col divide-y divide-border px-(--card-spacing)">
           {group.rows.map((row) =>
-            row.kind === "item" ? <Item key={row.entryId} item={row} /> : <Show key={row.showId} show={row} />,
+            row.kind === "item" ? (
+              <Item key={row.entryId} item={row} />
+            ) : row.kind === "show" ? (
+              <Show key={row.showId} show={row} />
+            ) : (
+              <Series key={row.seriesId} series={row} />
+            ),
           )}
         </ul>
       </Card>
@@ -219,11 +236,12 @@ function Group({ group }: { group: LibraryGroup }) {
 }
 
 function itemMeta(item: ItemRow): string {
+  if (item.mediaType === "book") return bookMeta(item);
   const time =
     item.mediaType === "game"
       ? `Time to beat: ${formatDuration(item.minutes)} (story)`
       : `Time to finish: ${formatDuration(item.minutes)}`;
-  return [TYPE_LABELS[item.mediaType], time, formatScore(item.score, item.scoreCount)].join(" · ");
+  return [TYPE_LABELS[item.mediaType], time, formatScore(item.score, item.scoreCount, item.providerName)].join(" · ");
 }
 
 function Item({ item }: { item: ItemRow }) {
@@ -259,6 +277,43 @@ function Show({ show }: { show: ShowRow }) {
           <Season key={season.entryId} season={season} />
         ))}
       </ul>
+    </li>
+  );
+}
+
+// Like a show: the series' progress counts all the user's books in it, in any
+// status; the rows are only the user's books in this group's status. A series
+// has no score of its own, so its line carries none.
+function Series({ series }: { series: SeriesRow }) {
+  const { read, total } = series.progress;
+  const meta = total ? `Series · ${read} of ${total} read` : "Series";
+  return (
+    <li className="py-3">
+      <div className="flex items-center gap-4">
+        <Poster url={series.books[0]?.imageUrl ?? null} title={series.title} size="md" mediaType="book" />
+        <div className="min-w-0 flex-1">
+          <h3 className="font-medium break-words">{series.title}</h3>
+          <p className={muted}>{meta}</p>
+          {total > 0 && <Progress aria-hidden="true" value={Math.min(100, (read / total) * 100)} className="mt-2 max-w-48" />}
+        </div>
+      </div>
+      <ul className="mt-2 flex flex-col divide-y divide-border sm:pl-24">
+        {series.books.map((book) => (
+          <SeriesBook key={book.entryId} book={book} />
+        ))}
+      </ul>
+    </li>
+  );
+}
+
+function SeriesBook({ book }: { book: SeriesBookRow }) {
+  return (
+    <li className="flex flex-wrap items-center gap-x-4 gap-y-3 py-2">
+      <div className="min-w-0 flex-1 basis-32">
+        <h4 className="break-words">{book.position === null ? book.title : `#${book.position} ${book.title}`}</h4>
+        <p className={muted}>{bookMeta(book)}</p>
+      </div>
+      <EntryControls entryId={book.entryId} status={book.status} />
     </li>
   );
 }

@@ -9,7 +9,7 @@ export type DashboardStats = {
   finished: number;
 };
 
-/** Entries per status (a movie, game or season each counts 1) and Up next's time. Up next holds every `backlog` entry. */
+/** Entries per status (a movie, game, book entry or season each counts 1) and Up next's time. Up next holds every `backlog` entry. */
 export function summarise(view: LibraryView): DashboardStats {
   const stats: DashboardStats = { backlog: 0, backlogMinutes: 0, backlogUnknownTime: 0, inProgress: 0, finished: 0 };
   const addBacklog = (minutes: number | null) => {
@@ -20,7 +20,7 @@ export function summarise(view: LibraryView): DashboardStats {
   for (const queue of Object.values(view.upNext)) for (const row of queue) addBacklog(row.kind === "item" ? row.minutes : row.runtimeMinutes);
   for (const group of view.groups) {
     for (const row of group.rows) {
-      const entries = row.kind === "item" ? 1 : row.seasons.length;
+      const entries = row.kind === "item" ? 1 : row.kind === "show" ? row.seasons.length : row.books.length;
       if (group.status === "in_progress") stats.inProgress += entries;
       else if (group.status === "finished") stats.finished += entries;
     }

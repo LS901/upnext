@@ -5,7 +5,7 @@
 export type QueueType = "movie" | "show" | "game" | "book";
 
 /** The queues in the order My library shows them. */
-export const QUEUE_TYPES: readonly QueueType[] = ["movie", "show", "game"];
+export const QUEUE_TYPES: readonly QueueType[] = ["movie", "show", "game", "book"];
 
 export const QUEUE_LABELS: Record<QueueType, string> = { movie: "Movies", show: "TV", game: "Games", book: "Books" };
 
@@ -14,8 +14,9 @@ export type Placed = { id: string; position: number };
 export type Direction = "up" | "down" | "top";
 
 /**
- * Movies and games queue by their type; a season queues as TV. (The column's
- * type allows "show", but the schema never lets an item entry be a show.)
+ * Movies, games and books queue by their type (a book's print and audio
+ * entries share Books); a season queues as TV. (The column's type allows
+ * "show", but the schema never lets an item entry be a show.)
  */
 export function queueOf(entry: { item_media_type: QueueType | null; season_id: string | null }): QueueType {
   if (entry.season_id) return "show";

@@ -35,6 +35,17 @@
               },
               "has_audiobook": true
             }
+          },
+          {
+            "document": {
+              "id": 8104,
+              "title": "Glasswing Signal",
+              "release_year": 2016,
+              "image": {
+                "url": "https://assets.hardcover.app/invented/glasswing-signal.jpg"
+              },
+              "has_audiobook": true
+            }
           }
         ]
       }

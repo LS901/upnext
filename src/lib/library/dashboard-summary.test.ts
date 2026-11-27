@@ -15,9 +15,13 @@ const item = (id: string, status: ItemRow["status"], minutes: number | null): It
   entryId: id,
   status,
   mediaType: "movie",
+  version: null,
   title: id,
   imageUrl: null,
   minutes,
+  pages: null,
+  narrators: null,
+  providerName: "tmdb",
   score: null,
   scoreCount: null,
 });

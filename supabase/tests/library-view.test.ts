@@ -137,7 +137,7 @@ describe("My library", () => {
     // b: seasons 1-3 minus b's exclusion of 2 = 2; b finished season 1.
     const other = await getMyLibrary(b.client, b.id);
     expect(other.groups.map((g) => g.label)).toEqual(["Paused", "Finished", "Dropped"]);
-    expect(other.groups.flatMap((g) => g.rows).map((r) => (r.kind === "show" ? r.progress : r.entryId))).toEqual([
+    expect(other.groups.flatMap((g) => g.rows).map((r) => (r.kind === "show" ? r.progress : r.kind === "item" ? r.entryId : r.seriesId))).toEqual([
       { finished: 1, total: 2 },
       { finished: 1, total: 2 },
       entry.bMovie,

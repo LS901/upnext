@@ -89,6 +89,7 @@ describe("Up next", () => {
       movie: [entry.m1, entry.m2, entry.m3],
       show: [entry.s1, entry.s2],
       game: [entry.game],
+      book: [],
     });
     // The game and the seasons start their own queues rather than joining the movies'.
     expect(await positions(["m1", "m2", "m3", "game", "s1", "s2"])).toEqual({ m1: 1, m2: 2, m3: 3, game: 1, s1: 1, s2: 2 });
@@ -169,6 +170,7 @@ describe("Up next", () => {
       movie: [entry.m1, entry.m2, entry.m3],
       show: [entry.s1, entry.s2],
       game: [entry.game],
+      book: [],
     });
   });
 
@@ -185,7 +187,7 @@ describe("Up next", () => {
   });
 
   test("another user's queue never shows in yours, and their entries can't be moved", async () => {
-    expect(await queues(b)).toEqual({ movie: [entry.bMovie, entry.bMovie2], show: [], game: [entry.bGame] });
+    expect(await queues(b)).toEqual({ movie: [entry.bMovie, entry.bMovie2], show: [], game: [entry.bGame], book: [] });
     expect((await queues()).movie).not.toContain(entry.bMovie);
 
     const refused = "That entry isn't in your library.";

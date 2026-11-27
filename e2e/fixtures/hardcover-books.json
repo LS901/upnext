@@ -52,5 +52,42 @@
       "contributions": []
     },
     "book_series": []
+  },
+  "8104": {
+    "id": 8104,
+    "title": "Glasswing Signal",
+    "pages": 288,
+    "rating": 4.0,
+    "ratings_count": 56,
+    "release_date": "2016-02-11",
+    "image": {
+      "url": "https://assets.hardcover.app/invented/glasswing-signal.jpg"
+    },
+    "default_audio_edition": {
+      "audio_seconds": 30000,
+      "contributions": [
+        {
+          "author": {
+            "name": "Invented Voice"
+          },
+          "contributor_role": {
+            "slug": "narrator"
+          }
+        }
+      ]
+    },
+    "book_series": [
+      {
+        "position": 2,
+        "details": "2",
+        "featured": true,
+        "series": {
+          "id": 7101,
+          "name": "The Glasswing Cycle",
+          "primary_books_count": 4,
+          "is_completed": false
+        }
+      }
+    ]
   }
 }
