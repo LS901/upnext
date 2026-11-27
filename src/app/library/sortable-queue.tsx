@@ -19,7 +19,16 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { useId, useOptimistic, useSyncExternalStore, useTransition, type ReactNode } from "react";
+import {
+  useId,
+  useLayoutEffect,
+  useOptimistic,
+  useRef,
+  useSyncExternalStore,
+  useTransition,
+  type FocusEvent,
+  type ReactNode,
+} from "react";
 import { placeUpNext } from "./actions";
 
 export type QueueItem = { entryId: string; title: string; row: ReactNode };
@@ -31,8 +40,12 @@ const noSubscription = () => () => {};
  * buttons work without JavaScript); this adds a drag handle. A drop saves the
  * new place through the placeUpNext action, as "before the next entry".
  * The order shown is the server's, with a dropped entry shown in its new place
- * until the save and refresh bring the server's new order. The rows keep their
- * keys throughout, so focus stays on the handle that was dragged.
+ * until the save and refresh bring the server's new order.
+ *
+ * Keeping focus: the rows keep their keys, but to reorder them React moves
+ * some of their elements, and the browser drops focus from an element it moves.
+ * So the list remembers the last thing focused in it and, when a reorder leaves
+ * focus nowhere, puts it back: the dragged handle, or the Move button pressed.
  */
 export function SortableQueue({ label, items }: { label: string; items: QueueItem[] }) {
   const [order, setOrder] = useOptimistic(items.map((i) => i.entryId));
@@ -48,6 +61,22 @@ export function SortableQueue({ label, items }: { label: string; items: QueueIte
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
+  const list = useRef<HTMLOListElement>(null);
+  const lastFocused = useRef<HTMLElement | null>(null);
+  const orderKey = order.join();
+  useLayoutEffect(() => {
+    const target = lastFocused.current;
+    const lost = document.activeElement === null || document.activeElement === document.body;
+    if (lost && target?.isConnected && list.current?.contains(target)) target.focus();
+  }, [orderKey]);
+  function onFocus(e: FocusEvent<HTMLOListElement>) {
+    lastFocused.current = e.target;
+  }
+  function onBlur(e: FocusEvent<HTMLOListElement>) {
+    // Focus moved somewhere else on purpose; a reorder's lost focus has no target.
+    if (e.relatedTarget && !list.current?.contains(e.relatedTarget)) lastFocused.current = null;
+  }
+
   const byId = new Map(items.map((i) => [i.entryId, i]));
   const announcements = announce(order, (entryId) => byId.get(entryId)?.title ?? "Entry");
 
@@ -73,7 +102,13 @@ export function SortableQueue({ label, items }: { label: string; items: QueueIte
       accessibility={{ announcements }}
     >
       <SortableContext items={order} strategy={verticalListSortingStrategy}>
-        <ol aria-label={label} aria-busy={saving} className="mt-2 flex flex-col divide-y divide-black/10 dark:divide-white/10">
+        <ol
+          ref={list}
+          onFocus={onFocus}
+          onBlur={onBlur}
+          aria-label={label}
+          aria-busy={saving}
+          className="mt-2 flex flex-col divide-y divide-black/10 dark:divide-white/10">
           {order.map((entryId, i) => {
             const item = byId.get(entryId);
             return item ? (

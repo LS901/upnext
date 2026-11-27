@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
-import { seasonLabel } from "@/app/search/season-label";
+import { seasonDetails, seasonLabel, seasonName } from "@/app/search/season-label";
 import { TYPE_LABELS } from "@/app/ui";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { formatDuration } from "@/lib/format/duration";
@@ -70,7 +70,7 @@ async function Library() {
   }
   return (
     <div className="mt-6 flex flex-col gap-10">
-      <UpNext upNext={upNext} hidden={hidden} hasBacklog={groups.some((g) => g.status === "backlog")} />
+      <UpNext upNext={upNext} hidden={hidden} backlog={groups.find((g) => g.status === "backlog")} />
       {groups.map((group) => (
         <Group key={group.status} group={group} />
       ))}
@@ -82,12 +82,15 @@ async function Library() {
 function UpNext({
   upNext,
   hidden,
-  hasBacklog,
+  backlog,
 }: {
   upNext: LibraryView["upNext"];
   hidden: QueueType[];
-  hasBacklog: boolean;
+  backlog: LibraryGroup | undefined;
 }) {
+  // Whether Backlog (below) has anything of each type that could be added.
+  const inBacklog = (type: QueueType) =>
+    !!backlog?.rows.some((r) => (r.kind === "show" ? type === "show" : r.mediaType === type));
   const counts = Object.fromEntries(QUEUE_TYPES.map((type) => [type, upNext[type].length])) as Record<QueueType, number>;
   return (
     <section aria-labelledby="up-next">
@@ -97,7 +100,7 @@ function UpNext({
       <QueueVisibility hidden={hidden} counts={counts} />
       <div className="mt-4 flex flex-col gap-6">
         {QUEUE_TYPES.filter((type) => !hidden.includes(type)).map((type) => (
-          <Queue key={type} type={type} rows={upNext[type]} hasBacklog={hasBacklog} />
+          <Queue key={type} type={type} rows={upNext[type]} hasBacklog={inBacklog(type)} />
         ))}
       </div>
     </section>
@@ -134,13 +137,13 @@ function Queue({ type, rows, hasBacklog }: { type: QueueType; rows: UpNextRow[];
 /** A queued season names its show and season, so two seasons of one show read apart. */
 function queuedTitle(row: UpNextRow): string {
   if (row.kind !== "season") return row.title;
-  return `${row.showTitle} · ${seasonLabel({ number: row.number, episodeCount: null, airDate: null })}`;
+  return `${row.showTitle} · ${seasonName(row.number)}`;
 }
 
 function QueuedRow({ row, order }: { row: UpNextRow; order: string[] }) {
   const season = row.kind === "season";
   const meta = season
-    ? [seasonLabel(row), `Time to finish: ${formatDuration(row.runtimeMinutes)}`, formatScore(row.score, row.scoreCount)]
+    ? [...seasonDetails(row), `Time to finish: ${formatDuration(row.runtimeMinutes)}`, formatScore(row.score, row.scoreCount)]
     : [itemMeta(row)];
   return (
     <div className="flex min-w-0 flex-1 flex-wrap items-center gap-4">
@@ -170,14 +173,15 @@ function QueuedRow({ row, order }: { row: UpNextRow; order: string[] }) {
 /**
  * Sends the exact place to move to (before which entry), worked out from the
  * order on this page, so a repeated click lands in the same place rather than
- * moving again. Disabled when the move would do nothing.
+ * moving again. Disabled when the move would do nothing; it then targets the
+ * entry itself, which moves nothing, in case it's sent before hydration.
  */
 function MoveButton(props: { entryId: string; order: string[]; direction: Direction; label: string }) {
   const target = targetFor(props.order, props.entryId, props.direction);
   return (
     <form action={placeUpNext}>
       <input type="hidden" name="entryId" value={props.entryId} />
-      <input type="hidden" name="beforeId" value={target?.beforeId ?? ""} />
+      <input type="hidden" name="beforeId" value={target ? (target.beforeId ?? "") : props.entryId} />
       <SubmitButton disabled={!target}>{props.label}</SubmitButton>
     </form>
   );

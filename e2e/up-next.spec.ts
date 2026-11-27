@@ -119,7 +119,9 @@ test("each type gets its own queue, in the order you set", async ({ page }) => {
   await expect(titles(movies)).toHaveText(MOVIES);
   await expect(titles(queue(page, "Games"))).toHaveText([GAME]);
   await expect(titles(queue(page, "TV"))).toHaveText([`${SHOW} · Season 1`]);
-  await expect(queue(page, "TV")).toContainText("Season 1 · 6 episodes");
+  // The heading names the season, so the line below it doesn't repeat it.
+  await expect(queue(page, "TV")).toContainText("6 episodes");
+  await expect(queue(page, "TV")).not.toContainText("Season 1 · 6 episodes");
   // Season 2 wasn't added, so the show stays under Backlog with just that season.
   await expect(row(backlog, SHOW)).toContainText("Season 2 · 6 episodes");
   await expect(row(backlog, SHOW)).not.toContainText("Season 1");
@@ -131,29 +133,48 @@ test("each type gets its own queue, in the order you set", async ({ page }) => {
   // A double-click moves one place, not two.
   await queued(movies, moss).getByRole("button", { name: "Move down" }).dblclick();
   await expect(titles(movies)).toHaveText([kite, moss, lantern]);
-  await queued(movies, lantern).getByRole("button", { name: "Move up" }).click();
-  await expect(titles(movies)).toHaveText([kite, lantern, moss]);
-  await expect(queued(movies, kite).getByRole("button", { name: "Move up" })).toBeDisabled();
-  await expect(queued(movies, moss).getByRole("button", { name: "Move down" })).toBeDisabled();
 
-  // Drag and drop, by keyboard: pick up, two places up, drop. Each key waits
-  // for its announcement, which also checks what a screen reader hears.
-  const handle = movies.getByRole("button", { name: `Drag to reorder ${moss}` });
-  await expect(handle).toBeEnabled();
-  await handle.focus();
+  // Drag and drop, by keyboard. Each key waits for its announcement, which also
+  // checks what a screen reader hears. Down one place first: the browser drops
+  // focus from an element that's moved, and moving down moves the dragged row.
+  const handle = (title: string) => movies.getByRole("button", { name: `Drag to reorder ${title}` });
+  await expect(handle(moss)).toBeEnabled();
+  await handle(moss).focus();
   // Picking up announces "Picked up …", then at once where it is.
-  await dragKey(page, "Space", `${moss} is at position 3 of 3.`);
-  await dragKey(page, "ArrowUp", `${moss} moved to position 2 of 3.`);
-  await dragKey(page, "ArrowUp", `${moss} moved to position 1 of 3.`);
-  await dragKey(page, "Space", `${moss} dropped at position 1 of 3.`);
-  await expect(titles(movies)).toHaveText([moss, kite, lantern]);
+  await dragKey(page, "Space", `${moss} is at position 2 of 3.`);
+  await dragKey(page, "ArrowDown", `${moss} moved to position 3 of 3.`);
+  await dragKey(page, "Space", `${moss} dropped at position 3 of 3.`);
+  await expect(titles(movies)).toHaveText([kite, lantern, moss]);
   await expect(movies).toHaveAttribute("aria-busy", "false");
-  // Focus stays on the handle that was dragged.
-  await expect(movies.getByRole("button", { name: `Drag to reorder ${moss}` })).toBeFocused();
+  await expect(handle(moss)).toBeFocused();
+
+  // Move up by keyboard, twice: focus stays on the button, even once it's
+  // disabled at the top.
+  const moveUp = queued(movies, moss).getByRole("button", { name: "Move up" });
+  await moveUp.focus();
+  await page.keyboard.press("Enter");
+  await expect(titles(movies)).toHaveText([kite, moss, lantern]);
+  await expect(moveUp).toBeFocused();
+  await expect(moveUp).toBeEnabled();
+  await page.keyboard.press("Enter");
+  await expect(titles(movies)).toHaveText([moss, kite, lantern]);
+  await expect(moveUp).toBeFocused();
+  await expect(moveUp).toBeDisabled();
+  await expect(queued(movies, lantern).getByRole("button", { name: "Move down" })).toBeDisabled();
+
+  // Up two places, the other way.
+  await handle(lantern).focus();
+  await dragKey(page, "Space", `${lantern} is at position 3 of 3.`);
+  await dragKey(page, "ArrowUp", `${lantern} moved to position 2 of 3.`);
+  await dragKey(page, "ArrowUp", `${lantern} moved to position 1 of 3.`);
+  await dragKey(page, "Space", `${lantern} dropped at position 1 of 3.`);
+  await expect(titles(movies)).toHaveText([lantern, moss, kite]);
+  await expect(movies).toHaveAttribute("aria-busy", "false");
+  await expect(handle(lantern)).toBeFocused();
 
   // Saved, not just shown: a reload keeps the order, and the other queues never moved.
   await page.reload();
-  await expect(titles(queue(page, "Movies"))).toHaveText([moss, kite, lantern]);
+  await expect(titles(queue(page, "Movies"))).toHaveText([lantern, moss, kite]);
   await expect(titles(queue(page, "Games"))).toHaveText([GAME]);
 });
 
@@ -177,20 +198,20 @@ test("Start and Remove from Up next take an entry off its queue", async ({ page 
   await page.goto("/library");
   const movies = queue(page, "Movies");
   const [kite, lantern, moss] = MOVIES;
-  await expect(titles(movies)).toHaveText([moss, kite, lantern]);
+  await expect(titles(movies)).toHaveText([lantern, moss, kite]);
 
-  await queued(movies, moss).getByRole("button", { name: "Start" }).click();
-  await expect(titles(movies)).toHaveText([kite, lantern]);
-  const playing = row(group(page, "In progress"), moss);
+  await queued(movies, lantern).getByRole("button", { name: "Start" }).click();
+  await expect(titles(movies)).toHaveText([moss, kite]);
+  const playing = row(group(page, "In progress"), lantern);
   await expect(playing).toBeVisible();
   // Only Backlog entries can be queued.
   await expect(playing.getByRole("button", { name: "Add to Up next" })).toHaveCount(0);
 
-  await queued(movies, kite).getByRole("button", { name: "Remove from Up next" }).click();
-  await expect(titles(movies)).toHaveText([lantern]);
-  await expect(row(group(page, "Backlog"), kite).getByRole("button", { name: "Add to Up next" })).toBeVisible();
+  await queued(movies, moss).getByRole("button", { name: "Remove from Up next" }).click();
+  await expect(titles(movies)).toHaveText([kite]);
+  await expect(row(group(page, "Backlog"), moss).getByRole("button", { name: "Add to Up next" })).toBeVisible();
 
   // Back in, it goes to the bottom.
-  await row(group(page, "Backlog"), kite).getByRole("button", { name: "Add to Up next" }).click();
-  await expect(titles(movies)).toHaveText([lantern, kite]);
+  await row(group(page, "Backlog"), moss).getByRole("button", { name: "Add to Up next" }).click();
+  await expect(titles(movies)).toHaveText([kite, moss]);
 });

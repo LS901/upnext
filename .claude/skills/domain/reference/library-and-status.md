@@ -30,7 +30,7 @@ Terms are defined in `glossary.md`. Examples are invented.
 
 ## Up next
 
-All owner said, 2026-11-26.
+Owner said, 2026-11-26, except where marked as a ruling.
 
 - **Leaving Up next**: an entry drops off its queue when it moves to any status other than Backlog. `setEntryStatus` in `src/lib/library/queries.ts` clears `up_next_position`, which the schema check also requires. No old position is stored.
 - **Putting something back**: an entry put back into Up next goes to the bottom of its type's queue.
@@ -38,8 +38,8 @@ All owner said, 2026-11-26.
 - **The Up next screen** sits at the top of My library:
   - Only **Backlog** entries can be added. Each goes to the bottom of its type's queue.
   - Each queued row has **Start**, which moves it to In progress and so off the queue, and **Remove from Up next**, which keeps it in Backlog.
-  - A queue is reordered with **Move up**, **Move down** and **Move to top** buttons, and by **drag and drop**. A queued TV season is titled with its show and season, such as "Example Show · Season 2".
-  - A **Show** row of checkboxes displays or hides each type's queue, with each queue's count. The choice is remembered on that device.
+  - A queue is reordered with **Move up**, **Move down** and **Move to top** buttons, and by **drag and drop**. A queued TV season is titled with its show and season, such as "Example Show · Season 2" (ruling, 2026-11-27, from review; owner may overrule).
+  - A **Show** row of checkboxes displays or hides each type's queue. The choice is remembered on that device. Each checkbox shows its queue's count, so a hidden queue still says what's in it (ruling, 2026-11-27, from review; owner may overrule).
   - A queued entry shows in its queue, not again under Backlog.
 
 ## Shows have no status of their own

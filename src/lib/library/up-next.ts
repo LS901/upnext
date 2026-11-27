@@ -39,25 +39,37 @@ async function loadQueue(supabase: Client, userId: string, type: QueueType): Pro
   return rows.map((r) => ({ id: r.id, position: r.up_next_position! }));
 }
 
-async function setPosition(supabase: Client, userId: string, entryId: string, position: number | null): Promise<void> {
-  const { data, error } = await supabase
+/**
+ * `move`: the entry must still be queued, so a move racing a Remove (another
+ * tab) can't put the entry back in its queue.
+ */
+async function setPosition(
+  supabase: Client,
+  userId: string,
+  entryId: string,
+  position: number | null,
+  { move = false } = {},
+): Promise<void> {
+  let update = supabase
     .from("library_entries")
     .update({ up_next_position: position })
     .eq("id", entryId)
     .eq("user_id", userId)
-    .eq("status", "backlog")
-    .select("id");
+    .eq("status", "backlog");
+  if (move) update = update.not("up_next_position", "is", null);
+  const { data, error } = await update.select("id");
   if (error) throw error;
   if (data.length) return;
-  // Nothing changed. If it left Backlog meanwhile (Start in another tab) there's
-  // nothing to do; otherwise RLS refused the write, because it isn't the user's.
+  // Nothing changed. If it left Backlog, or (for a move) Up next, meanwhile,
+  // there's nothing to do; otherwise RLS refused the write: it isn't the user's.
   const entry = await ownEntry(supabase, userId, entryId);
-  if (entry.status === "backlog") throw new Error(NOT_YOURS);
+  if (entry.status !== "backlog" || (move && entry.up_next_position === null)) return;
+  throw new Error(NOT_YOURS);
 }
 
-async function apply(supabase: Client, userId: string, placement: Placement | null): Promise<void> {
+async function apply(supabase: Client, userId: string, placement: Placement | null, move: boolean): Promise<void> {
   if (!placement) return;
-  if (placement.kind === "one") return setPosition(supabase, userId, placement.id, placement.position);
+  if (placement.kind === "one") return setPosition(supabase, userId, placement.id, placement.position, { move });
   // A renumber is one statement in the database, so it happens in full or not at all.
   const { error } = await supabase.rpc("set_up_next_order", { entry_ids: placement.order });
   if (error) throw error;
@@ -69,7 +81,7 @@ export async function addToUpNext(supabase: Client, userId: string, entryId: str
   if (entry.up_next_position !== null) return;
   if (entry.status !== "backlog") throw new Error("Only Backlog entries can go in Up next.");
   const queue = await loadQueue(supabase, userId, queueOf(entry));
-  await apply(supabase, userId, placeBefore(queue, entry.id, null));
+  await apply(supabase, userId, placeBefore(queue, entry.id, null), false);
 }
 
 /** Takes an entry off its queue; it stays in Backlog. Not queued (a double-click): nothing changes. */
@@ -96,5 +108,5 @@ export async function placeInUpNext(
   if (entry.up_next_position === null) return;
   const queue = await loadQueue(supabase, userId, queueOf(entry));
   if (beforeId !== null && !queue.some((p) => p.id === beforeId)) return;
-  await apply(supabase, userId, placeBefore(queue, entry.id, beforeId));
+  await apply(supabase, userId, placeBefore(queue, entry.id, beforeId), true);
 }

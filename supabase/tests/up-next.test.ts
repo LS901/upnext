@@ -5,7 +5,7 @@ import { randomInt } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
 import { getMyLibrary, setEntryStatus } from "../../src/lib/library/queries";
 import { addToUpNext, placeInUpNext, removeFromUpNext } from "../../src/lib/library/up-next";
-import { adminClient, createTestUser, deleteTestUsers, type TestUser } from "./helpers";
+import { adminClient, anonClient, createTestUser, deleteTestUsers, type TestUser } from "./helpers";
 
 vi.mock("server-only", () => ({}));
 
@@ -73,6 +73,8 @@ describe("Up next", () => {
     await add(a, "s2", { season_id: season[2] });
     // b's library is public (the default), so a's client can read this entry.
     await add(b, "bMovie", { item_id: item.m1, item_media_type: "movie", up_next_position: 1 });
+    await add(b, "bMovie2", { item_id: item.m2, item_media_type: "movie", up_next_position: 2 });
+    await add(b, "bGame", { item_id: item.game, item_media_type: "game" });
   });
 
   afterAll(async () => {
@@ -180,7 +182,7 @@ describe("Up next", () => {
   });
 
   test("another user's queue never shows in yours, and their entries can't be queued, moved or removed", async () => {
-    expect(await queues(b)).toEqual({ movie: [entry.bMovie], show: [], game: [] });
+    expect(await queues(b)).toEqual({ movie: [entry.bMovie, entry.bMovie2], show: [], game: [] });
     expect((await queues()).movie).not.toContain(entry.bMovie);
 
     const refused = "That entry isn't in your library.";
@@ -189,12 +191,26 @@ describe("Up next", () => {
     await expect(removeFromUpNext(a.client, a.id, entry.bMovie)).rejects.toThrow(refused);
     // Even passing b's own id, RLS lets a's client change nothing.
     await expect(removeFromUpNext(a.client, b.id, entry.bMovie)).rejects.toThrow(refused);
-    await addToUpNext(a.client, b.id, entry.bMovie).catch(() => {});
-    await placeInUpNext(a.client, b.id, entry.bMovie, null).catch(() => {});
-    // Nor through the renumber function: it only ever touches the caller's rows.
-    const { data: touched } = await a.client.rpc("set_up_next_order", { entry_ids: [entry.bMovie] });
-    expect(touched).toBe(0);
+    // And where the write would really change something: an add, and a move.
+    await expect(addToUpNext(a.client, b.id, entry.bGame)).rejects.toThrow(refused);
+    await expect(placeInUpNext(a.client, b.id, entry.bMovie2, entry.bMovie)).rejects.toThrow(refused);
 
-    expect(await positions(["bMovie"])).toEqual({ bMovie: 1 });
+    expect(await positions(["bMovie", "bMovie2", "bGame"])).toEqual({ bMovie: 1, bMovie2: 2, bGame: null });
+  });
+
+  test("the renumber function only touches the caller's own queued Backlog entries, and only signed in", async () => {
+    // Another user's queued entry.
+    const { data: theirs, error } = await a.client.rpc("set_up_next_order", { entry_ids: [entry.bMovie2, entry.bMovie] });
+    if (error) throw error;
+    expect(theirs).toBe(0);
+    // The caller's own, but not queued: m2 was taken off Up next, m4 is Paused.
+    const { data: unqueued, error: ownError } = await a.client.rpc("set_up_next_order", { entry_ids: [entry.m2, entry.m4] });
+    if (ownError) throw ownError;
+    expect(unqueued).toBe(0);
+    // Signed out, it can't be called at all.
+    const { error: anonError } = await anonClient().rpc("set_up_next_order", { entry_ids: [entry.m3] });
+    expect(anonError).not.toBeNull();
+
+    expect(await positions(["bMovie", "bMovie2", "m2", "m4"])).toEqual({ bMovie: 1, bMovie2: 2, m2: null, m4: null });
   });
 });
