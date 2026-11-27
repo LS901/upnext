@@ -28,7 +28,7 @@ CI (`.github/workflows/`) runs check, e2e, the domain check, gitleaks, `npm audi
 - `src/app/`: routes and route handlers; unit tests sit beside the code they cover (here and in `src/lib/`) as `*.test.ts(x)`
 - `src/lib/`: `providers/` (TMDB and IGDB clients), `catalogue/` (import and refresh), `library/`, `supabase/`, `auth/`, `format/`
 - `scripts/`: the `providers:check` and `refresh` scripts, and `check-knowledge.mjs` (the domain checker)
-- `.github/`: CI and CodeQL workflows, Dependabot config; `.gitleaks.toml` is the secret-scan config
+- `.github/`: CI and CodeQL workflows, Dependabot config and its auto-merge workflow; `.gitleaks.toml` is the secret-scan config
 - `e2e/`: Playwright specs and the stub provider server (`stub-providers.ts`, port 3101)
 - `supabase/migrations/`: SQL migrations (source of truth for the schema)
 - `supabase/seed.sql`: invented seed data only, never real users
