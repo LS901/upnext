@@ -104,9 +104,15 @@ describe("My library", () => {
         scoreCount: null,
       }),
     ]);
-    expect(backlog.rows.map((r) => r.title)).toEqual(["Invented Libview Film", "Invented Libview Show"]);
-    expect(backlog.rows[0]).toMatchObject({ entryId: entry.aMovie, minutes: 125, score: 71, scoreCount: 321, imageUrl: null });
-    const show = backlog.rows[1] as ShowRow;
+    // The film is in Up next, so it shows in the Movies queue, not again under Backlog.
+    const { upNext } = await getMyLibrary(a.client, a.id);
+    expect(upNext.movie).toEqual([
+      expect.objectContaining({ entryId: entry.aMovie, minutes: 125, score: 71, scoreCount: 321, imageUrl: null }),
+    ]);
+    expect(upNext.show).toEqual([]);
+    expect(upNext.game).toEqual([]);
+    expect(backlog.rows.map((r) => r.title)).toEqual(["Invented Libview Show"]);
+    const show = backlog.rows[0] as ShowRow;
     expect(show.seasons).toEqual([
       { entryId: entry.aS1, status: "backlog", number: 1, episodeCount: null, airDate: null, runtimeMinutes: 98 },
     ]);

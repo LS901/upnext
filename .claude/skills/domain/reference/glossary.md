@@ -25,7 +25,7 @@ Paths below are relative to the named repo. Examples are invented.
 | **Time to finish** | How long an item takes. Movie: its runtime. Show: the sum of episode runtimes, per season and in total. Game: its time to beat. | owner said (2026-11-26) |
 | **Time to beat** | A game's estimated play time from IGDB `game_time_to_beats`: `hastily` (main story), `normally` (story plus some side content) and `completely` (100%), each an average in seconds, with `count` submissions behind it. | research: IGDB API docs (2026-11-26) |
 | **Metadata provider** | The outside source of item data: TMDB for movies and shows, IGDB for games. | owner said (2026-11-26): credentials set up |
-| **Up next** | An ordered shortlist inside the Backlog: what the user plans to start soonest. It is not a separate status. | owner said (2026-11-26) |
+| **Up next** | An ordered shortlist inside the Backlog: what the user plans to start soonest. It is not a separate status. There is one queue per media type (Movies, TV, Games; Books when books land), each ordered on its own. | owner said (2026-11-26) |
 | **Public library** | The default. Other users, and signed-out visitors, can read a user's library (read-only), but never its notes. | owner said (2026-11-26) |
 | **Private library** | A library its owner opted out of sharing. Nobody else sees it. | owner said (2026-11-26) |
 | **Notes** | A user's free-text notes on a library entry. Always private to the owner. | owner said (2026-11-26) |
