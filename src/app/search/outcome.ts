@@ -8,8 +8,8 @@ export type Answer =
 /** `everythingHidden`: no provider was asked, because every type is hidden. */
 export type Outcome = { results: SearchResult[]; failed: Provider[]; nothingFound: boolean; everythingHidden: boolean };
 
-/** The types each provider searches, in the order the providers are asked. */
 // hardcover is empty until Task 2 adds the client and Task 4 wires book search.
+/** The types each provider searches, in the order the providers are asked. */
 export const PROVIDER_TYPES: Record<Provider, readonly MediaType[]> = { tmdb: ["movie", "show"], igdb: ["game"], hardcover: [] };
 
 /** The providers a search asks: each one unless every type it searches is hidden. */
