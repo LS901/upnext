@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { Geist, Geist_Mono } from "next/font/google";
 import { AccountMenu } from "./account-menu";
 import { MainNav } from "./main-nav";
+import { PITCH } from "./pitch";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -18,7 +19,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: { default: "upnext", template: "%s · upnext" },
-  description: "Track the movies, shows and games you're on, what's next, and what you've finished.",
+  description: PITCH,
   appleWebApp: { title: "upnext", statusBarStyle: "black-translucent" },
 };
 
