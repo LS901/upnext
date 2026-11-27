@@ -5,7 +5,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { seasonLabel } from "@/app/search/season-label";
-import { quietButton, TYPE_LABELS } from "@/app/ui";
+import { TYPE_LABELS } from "@/app/ui";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { formatDuration } from "@/lib/format/duration";
 import { formatScore } from "@/lib/format/score";
@@ -19,13 +19,21 @@ import {
   type UpNextRow,
 } from "@/lib/library/queries";
 import type { EntryStatus } from "@/lib/library/status";
-import { HIDDEN_COOKIE, parseHidden, QUEUE_LABELS, QUEUE_TYPES, type QueueType } from "@/lib/library/up-next-order";
+import {
+  HIDDEN_COOKIE,
+  parseHidden,
+  QUEUE_LABELS,
+  QUEUE_TYPES,
+  targetFor,
+  type Direction,
+  type QueueType,
+} from "@/lib/library/up-next-order";
 import { createClient } from "@/lib/supabase/server";
-import { addUpNext, moveUpNext, removeEntry, removeUpNext, setStatus } from "./actions";
+import { addUpNext, placeUpNext, removeEntry, removeUpNext, setStatus } from "./actions";
 import { QueueVisibility } from "./queue-visibility";
-import { RemoveButton } from "./remove-button";
 import { SortableQueue } from "./sortable-queue";
 import { StatusSelect } from "./status-select";
+import { SubmitButton } from "./submit-button";
 
 export const metadata: Metadata = { title: "My library" };
 
@@ -62,7 +70,7 @@ async function Library() {
   }
   return (
     <div className="mt-6 flex flex-col gap-10">
-      <UpNext upNext={upNext} hidden={hidden} />
+      <UpNext upNext={upNext} hidden={hidden} hasBacklog={groups.some((g) => g.status === "backlog")} />
       {groups.map((group) => (
         <Group key={group.status} group={group} />
       ))}
@@ -71,49 +79,65 @@ async function Library() {
 }
 
 // One queue per media type, each in the user's order (owner said, 2026-11-26).
-function UpNext({ upNext, hidden }: { upNext: LibraryView["upNext"]; hidden: QueueType[] }) {
+function UpNext({
+  upNext,
+  hidden,
+  hasBacklog,
+}: {
+  upNext: LibraryView["upNext"];
+  hidden: QueueType[];
+  hasBacklog: boolean;
+}) {
+  const counts = Object.fromEntries(QUEUE_TYPES.map((type) => [type, upNext[type].length])) as Record<QueueType, number>;
   return (
     <section aria-labelledby="up-next">
       <h2 id="up-next" className="text-xl font-semibold">
         Up next
       </h2>
-      <QueueVisibility hidden={hidden} />
+      <QueueVisibility hidden={hidden} counts={counts} />
       <div className="mt-4 flex flex-col gap-6">
         {QUEUE_TYPES.filter((type) => !hidden.includes(type)).map((type) => (
-          <Queue key={type} type={type} rows={upNext[type]} />
+          <Queue key={type} type={type} rows={upNext[type]} hasBacklog={hasBacklog} />
         ))}
       </div>
     </section>
   );
 }
 
-function Queue({ type, rows }: { type: QueueType; rows: UpNextRow[] }) {
+function Queue({ type, rows, hasBacklog }: { type: QueueType; rows: UpNextRow[]; hasBacklog: boolean }) {
   const id = `queue-${type}`;
   const label = QUEUE_LABELS[type];
+  const order = rows.map((r) => r.entryId);
   return (
     <section aria-labelledby={id}>
       <h3 id={id} className="font-semibold">
         {label}
       </h3>
       {rows.length ? (
-        // Keyed by the order, so after a save the list starts from the server's order.
         <SortableQueue
-          key={rows.map((r) => r.entryId).join()}
           label={`${label} up next`}
-          items={rows.map((row, i) => ({
+          items={rows.map((row) => ({
             entryId: row.entryId,
-            title: row.kind === "season" ? `${row.showTitle} ${seasonLabel(row)}` : row.title,
-            row: <QueuedRow row={row} first={i === 0} last={i === rows.length - 1} />,
+            title: queuedTitle(row),
+            row: <QueuedRow row={row} order={order} />,
           }))}
         />
       ) : (
-        <p className={`mt-1 ${muted}`}>Nothing up next. Add something from your Backlog below.</p>
+        <p className={`mt-1 ${muted}`}>
+          {hasBacklog ? "Nothing up next. Add something from your Backlog below." : "Nothing up next."}
+        </p>
       )}
     </section>
   );
 }
 
-function QueuedRow({ row, first, last }: { row: UpNextRow; first: boolean; last: boolean }) {
+/** A queued season names its show and season, so two seasons of one show read apart. */
+function queuedTitle(row: UpNextRow): string {
+  if (row.kind !== "season") return row.title;
+  return `${row.showTitle} · ${seasonLabel({ number: row.number, episodeCount: null, airDate: null })}`;
+}
+
+function QueuedRow({ row, order }: { row: UpNextRow; order: string[] }) {
   const season = row.kind === "season";
   const meta = season
     ? [seasonLabel(row), `Time to finish: ${formatDuration(row.runtimeMinutes)}`, formatScore(row.score, row.scoreCount)]
@@ -122,39 +146,39 @@ function QueuedRow({ row, first, last }: { row: UpNextRow; first: boolean; last:
     <div className="flex min-w-0 flex-1 flex-wrap items-center gap-4">
       <Poster url={row.imageUrl} />
       <div className="min-w-0 flex-1">
-        <h4 className="font-medium">{season ? row.showTitle : row.title}</h4>
+        <h4 className="font-medium">{queuedTitle(row)}</h4>
         <p className={muted}>{meta.join(" · ")}</p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <form action={setStatus}>
           <input type="hidden" name="entryId" value={row.entryId} />
           <input type="hidden" name="status" value="in_progress" />
-          <button type="submit" className={quietButton}>
-            Start
-          </button>
+          <SubmitButton>Start</SubmitButton>
         </form>
-        <MoveButton entryId={row.entryId} direction="up" label="Move up" disabled={first} />
-        <MoveButton entryId={row.entryId} direction="down" label="Move down" disabled={last} />
-        <MoveButton entryId={row.entryId} direction="top" label="Move to top" disabled={first} />
+        <MoveButton entryId={row.entryId} order={order} direction="up" label="Move up" />
+        <MoveButton entryId={row.entryId} order={order} direction="down" label="Move down" />
+        <MoveButton entryId={row.entryId} order={order} direction="top" label="Move to top" />
         <form action={removeUpNext}>
           <input type="hidden" name="entryId" value={row.entryId} />
-          <button type="submit" className={quietButton}>
-            Remove from Up next
-          </button>
+          <SubmitButton>Remove from Up next</SubmitButton>
         </form>
       </div>
     </div>
   );
 }
 
-function MoveButton(props: { entryId: string; direction: "up" | "down" | "top"; label: string; disabled: boolean }) {
+/**
+ * Sends the exact place to move to (before which entry), worked out from the
+ * order on this page, so a repeated click lands in the same place rather than
+ * moving again. Disabled when the move would do nothing.
+ */
+function MoveButton(props: { entryId: string; order: string[]; direction: Direction; label: string }) {
+  const target = targetFor(props.order, props.entryId, props.direction);
   return (
-    <form action={moveUpNext}>
+    <form action={placeUpNext}>
       <input type="hidden" name="entryId" value={props.entryId} />
-      <input type="hidden" name="direction" value={props.direction} />
-      <button type="submit" disabled={props.disabled} className={`${quietButton} disabled:opacity-40`}>
-        {props.label}
-      </button>
+      <input type="hidden" name="beforeId" value={target?.beforeId ?? ""} />
+      <SubmitButton disabled={!target}>{props.label}</SubmitButton>
     </form>
   );
 }
@@ -246,9 +270,7 @@ function EntryControls({ entryId, status }: { entryId: string; status: EntryStat
       {status === "backlog" && (
         <form action={addUpNext}>
           <input type="hidden" name="entryId" value={entryId} />
-          <button type="submit" className={quietButton}>
-            Add to Up next
-          </button>
+          <SubmitButton>Add to Up next</SubmitButton>
         </form>
       )}
       <form action={setStatus}>
@@ -257,7 +279,7 @@ function EntryControls({ entryId, status }: { entryId: string; status: EntryStat
       </form>
       <form action={removeEntry}>
         <input type="hidden" name="entryId" value={entryId} />
-        <RemoveButton />
+        <SubmitButton>Remove</SubmitButton>
       </form>
     </div>
   );

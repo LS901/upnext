@@ -4,9 +4,10 @@ import { refresh } from "next/cache";
 import { cookies } from "next/headers";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { deleteEntry, setEntryStatus } from "@/lib/library/queries";
-import { addToUpNext, moveInUpNext, placeInUpNext, removeFromUpNext } from "@/lib/library/up-next";
+import { addToUpNext, placeInUpNext, removeFromUpNext } from "@/lib/library/up-next";
 import { createClient } from "@/lib/supabase/server";
-import { addUpNext, moveUpNext, placeUpNext, removeEntry, removeUpNext, setStatus, setUpNextVisibility } from "./actions";
+import * as actions from "./actions";
+import { addUpNext, placeUpNext, removeEntry, removeUpNext, setStatus, setUpNextVisibility } from "./actions";
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ refresh: vi.fn() }));
@@ -21,7 +22,6 @@ vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
 vi.mock("@/lib/library/up-next", () => ({
   addToUpNext: vi.fn(),
   removeFromUpNext: vi.fn(),
-  moveInUpNext: vi.fn(),
   placeInUpNext: vi.fn(),
 }));
 vi.mock("next/headers", () => ({ cookies: vi.fn() }));
@@ -44,7 +44,7 @@ beforeEach(() => {
   vi.mocked(deleteEntry).mockReset().mockResolvedValue();
   vi.mocked(refresh).mockClear();
   vi.mocked(createClient).mockResolvedValue(client as never);
-  for (const fn of [addToUpNext, removeFromUpNext, moveInUpNext, placeInUpNext]) vi.mocked(fn).mockReset();
+  for (const fn of [addToUpNext, removeFromUpNext, placeInUpNext]) vi.mocked(fn).mockReset();
   cookieStore.set.mockReset();
   vi.mocked(cookies).mockResolvedValue(cookieStore as never);
 });
@@ -84,29 +84,32 @@ test("the Up next actions write as the signed-in user, then refresh the page", a
   expect(addToUpNext).toHaveBeenCalledExactlyOnceWith(client, USER.id, ENTRY);
   await removeUpNext(form({ entryId: ENTRY }));
   expect(removeFromUpNext).toHaveBeenCalledExactlyOnceWith(client, USER.id, ENTRY);
-  await moveUpNext(form({ entryId: ENTRY, direction: "top" }));
-  expect(moveInUpNext).toHaveBeenCalledExactlyOnceWith(client, USER.id, ENTRY, "top");
   await placeUpNext(form({ entryId: ENTRY, beforeId: OTHER }));
   expect(placeInUpNext).toHaveBeenCalledWith(client, USER.id, ENTRY, OTHER);
   await placeUpNext(form({ entryId: ENTRY, beforeId: "" }));
   expect(placeInUpNext).toHaveBeenLastCalledWith(client, USER.id, ENTRY, null);
-  expect(refresh).toHaveBeenCalledTimes(5);
+  expect(refresh).toHaveBeenCalledTimes(4);
 });
 
-test("Up next actions refuse a bad entry id, direction or target before anything is written", async () => {
+test("the Move buttons post an exact target to placeUpNext; there is no relative move action to repeat", async () => {
+  // A relative "move down" sent twice (a double-click) moved twice; an exact
+  // target sent twice lands in the same place.
+  expect(actions).not.toHaveProperty("moveUpNext");
+});
+
+test("Up next actions refuse a bad entry id or target before anything is written", async () => {
   await expect(addUpNext(form({ entryId: "nope" }))).rejects.toThrow("Not an Up next change");
   await expect(removeUpNext(form({ entryId: "" }))).rejects.toThrow("Not an Up next change");
-  await expect(moveUpNext(form({ entryId: ENTRY, direction: "sideways" }))).rejects.toThrow("Not an Up next change");
   await expect(placeUpNext(form({ entryId: ENTRY, beforeId: "1 or 1=1" }))).rejects.toThrow("Not an Up next change");
-  for (const fn of [addToUpNext, removeFromUpNext, moveInUpNext, placeInUpNext]) expect(fn).not.toHaveBeenCalled();
+  for (const fn of [addToUpNext, removeFromUpNext, placeInUpNext]) expect(fn).not.toHaveBeenCalled();
 });
 
 test("Up next actions send a signed-out visitor to sign in", async () => {
   vi.mocked(getCurrentUser).mockResolvedValue(null);
   await expect(addUpNext(form({ entryId: ENTRY }))).rejects.toThrow("redirect:/login");
-  await expect(moveUpNext(form({ entryId: ENTRY, direction: "up" }))).rejects.toThrow("redirect:/login");
+  await expect(placeUpNext(form({ entryId: ENTRY, beforeId: "" }))).rejects.toThrow("redirect:/login");
   expect(addToUpNext).not.toHaveBeenCalled();
-  expect(moveInUpNext).not.toHaveBeenCalled();
+  expect(placeInUpNext).not.toHaveBeenCalled();
 });
 
 test("showing and hiding queues is remembered in a cookie of hidden types", async () => {
@@ -116,9 +119,11 @@ test("showing and hiding queues is remembered in a cookie of hidden types", asyn
   expect(cookieStore.set).toHaveBeenCalledExactlyOnceWith(
     "upnext-hidden",
     "movie,game",
-    expect.objectContaining({ httpOnly: true, sameSite: "lax", path: "/" }),
+    // Secure only in production: the local dev server is plain http.
+    expect.objectContaining({ httpOnly: true, sameSite: "lax", path: "/", secure: false }),
   );
-  expect(refresh).toHaveBeenCalledOnce();
+  // Setting a cookie in an action already re-renders the page.
+  expect(refresh).not.toHaveBeenCalled();
 });
 
 test("an entry the user doesn't own fails and nothing is refreshed", async () => {

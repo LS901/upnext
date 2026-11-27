@@ -2,7 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 import { fetchAll } from "@/lib/supabase/fetch-all";
-import { placeBefore, queueOf, targetFor, type Direction, type Placed, type QueueType } from "./up-next-order";
+import { placeBefore, queueOf, type Placed, type Placement, type QueueType } from "./up-next-order";
 
 // Up next writes, through the user's own client. Every read is filtered to the
 // user (their client can read other users' public entries too) and every write
@@ -48,12 +48,19 @@ async function setPosition(supabase: Client, userId: string, entryId: string, po
     .eq("status", "backlog")
     .select("id");
   if (error) throw error;
-  // Not the user's (RLS hid it), or it left Backlog meanwhile.
-  if (!data.length) throw new Error(NOT_YOURS);
+  if (data.length) return;
+  // Nothing changed. If it left Backlog meanwhile (Start in another tab) there's
+  // nothing to do; otherwise RLS refused the write, because it isn't the user's.
+  const entry = await ownEntry(supabase, userId, entryId);
+  if (entry.status === "backlog") throw new Error(NOT_YOURS);
 }
 
-async function write(supabase: Client, userId: string, placed: Placed[]): Promise<void> {
-  await Promise.all(placed.map((p) => setPosition(supabase, userId, p.id, p.position)));
+async function apply(supabase: Client, userId: string, placement: Placement | null): Promise<void> {
+  if (!placement) return;
+  if (placement.kind === "one") return setPosition(supabase, userId, placement.id, placement.position);
+  // A renumber is one statement in the database, so it happens in full or not at all.
+  const { error } = await supabase.rpc("set_up_next_order", { entry_ids: placement.order });
+  if (error) throw error;
 }
 
 /** Adds a Backlog entry to the bottom of its type's queue. Already queued: nothing changes. */
@@ -62,7 +69,7 @@ export async function addToUpNext(supabase: Client, userId: string, entryId: str
   if (entry.up_next_position !== null) return;
   if (entry.status !== "backlog") throw new Error("Only Backlog entries can go in Up next.");
   const queue = await loadQueue(supabase, userId, queueOf(entry));
-  await write(supabase, userId, placeBefore(queue, entry.id, null));
+  await apply(supabase, userId, placeBefore(queue, entry.id, null));
 }
 
 /** Takes an entry off its queue; it stays in Backlog. Not queued (a double-click): nothing changes. */
@@ -72,19 +79,12 @@ export async function removeFromUpNext(supabase: Client, userId: string, entryId
   await setPosition(supabase, userId, entry.id, null);
 }
 
-/** The Move up / Move down / Move to top buttons. A move past either end, or of an entry no longer queued, does nothing. */
-export async function moveInUpNext(supabase: Client, userId: string, entryId: string, direction: Direction): Promise<void> {
-  const entry = await ownEntry(supabase, userId, entryId);
-  if (entry.up_next_position === null) return;
-  const queue = await loadQueue(supabase, userId, queueOf(entry));
-  const target = targetFor(queue, entry.id, direction);
-  if (target) await write(supabase, userId, placeBefore(queue, entry.id, target.beforeId));
-}
-
 /**
- * A drag: puts the entry just before `beforeId` (`null`: at the end). `beforeId`
+ * Puts a queued entry just before `beforeId` (`null`: at the end): the Move
+ * buttons and a drag both send this exact target, so a repeat (a double-click,
+ * a stale page) finds the entry already there and changes nothing. `beforeId`
  * must be in the same queue, so an entry can never land in another type's
- * queue; when it isn't (another type, or a stale page), nothing moves.
+ * queue; when it isn't (another type, or gone), nothing moves.
  */
 export async function placeInUpNext(
   supabase: Client,
@@ -96,5 +96,5 @@ export async function placeInUpNext(
   if (entry.up_next_position === null) return;
   const queue = await loadQueue(supabase, userId, queueOf(entry));
   if (beforeId !== null && !queue.some((p) => p.id === beforeId)) return;
-  await write(supabase, userId, placeBefore(queue, entry.id, beforeId));
+  await apply(supabase, userId, placeBefore(queue, entry.id, beforeId));
 }

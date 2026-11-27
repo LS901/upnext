@@ -4,7 +4,7 @@
 import { randomInt } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
 import { getMyLibrary, setEntryStatus } from "../../src/lib/library/queries";
-import { addToUpNext, moveInUpNext, placeInUpNext, removeFromUpNext } from "../../src/lib/library/up-next";
+import { addToUpNext, placeInUpNext, removeFromUpNext } from "../../src/lib/library/up-next";
 import { adminClient, createTestUser, deleteTestUsers, type TestUser } from "./helpers";
 
 vi.mock("server-only", () => ({}));
@@ -105,18 +105,55 @@ describe("Up next", () => {
     expect(await positions(["m4"])).toEqual({ m4: null });
   });
 
-  test("the buttons move an entry within its queue, and a move past either end does nothing", async () => {
-    await moveInUpNext(a.client, a.id, entry.m3, "top");
+  test("a move sends an exact target, so repeating it (a double-click, a stale page) changes nothing", async () => {
+    await placeInUpNext(a.client, a.id, entry.m3, entry.m1); // Move to top
+    await placeInUpNext(a.client, a.id, entry.m3, entry.m1);
     expect((await queues()).movie).toEqual([entry.m3, entry.m1, entry.m2]);
-    await moveInUpNext(a.client, a.id, entry.m3, "down");
+    await placeInUpNext(a.client, a.id, entry.m3, entry.m2); // Move down
+    await placeInUpNext(a.client, a.id, entry.m3, entry.m2);
     expect((await queues()).movie).toEqual([entry.m1, entry.m3, entry.m2]);
-    await moveInUpNext(a.client, a.id, entry.m2, "up");
-    expect((await queues()).movie).toEqual([entry.m1, entry.m2, entry.m3]);
-
-    await moveInUpNext(a.client, a.id, entry.m1, "up");
-    await moveInUpNext(a.client, a.id, entry.m3, "down");
+    await placeInUpNext(a.client, a.id, entry.m2, entry.m3); // Move up
+    await placeInUpNext(a.client, a.id, entry.m2, entry.m3);
     expect((await queues()).movie).toEqual([entry.m1, entry.m2, entry.m3]);
     expect(await positions(["game", "s1"])).toEqual({ game: 1, s1: 1 });
+  });
+
+  test("when positions are tied (two adds at once), a move renumbers the queue 1..n in one go", async () => {
+    const tie = await adminClient()
+      .from("library_entries")
+      .update({ up_next_position: 7 })
+      .in("id", [entry.m1, entry.m2, entry.m3]);
+    if (tie.error) throw tie.error;
+    const [first, second, third] = (await queues()).movie; // ties settle by entry id
+
+    await placeInUpNext(a.client, a.id, third, second);
+    expect((await queues()).movie).toEqual([first, third, second]);
+    const { data } = await adminClient()
+      .from("library_entries")
+      .select("id, up_next_position")
+      .in("id", [first, second, third]);
+    expect(Object.fromEntries(data!.map((r) => [r.id, r.up_next_position]))).toEqual({ [first]: 1, [third]: 2, [second]: 3 });
+
+    // Put them back as the later tests expect: m1, m2, m3.
+    await placeInUpNext(a.client, a.id, entry.m1, (await queues()).movie[0]);
+    await placeInUpNext(a.client, a.id, entry.m3, null);
+    await placeInUpNext(a.client, a.id, entry.m2, entry.m3);
+    expect((await queues()).movie).toEqual([entry.m1, entry.m2, entry.m3]);
+  });
+
+  test("a queued season leaves its show's Backlog row; progress still counts every season", async () => {
+    await setEntryStatus(a.client, a.id, entry.s2, "finished");
+    const { groups } = await getMyLibrary(a.client, a.id);
+    expect(groups.find((g) => g.status === "backlog")).toBeUndefined();
+    const finished = groups.find((g) => g.status === "finished")!;
+    expect(finished.rows).toEqual([
+      expect.objectContaining({
+        title: "Invented Queue Show",
+        progress: { finished: 1, total: 2 },
+        seasons: [expect.objectContaining({ entryId: entry.s2 })],
+      }),
+    ]);
+    await setEntryStatus(a.client, a.id, entry.s2, "backlog");
   });
 
   test("a drag places an entry before another in the same queue, never into another type's", async () => {
@@ -148,11 +185,15 @@ describe("Up next", () => {
 
     const refused = "That entry isn't in your library.";
     await expect(addToUpNext(a.client, a.id, entry.bMovie)).rejects.toThrow(refused);
-    await expect(moveInUpNext(a.client, a.id, entry.bMovie, "down")).rejects.toThrow(refused);
     await expect(placeInUpNext(a.client, a.id, entry.bMovie, null)).rejects.toThrow(refused);
     await expect(removeFromUpNext(a.client, a.id, entry.bMovie)).rejects.toThrow(refused);
     // Even passing b's own id, RLS lets a's client change nothing.
     await expect(removeFromUpNext(a.client, b.id, entry.bMovie)).rejects.toThrow(refused);
+    await addToUpNext(a.client, b.id, entry.bMovie).catch(() => {});
+    await placeInUpNext(a.client, b.id, entry.bMovie, null).catch(() => {});
+    // Nor through the renumber function: it only ever touches the caller's rows.
+    const { data: touched } = await a.client.rpc("set_up_next_order", { entry_ids: [entry.bMovie] });
+    expect(touched).toBe(0);
 
     expect(await positions(["bMovie"])).toEqual({ bMovie: 1 });
   });

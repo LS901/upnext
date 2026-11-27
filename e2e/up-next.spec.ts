@@ -13,7 +13,8 @@ const APP = "http://localhost:3100";
 type Account = { state: Awaited<ReturnType<BrowserContext["storageState"]>>; userId: string };
 
 // Signed in once per worker (local Auth rate-limits sign-in emails); the tests
-// below run in that one worker, in order, against the same library.
+// below run in that one worker, in order, against the same library, so each
+// starts where the last left off and a failure skips the rest.
 const test = base.extend<object, { account: Account }>({
   account: [
     async ({ browser }, provide) => {
@@ -33,7 +34,7 @@ const test = base.extend<object, { account: Account }>({
   ],
   storageState: async ({ account }, provide) => provide(account.state),
 });
-test.describe.configure({ mode: "default" });
+test.describe.configure({ mode: "serial" });
 
 const MOVIES = ["Kite Ledger", "Lantern Quay", "Moss Archive"];
 const GAME = "Nettle Circuit";
@@ -82,6 +83,18 @@ const row = (scope: Locator, title: string) =>
 
 const titles = (list: Locator) => list.getByRole("heading", { level: 4 });
 
+/**
+ * One key of a keyboard drag: press it, wait for its screen-reader announcement
+ * (dnd-kit's live region), then let dnd-kit settle. It attaches its key listener
+ * on the next task after a pick-up and measures the list after the next frame,
+ * so a key pressed sooner is lost.
+ */
+async function dragKey(page: Page, key: string, announcement: string) {
+  await page.keyboard.press(key);
+  await expect(page.getByRole("status").filter({ hasText: announcement })).toHaveCount(1);
+  await page.evaluate(() => new Promise<void>((done) => requestAnimationFrame(() => setTimeout(done, 0))));
+}
+
 test("each type gets its own queue, in the order you set", async ({ page }) => {
   await page.goto("/library");
   const upNext = page.getByRole("region", { name: "Up next", exact: true });
@@ -105,7 +118,7 @@ test("each type gets its own queue, in the order you set", async ({ page }) => {
   const movies = queue(page, "Movies");
   await expect(titles(movies)).toHaveText(MOVIES);
   await expect(titles(queue(page, "Games"))).toHaveText([GAME]);
-  await expect(titles(queue(page, "TV"))).toHaveText([SHOW]);
+  await expect(titles(queue(page, "TV"))).toHaveText([`${SHOW} · Season 1`]);
   await expect(queue(page, "TV")).toContainText("Season 1 · 6 episodes");
   // Season 2 wasn't added, so the show stays under Backlog with just that season.
   await expect(row(backlog, SHOW)).toContainText("Season 2 · 6 episodes");
@@ -115,24 +128,28 @@ test("each type gets its own queue, in the order you set", async ({ page }) => {
   const [kite, lantern, moss] = MOVIES;
   await queued(movies, moss).getByRole("button", { name: "Move to top" }).click();
   await expect(titles(movies)).toHaveText([moss, kite, lantern]);
-  await queued(movies, moss).getByRole("button", { name: "Move down" }).click();
+  // A double-click moves one place, not two.
+  await queued(movies, moss).getByRole("button", { name: "Move down" }).dblclick();
   await expect(titles(movies)).toHaveText([kite, moss, lantern]);
   await queued(movies, lantern).getByRole("button", { name: "Move up" }).click();
   await expect(titles(movies)).toHaveText([kite, lantern, moss]);
   await expect(queued(movies, kite).getByRole("button", { name: "Move up" })).toBeDisabled();
   await expect(queued(movies, moss).getByRole("button", { name: "Move down" })).toBeDisabled();
 
-  // Drag and drop, by keyboard: pick up, two places up, drop.
+  // Drag and drop, by keyboard: pick up, two places up, drop. Each key waits
+  // for its announcement, which also checks what a screen reader hears.
   const handle = movies.getByRole("button", { name: `Drag to reorder ${moss}` });
   await expect(handle).toBeEnabled();
   await handle.focus();
-  // dnd-kit measures the list between key presses, so give each a moment.
-  for (const key of ["Space", "ArrowUp", "ArrowUp", "Space"]) {
-    await page.keyboard.press(key);
-    await page.waitForTimeout(150);
-  }
+  // Picking up announces "Picked up …", then at once where it is.
+  await dragKey(page, "Space", `${moss} is at position 3 of 3.`);
+  await dragKey(page, "ArrowUp", `${moss} moved to position 2 of 3.`);
+  await dragKey(page, "ArrowUp", `${moss} moved to position 1 of 3.`);
+  await dragKey(page, "Space", `${moss} dropped at position 1 of 3.`);
   await expect(titles(movies)).toHaveText([moss, kite, lantern]);
   await expect(movies).toHaveAttribute("aria-busy", "false");
+  // Focus stays on the handle that was dragged.
+  await expect(movies.getByRole("button", { name: `Drag to reorder ${moss}` })).toBeFocused();
 
   // Saved, not just shown: a reload keeps the order, and the other queues never moved.
   await page.reload();
@@ -149,7 +166,8 @@ test("a hidden queue stays hidden until you show it again", async ({ page }) => 
 
   await page.reload();
   await expect(queue(page, "Games")).toHaveCount(0);
-  await expect(page.getByRole("group", { name: "Show" }).getByRole("checkbox", { name: "Games" })).not.toBeChecked();
+  // Hidden, but its count still says what's in it.
+  await expect(page.getByRole("group", { name: "Show" }).getByRole("checkbox", { name: "Games (1)" })).not.toBeChecked();
 
   await page.getByRole("group", { name: "Show" }).getByRole("checkbox", { name: "Games" }).check();
   await expect(titles(queue(page, "Games"))).toHaveText([GAME]);

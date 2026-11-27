@@ -1,6 +1,6 @@
-Last reviewed: 2026-11-26
+Last reviewed: 2026-11-27
 
-Sources: owner interview and follow-up, 2026-11-26 (Lewis); owner decisions on show progress and books, 2026-11-26; owner on audiobooks (a version under books, picked with a selector), 2026-11-26; schema in `supabase/migrations/20261126082919_library_entries.sql` and `20261126083314_notes_and_exclusions.sql`. The data model and its row-level security exist, and the My library page (`src/app/library/`, `src/lib/library/`) shows status and show progress; there are no lists or public profile pages yet.
+Sources: owner interview and follow-up, 2026-11-26 (Lewis); owner decisions on show progress and books, 2026-11-26; owner on audiobooks (a version under books, picked with a selector), 2026-11-26; schema in `supabase/migrations/20261126082919_library_entries.sql`, `20261126083314_notes_and_exclusions.sql` and `20261126200000_up_next_order.sql`. The data model and its row-level security exist, and the My library page (`src/app/library/`, `src/lib/library/`) shows status and show progress; there are no lists or public profile pages yet.
 
 # Library and status
 
@@ -28,6 +28,20 @@ Terms are defined in `glossary.md`. Examples are invented.
 
 **Up next** is an ordered shortlist inside Backlog, not a sixth status (owner said, 2026-11-26). The user orders it. There is **one queue per media type**: Movies, TV (single seasons) and Games, and Books when books land. Each queue is ordered on its own, and an entry never moves into another type's queue (owner said, 2026-11-26). It holds items and single seasons: one season of a show can be up next, and someone can track only season 5 of a show, for example an anthology (owner said, 2026-11-26). In the database it is `up_next_position`, allowed only while the status is Backlog.
 
+## Up next
+
+All owner said, 2026-11-26.
+
+- **Leaving Up next**: an entry drops off its queue when it moves to any status other than Backlog. `setEntryStatus` in `src/lib/library/queries.ts` clears `up_next_position`, which the schema check also requires. No old position is stored.
+- **Putting something back**: an entry put back into Up next goes to the bottom of its type's queue.
+- **Reordering is free**: the user can move any Up next entry to any position in its queue, at any time, as often as they like; nothing is fixed in place.
+- **The Up next screen** sits at the top of My library:
+  - Only **Backlog** entries can be added. Each goes to the bottom of its type's queue.
+  - Each queued row has **Start**, which moves it to In progress and so off the queue, and **Remove from Up next**, which keeps it in Backlog.
+  - A queue is reordered with **Move up**, **Move down** and **Move to top** buttons, and by **drag and drop**. A queued TV season is titled with its show and season, such as "Example Show · Season 2".
+  - A **Show** row of checkboxes displays or hides each type's queue, with each queue's count. The choice is remembered on that device.
+  - A queued entry shows in its queue, not again under Backlog.
+
 ## Shows have no status of their own
 
 A show has **no status of its own**. Its seasons carry the statuses, and a **progress summary** such as "2 of 4 seasons finished" is derived from them (owner said, 2026-11-26):
@@ -50,14 +64,6 @@ Books become a **fourth media type**, planned for after the TMDB and IGDB import
 
 ## Unconfirmed
 
-- **Leaving up next**: an entry drops off the shortlist when it moves to any status other than Backlog. `setEntryStatus` in `src/lib/library/queries.ts` clears `up_next_position`, which the schema check also requires. No old position is stored (owner said, 2026-11-26).
-- **The Up next screen** (top of My library, owner said 2026-11-26):
-  - Only **Backlog** entries can be added. Each goes to the bottom of its type's queue.
-  - Each queued row has **Start**, which moves it to In progress and so off the queue, and **Remove from Up next**, which keeps it in Backlog.
-  - The queue is reordered with **Move up**, **Move down** and **Move to top** buttons, and by **drag and drop**.
-  - A **Show** row of checkboxes displays or hides each type's queue. The choice is remembered on that device.
-  - A queued entry shows in its queue, not again under Backlog.
-- **Putting something back, and reordering**: an entry put back into Up next goes to the bottom of the list. The user can move any Up next entry to any position, at any time, as often as they like; nothing is fixed in place (owner said, 2026-11-26). `up_next_position` is a `double precision`, so a move can land between two neighbours without renumbering the rest.
 - **Transitions**: probably any status can move to any other. Is there anything that should be blocked, for example Backlog straight to Finished? Owner to confirm.
 - **Print and audiobook of one book**: whether one user can track both versions of the same book at once, and how that squares with one entry per item (INV-008). Left to the books task.
 - **Audiobook data**: where audiobook editions, narrators and lengths come from. Left to the books task.

@@ -8,10 +8,11 @@ import { setUpNextVisibility } from "./actions";
 const noSubscription = () => () => {};
 
 /**
- * The "Show" checkboxes above the Up next queues. With JavaScript a tick saves
- * at once; without it, the Update button submits the form.
+ * The "Show" checkboxes above the Up next queues, each with how many entries
+ * its queue holds, so a hidden queue still shows what's in it. With JavaScript
+ * a tick saves at once; without it, the Update button submits the form.
  */
-export function QueueVisibility({ hidden }: { hidden: QueueType[] }) {
+export function QueueVisibility({ hidden, counts }: { hidden: QueueType[]; counts: Record<QueueType, number> }) {
   const hydrated = useSyncExternalStore(
     noSubscription,
     () => true,
@@ -30,7 +31,7 @@ export function QueueVisibility({ hidden }: { hidden: QueueType[] }) {
               defaultChecked={!hidden.includes(type)}
               onChange={(e) => e.currentTarget.form?.requestSubmit()}
             />
-            {QUEUE_LABELS[type]}
+            {QUEUE_LABELS[type]} ({counts[type]})
           </label>
         ))}
       </fieldset>

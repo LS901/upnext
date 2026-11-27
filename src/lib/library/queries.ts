@@ -167,8 +167,9 @@ export async function getMyLibrary(supabase: Client, userId: string): Promise<Li
     if (rows.length) groups.push({ status, label: STATUS_LABELS[status], rows });
   }
 
-  // Each queue in the user's order; ties (two adds at once) settle by entry id.
-  queued.sort((x, y) => x.position - y.position || x.row.entryId.localeCompare(y.row.entryId));
+  // Each queue in the user's order; ties (two adds at once) settle by entry id,
+  // compared as the database orders it (plain order, not locale order).
+  queued.sort((x, y) => x.position - y.position || (x.row.entryId < y.row.entryId ? -1 : 1));
   const upNext = Object.fromEntries(
     QUEUE_TYPES.map((type) => [type, queued.filter((q) => q.type === type).map((q) => q.row)]),
   ) as Record<QueueType, UpNextRow[]>;
