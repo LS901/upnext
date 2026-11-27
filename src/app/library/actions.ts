@@ -7,7 +7,7 @@ import { text, texts } from "@/app/form-data";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { deleteEntry, setEntryStatus } from "@/lib/library/queries";
 import { isEntryStatus } from "@/lib/library/status";
-import { addToUpNext, placeInUpNext, removeFromUpNext } from "@/lib/library/up-next";
+import { placeInUpNext } from "@/lib/library/up-next";
 import { HIDDEN_COOKIE, hiddenFromShown } from "@/lib/library/up-next-order";
 import { createClient } from "@/lib/supabase/server";
 
@@ -40,8 +40,10 @@ export async function removeEntry(formData: FormData) {
   refresh();
 }
 
-// Up next (one queue per media type). The same rules: valid ids first, then
-// the signed-in user, then writes through the user's own client.
+// Up next (one queue per media type, holding every Backlog entry; the database
+// adds and removes entries as their status changes, so the only Up next write
+// here is a reorder). The same rules: valid ids first, then the signed-in user,
+// then writes through the user's own client.
 
 const NOT_UP_NEXT = "Not an Up next change that can be made.";
 
@@ -55,20 +57,6 @@ function entryIdFrom(formData: FormData): string {
   const entryId = text(formData, "entryId");
   if (!UUID.test(entryId)) throw new Error(NOT_UP_NEXT);
   return entryId;
-}
-
-export async function addUpNext(formData: FormData) {
-  const entryId = entryIdFrom(formData);
-  const { supabase, userId } = await signedIn();
-  await addToUpNext(supabase, userId, entryId);
-  refresh();
-}
-
-export async function removeUpNext(formData: FormData) {
-  const entryId = entryIdFrom(formData);
-  const { supabase, userId } = await signedIn();
-  await removeFromUpNext(supabase, userId, entryId);
-  refresh();
 }
 
 /**

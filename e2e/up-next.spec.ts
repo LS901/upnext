@@ -3,10 +3,10 @@ import { expect, test as base, type BrowserContext, type Locator, type Page } fr
 import { adminClient } from "./local-supabase";
 import { newEmail, signInByLink, usernameInHeader } from "./sign-in-helpers";
 
-// Up next: one queue per media type, ordered by the user (owner said, 2026-11-26).
-// The catalogue rows and Backlog entries are made directly in the database for a
-// fresh user, so these tests need no provider calls; every title is invented and
-// unique to this file.
+// Up next: one queue per media type, ordered by the user (owner said, 2026-11-26),
+// holding everything not started (owner said, 2026-11-27). The catalogue rows and
+// entries are made directly in the database for a fresh user, so these tests need
+// no provider calls; every title is invented and unique to this file.
 
 const APP = "http://localhost:3100";
 
@@ -67,7 +67,7 @@ async function seedBacklog(userId: string) {
   if (entriesError) throw entriesError;
 }
 
-/** A status group, such as "Backlog". */
+/** A status group, such as "In progress". */
 const group = (page: Page, status: string) => page.getByRole("region", { name: status, exact: true });
 
 /** One type's queue, such as "Movies". */
@@ -97,34 +97,20 @@ async function dragKey(page: Page, key: string, announcement: string) {
 
 test("each type gets its own queue, in the order you set", async ({ page }) => {
   await page.goto("/library");
-  const upNext = page.getByRole("region", { name: "Up next", exact: true });
-  for (const label of ["Movies", "TV", "Games"]) {
-    await expect(upNext.getByRole("region", { name: label, exact: true })).toContainText(
-      "Nothing up next. Add something from your Backlog below.",
-    );
-  }
 
-  const backlog = group(page, "Backlog");
-  for (const title of [...MOVIES, GAME]) {
-    await row(backlog, title).getByRole("button", { name: "Add to Up next" }).click();
-    await expect(row(backlog, title)).toHaveCount(0);
-  }
-  const seasonOne = row(backlog, SHOW)
-    .getByRole("listitem")
-    .filter({ has: page.getByRole("heading", { level: 4, name: "Season 1 · 6 episodes" }) });
-  await seasonOne.getByRole("button", { name: "Add to Up next" }).click();
-
-  // Each lands at the bottom of its own type's queue, never another's.
+  // Added means queued: each lands at the bottom of its own type's queue, never
+  // another's, in the order it was added.
   const movies = queue(page, "Movies");
   await expect(titles(movies)).toHaveText(MOVIES);
   await expect(titles(queue(page, "Games"))).toHaveText([GAME]);
-  await expect(titles(queue(page, "TV"))).toHaveText([`${SHOW} · Season 1`]);
+  await expect(titles(queue(page, "TV"))).toHaveText([`${SHOW} · Season 1`, `${SHOW} · Season 2`]);
   // The heading names the season, so the line below it doesn't repeat it.
   await expect(queue(page, "TV")).toContainText("6 episodes");
   await expect(queue(page, "TV")).not.toContainText("Season 1 · 6 episodes");
-  // Season 2 wasn't added, so the show stays under Backlog with just that season.
-  await expect(row(backlog, SHOW)).toContainText("Season 2 · 6 episodes");
-  await expect(row(backlog, SHOW)).not.toContainText("Season 1");
+  // There's no separate Backlog, and nothing to add to or take off Up next.
+  await expect(page.getByRole("heading", { name: "Backlog" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Add to Up next" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Remove from Up next" })).toHaveCount(0);
 
   // The buttons.
   const [kite, lantern, moss] = MOVIES;
@@ -194,7 +180,7 @@ test("a hidden queue stays hidden until you show it again", async ({ page }) => 
   await expect(titles(queue(page, "Games"))).toHaveText([GAME]);
 });
 
-test("Start and Remove from Up next take an entry off its queue", async ({ page }) => {
+test("Start and Remove take an entry off its queue", async ({ page }) => {
   await page.goto("/library");
   const movies = queue(page, "Movies");
   const [kite, lantern, moss] = MOVIES;
@@ -207,16 +193,17 @@ test("Start and Remove from Up next take an entry off its queue", async ({ page 
   // Only Backlog entries can be queued.
   await expect(playing.getByRole("button", { name: "Add to Up next" })).toHaveCount(0);
 
-  await queued(movies, moss).getByRole("button", { name: "Remove from Up next" }).click();
+  // Remove takes it out of the library.
+  await queued(movies, moss).getByRole("button", { name: "Remove", exact: true }).click();
   await expect(titles(movies)).toHaveText([kite]);
-  await expect(row(group(page, "Backlog"), moss).getByRole("button", { name: "Add to Up next" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: moss, exact: true })).toHaveCount(0);
 
   // Back in, it goes to the bottom. Focus left in the queue earlier, then
   // clicked away from, isn't pulled back when the queue changes.
   const kiteToTop = queued(movies, kite).getByRole("button", { name: "Move to top" });
   await kiteToTop.focus();
   await page.getByRole("heading", { level: 1, name: "My library" }).click();
-  await row(group(page, "Backlog"), moss).getByRole("button", { name: "Add to Up next" }).click();
-  await expect(titles(movies)).toHaveText([kite, moss]);
+  await playing.getByRole("combobox", { name: "Status" }).selectOption("Up next");
+  await expect(titles(movies)).toHaveText([kite, lantern]);
   await expect(kiteToTop).not.toBeFocused();
 });

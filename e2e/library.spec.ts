@@ -43,9 +43,19 @@ function result(page: Page, title: string) {
   return page.getByRole("listitem").filter({ has: page.getByRole("heading", { name: title, exact: true }) });
 }
 
-/** A status group on /library, such as "Backlog". */
+/** A status group on /library, such as "Finished". */
 function group(page: Page, status: string) {
   return page.getByRole("region", { name: status, exact: true });
+}
+
+/** One type's Up next queue on /library, such as "Movies". */
+function queue(page: Page, label: string) {
+  return page.getByRole("list", { name: `${label} up next`, exact: true });
+}
+
+/** A row in an Up next queue, by its title ("Show · Season 1" for a season). */
+function queued(list: Locator, title: string) {
+  return list.getByRole("listitem").filter({ has: list.page().getByRole("heading", { level: 4, name: title, exact: true }) });
 }
 
 /** A movie, game or show row in a group. */
@@ -100,40 +110,36 @@ test("add a movie and two seasons, then finish a season", async ({ page }) => {
   await page.goto("/library");
   await expect(page).toHaveTitle("My library · upnext");
   await expect(page.getByText("Nothing here yet.")).toHaveCount(0);
-  // Up next always comes first; then the one status group so far.
-  await expect(page.getByRole("heading", { level: 2 })).toHaveText(["Up next", "Backlog"]);
-  const backlog = group(page, "Backlog");
+  // Up next always comes first, holding everything added; no status group yet.
+  await expect(page.getByRole("heading", { level: 2 })).toHaveText(["Up next"]);
 
-  const movie = row(backlog, "Kestrel Morning");
+  const movie = queued(queue(page, "Movies"), "Kestrel Morning");
   await expect(movie).toContainText("Movie");
   await expect(movie).toContainText("Time to finish: 1 h 44 min");
   await expect(movie).toContainText("Score 71/100 (321 votes)");
   await expect(movie.getByRole("combobox", { name: "Status" })).toHaveValue("backlog");
 
-  // Seasons sit under their show; specials and season 3 aren't added but season 3 counts.
-  const show = row(backlog, "Harbour of Glass");
-  await expect(show).toContainText("TV");
-  await expect(show).toContainText("0 of 3 seasons finished");
-  await expect(show).toContainText("Score 82/100 (140 votes)");
-  await expect(show.getByRole("heading", { level: 4 })).toHaveText([
-    "Season 1 · 8 episodes · 2021",
-    "Season 2 · 8 episodes · 2022",
-  ]);
-  await expect(seasonRow(show, "Season 1 · 8 episodes · 2021")).toContainText("Time to finish: 1 h 38 min");
-  await expect(seasonRow(show, "Season 2 · 8 episodes · 2022")).toContainText("Time to finish: 52 min");
+  // Each season is its own row in the TV queue, in the order added.
+  const tv = queue(page, "TV");
+  await expect(tv.getByRole("heading", { level: 4 })).toHaveText(["Harbour of Glass · Season 1", "Harbour of Glass · Season 2"]);
+  const seasonOne = queued(tv, "Harbour of Glass · Season 1");
+  await expect(seasonOne).toContainText("8 episodes · 2021");
+  await expect(seasonOne).toContainText("Time to finish: 1 h 38 min");
+  await expect(seasonOne).toContainText("Score 82/100 (140 votes)");
+  await expect(queued(tv, "Harbour of Glass · Season 2")).toContainText("Time to finish: 52 min");
 
-  // Finish season 1: it moves to Finished under its show, and progress reads 1 of 3.
-  await seasonRow(show, "Season 1 · 8 episodes · 2021").getByRole("combobox", { name: "Status" }).selectOption("Finished");
+  // Finish season 1: it moves to Finished under its show, and progress reads 1 of 3
+  // (specials and season 3 aren't added, but season 3 counts).
+  await seasonOne.getByRole("combobox", { name: "Status" }).selectOption("Finished");
   const finished = group(page, "Finished");
   const finishedShow = row(finished, "Harbour of Glass");
   await expect(finishedShow).toContainText("1 of 3 seasons finished");
   await expect(seasonRow(finishedShow, "Season 1 · 8 episodes · 2021").getByRole("combobox", { name: "Status" })).toHaveValue(
     "finished",
   );
-  await expect(row(backlog, "Harbour of Glass")).toContainText("1 of 3 seasons finished");
-  await expect(seasonRow(row(backlog, "Harbour of Glass"), "Season 1 · 8 episodes · 2021")).toHaveCount(0);
-  // Groups run In progress, Backlog, Paused, Finished, Dropped, and empty ones are left out.
-  await expect(page.getByRole("heading", { level: 2 })).toHaveText(["Up next", "Backlog", "Finished"]);
+  await expect(tv.getByRole("heading", { level: 4 })).toHaveText(["Harbour of Glass · Season 2"]);
+  // Groups run In progress, Paused, Finished, Dropped, and empty ones are left out.
+  await expect(page.getByRole("heading", { level: 2 })).toHaveText(["Up next", "Finished"]);
 
   // It sticks after a reload.
   await page.reload();
@@ -147,7 +153,7 @@ test("a game shows its time to beat, and Remove takes it out", async ({ page, ac
   await expect(result(page, "Clockwork Lighthouse").getByRole("button", { name: "In your library" })).toBeVisible();
 
   await page.goto("/library");
-  const game = row(group(page, "Backlog"), "Clockwork Lighthouse");
+  const game = queued(queue(page, "Games"), "Clockwork Lighthouse");
   await expect(game).toContainText("Game");
   await expect(game).toContainText("Time to beat: 12 h (story)");
   await expect(game).toContainText("Score 82/100 (44 votes)");
@@ -182,7 +188,11 @@ test("a show with only specials reads No seasons yet", async ({ page }) => {
   await expect(page).toHaveURL("/search/show/9102?added=1");
 
   await page.goto("/library");
-  const show = row(group(page, "Backlog"), "Saltmarsh Specials");
+  // A show's progress line shows on its row in a status group, so pause the season.
+  const specials = queued(queue(page, "TV"), "Saltmarsh Specials · Specials");
+  await expect(specials).toContainText("No score");
+  await specials.getByRole("combobox", { name: "Status" }).selectOption("Paused");
+  const show = row(group(page, "Paused"), "Saltmarsh Specials");
   await expect(show).toContainText("No seasons yet");
   await expect(show).toContainText("No score");
   await expect(seasonRow(show, "Specials")).toContainText("Time to finish: unknown");
@@ -196,11 +206,12 @@ test("a double-click on Remove removes the entry once, with no error page", asyn
   await expect(page).toHaveURL("/search/show/9101?added=1");
 
   await page.goto("/library");
-  const season = seasonRow(row(group(page, "Backlog"), "Harbour of Glass"), label);
+  const title = "Harbour of Glass · Season 3";
+  const season = queued(queue(page, "TV"), title);
   await expect(season.getByRole("button", { name: "Remove" })).toBeEnabled(); // hydrated
   await season.getByRole("button", { name: "Remove" }).dblclick();
 
-  await expect(page.getByRole("heading", { level: 4, name: label })).toHaveCount(0);
+  await expect(page.getByRole("heading", { level: 4, name: title })).toHaveCount(0);
   await expect(page.getByRole("heading", { level: 1, name: "My library" })).toBeVisible();
   await expect(page.getByText("Something went wrong")).toHaveCount(0);
   await expect(page.getByText(/This page couldn.t load|Application error/)).toHaveCount(0); // Next's default
@@ -239,8 +250,7 @@ test("a very long title wraps and never scrolls the page sideways at 390px", asy
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/library");
-  await expect(row(group(page, "Backlog"), title)).toBeVisible();
-  await row(group(page, "Backlog"), title).getByRole("button", { name: "Add to Up next" }).click();
+  // Added means queued.
   await expect(page.getByRole("list", { name: "Movies up next" }).getByRole("heading", { level: 4, name: title })).toBeVisible();
   const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
   expect(scrollWidth).toBeLessThanOrEqual(390);

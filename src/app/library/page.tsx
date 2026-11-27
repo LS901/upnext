@@ -33,7 +33,7 @@ import {
   type QueueType,
 } from "@/lib/library/up-next-order";
 import { createClient } from "@/lib/supabase/server";
-import { addUpNext, placeUpNext, removeEntry, removeUpNext, setStatus } from "./actions";
+import { placeUpNext, removeEntry, setStatus } from "./actions";
 import { QueueVisibility } from "./queue-visibility";
 import { SortableQueue } from "./sortable-queue";
 import { StatusSelect } from "./status-select";
@@ -74,7 +74,7 @@ async function Library() {
   }
   return (
     <div className="mt-6 flex flex-col gap-10">
-      <UpNext upNext={upNext} hidden={hidden} backlog={groups.find((g) => g.status === "backlog")} />
+      <UpNext upNext={upNext} hidden={hidden} />
       {groups.map((group) => (
         <Group key={group.status} group={group} />
       ))}
@@ -82,19 +82,9 @@ async function Library() {
   );
 }
 
-// One queue per media type, each in the user's order (owner said, 2026-11-26).
-function UpNext({
-  upNext,
-  hidden,
-  backlog,
-}: {
-  upNext: LibraryView["upNext"];
-  hidden: QueueType[];
-  backlog: LibraryGroup | undefined;
-}) {
-  // Whether Backlog (below) has anything of each type that could be added.
-  const inBacklog = (type: QueueType) =>
-    !!backlog?.rows.some((r) => (r.kind === "show" ? type === "show" : r.mediaType === type));
+// One queue per media type, each in the user's order (owner said, 2026-11-26),
+// holding everything not started yet (owner said, 2026-11-27).
+function UpNext({ upNext, hidden }: { upNext: LibraryView["upNext"]; hidden: QueueType[] }) {
   const counts = Object.fromEntries(QUEUE_TYPES.map((type) => [type, upNext[type].length])) as Record<QueueType, number>;
   return (
     <section aria-labelledby="up-next">
@@ -104,14 +94,14 @@ function UpNext({
       <QueueVisibility hidden={hidden} counts={counts} />
       <div className="mt-4 flex flex-col gap-4">
         {QUEUE_TYPES.filter((type) => !hidden.includes(type)).map((type) => (
-          <Queue key={type} type={type} rows={upNext[type]} hasBacklog={inBacklog(type)} />
+          <Queue key={type} type={type} rows={upNext[type]} />
         ))}
       </div>
     </section>
   );
 }
 
-function Queue({ type, rows, hasBacklog }: { type: QueueType; rows: UpNextRow[]; hasBacklog: boolean }) {
+function Queue({ type, rows }: { type: QueueType; rows: UpNextRow[] }) {
   const id = `queue-${type}`;
   const label = QUEUE_LABELS[type];
   const order = rows.map((r) => r.entryId);
@@ -122,18 +112,16 @@ function Queue({ type, rows, hasBacklog }: { type: QueueType; rows: UpNextRow[];
           {label}
         </h3>
         {rows.length ? (
-        <SortableQueue
-          label={`${label} up next`}
-          items={rows.map((row) => ({
-            entryId: row.entryId,
-            title: queuedTitle(row),
-            row: <QueuedRow row={row} order={order} />,
-          }))}
-        />
-      ) : (
-          <p className={`px-(--card-spacing) ${muted}`}>
-            {hasBacklog ? "Nothing up next. Add something from your Backlog below." : "Nothing up next."}
-          </p>
+          <SortableQueue
+            label={`${label} up next`}
+            items={rows.map((row) => ({
+              entryId: row.entryId,
+              title: queuedTitle(row),
+              row: <QueuedRow row={row} order={order} />,
+            }))}
+          />
+        ) : (
+          <p className={`px-(--card-spacing) ${muted}`}>Nothing up next.</p>
         )}
       </Card>
     </section>
@@ -167,9 +155,13 @@ function QueuedRow({ row, order }: { row: UpNextRow; order: string[] }) {
         <MoveButton entryId={row.entryId} order={order} direction="up" label="Move up" icon={ArrowUp} />
         <MoveButton entryId={row.entryId} order={order} direction="down" label="Move down" icon={ArrowDown} />
         <MoveButton entryId={row.entryId} order={order} direction="top" label="Move to top" icon={ArrowUpToLine} />
-        <form action={removeUpNext}>
+        <form action={setStatus}>
           <input type="hidden" name="entryId" value={row.entryId} />
-          <SubmitButton>Remove from Up next</SubmitButton>
+          <StatusSelect status={row.status} />
+        </form>
+        <form action={removeEntry}>
+          <input type="hidden" name="entryId" value={row.entryId} />
+          <SubmitButton>Remove</SubmitButton>
         </form>
       </div>
     </div>
@@ -277,17 +269,10 @@ function Season({ season }: { season: SeasonRow }) {
   );
 }
 
-// Only Backlog entries can go in Up next (owner said, 2026-11-26).
 function EntryControls({ entryId, status }: { entryId: string; status: EntryStatus }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
       <StatusChip status={status} />
-      {status === "backlog" && (
-        <form action={addUpNext}>
-          <input type="hidden" name="entryId" value={entryId} />
-          <SubmitButton>Add to Up next</SubmitButton>
-        </form>
-      )}
       <form action={setStatus}>
         <input type="hidden" name="entryId" value={entryId} />
         <StatusSelect status={status} />
