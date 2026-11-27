@@ -47,10 +47,19 @@ function unique(term: string): string {
   return `${term} ${randomBytes(3).toString("hex")}`;
 }
 
+/**
+ * Searches as a person would: three letters or more search on their own after
+ * a pause (waiting for that, so the search runs once); shorter ones need the
+ * Search button.
+ */
 async function search(page: Page, term: string) {
   await page.getByLabel("Search movies, TV and games").fill(term);
-  await page.getByRole("button", { name: "Search", exact: true }).click();
-  await expect(page).toHaveURL(/[?&]q=/);
+  const q = term.trim();
+  if (q.length >= 3) {
+    await expect(page).toHaveURL((url) => url.searchParams.get("q") === q);
+  } else {
+    await page.getByRole("button", { name: "Search", exact: true }).click();
+  }
 }
 
 function result(page: Page, title: string) {
@@ -117,6 +126,40 @@ test("an empty search makes no provider calls", async ({ page }) => {
   expect(seen.sort()).toEqual(["igdb", "tmdb"]);
 });
 
+test("results appear as you type, with one search per pause, not one per letter", async ({ page }) => {
+  await page.goto("/search");
+  const box = page.getByLabel("Search movies, TV and games");
+  // Random first, so no prefix of it is another test's search in the stub's
+  // shared log (other specs search "Kestrel"). The stub answers any term.
+  const term = `${randomBytes(3).toString("hex")} Kestrel`;
+  // Click in first, as a person would. (The form streams in hidden and is then
+  // shown; pressSequentially alone doesn't wait for that, so its keys can miss.)
+  await box.click();
+  await box.pressSequentially(term, { delay: 40 });
+
+  // No click: the results come on their own, and the cursor stays in the box.
+  await expect(result(page, "Kestrel Morning")).toBeVisible();
+  await expect(page).toHaveURL((url) => url.searchParams.get("q") === term);
+  await expect(box).toBeFocused();
+  await expect(box).toHaveValue(term);
+
+  // Only the whole term reached the providers, once each: none of its prefixes.
+  const sent = (await stubRequests()).filter((r) => r.term !== undefined && term.startsWith(r.term));
+  expect(sent.map((r) => r.term)).toEqual([term, term]);
+  expect(sent.map((r) => r.provider).sort()).toEqual(["igdb", "tmdb"]);
+
+  // Emptying the box clears the results.
+  await box.fill("");
+  await expect(page.getByText("Type a title to search.")).toBeVisible();
+  await expect(result(page, "Kestrel Morning")).toHaveCount(0);
+
+  // A title shorter than three letters doesn't search on its own; Enter does.
+  await box.fill("It");
+  await box.press("Enter");
+  await expect(page).toHaveURL((url) => url.searchParams.get("q") === "It");
+  await expect(result(page, "Kestrel Morning")).toBeVisible();
+});
+
 test("search shows both providers and hides excluded types", async ({ page }) => {
   await page.goto("/search");
   const header = page.getByRole("banner");
@@ -140,7 +183,10 @@ test("search shows both providers and hides excluded types", async ({ page }) =>
 
   // Hide games: IGDB isn't asked at all.
   await expect(page.getByRole("heading", { name: "Hide" })).toBeVisible();
+  // Ticking a box searches again at once, with no click.
   await page.getByRole("checkbox", { name: "Games" }).check();
+  await expect(page).toHaveURL(/[?&]exclude=game/);
+  await expect(result(page, "Clockwork Lighthouse")).toHaveCount(0);
   const noGames = unique("Kestrel");
   await search(page, noGames);
   await expect(result(page, "Kestrel Morning")).toBeVisible();
