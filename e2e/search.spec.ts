@@ -142,6 +142,8 @@ test("results appear as you type, with one search per pause, not one per letter"
   await expect(page).toHaveURL((url) => url.searchParams.get("q") === term);
   await expect(box).toBeFocused();
   await expect(box).toHaveValue(term);
+  // Screen readers hear that the results changed.
+  await expect(page.getByRole("status")).toHaveText(/^\d+ results\.$/);
 
   // Only the whole term reached the providers, once each: none of its prefixes.
   const sent = (await stubRequests()).filter((r) => r.term !== undefined && term.startsWith(r.term));
@@ -158,6 +160,16 @@ test("results appear as you type, with one search per pause, not one per letter"
   await box.press("Enter");
   await expect(page).toHaveURL((url) => url.searchParams.get("q") === "It");
   await expect(result(page, "Kestrel Morning")).toBeVisible();
+
+  // The Search button searches at once too, and cancels the pause's search, so
+  // the providers are asked once.
+  const clicked = `${randomBytes(3).toString("hex")} Kestrel`;
+  await box.fill(clicked);
+  await page.getByRole("button", { name: "Search", exact: true }).click();
+  await expect(page).toHaveURL((url) => url.searchParams.get("q") === clicked);
+  await expect(result(page, "Kestrel Morning")).toBeVisible();
+  const asked = (await stubRequests()).filter((r) => r.term === clicked).map((r) => r.provider);
+  expect(asked.sort()).toEqual(["igdb", "tmdb"]);
 });
 
 test("search shows both providers and hides excluded types", async ({ page }) => {

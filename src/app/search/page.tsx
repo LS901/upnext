@@ -77,6 +77,11 @@ async function SearchContent({ searchParams }: Pick<PageProps<"/search">, "searc
       <div className="flex flex-col gap-6">
         <SearchForm q={state.q} exclude={state.exclude} />
 
+        {/* Results now change without a page load, so say so to screen readers. */}
+        <p role="status" className="sr-only">
+          {outcome && !outcome.everythingHidden && (outcome.results.length ? resultCount(outcome.results.length) : "No results.")}
+        </p>
+
         {[...failed].map((provider) => (
           <p key={provider} role="alert" className="text-red-700 dark:text-red-400">
             Couldn&apos;t reach {PROVIDER_NAMES[provider]} right now.
@@ -119,6 +124,10 @@ async function SearchContent({ searchParams }: Pick<PageProps<"/search">, "searc
       </aside>
     </div>
   );
+}
+
+function resultCount(n: number): string {
+  return `${n} ${n === 1 ? "result" : "results"}.`;
 }
 
 function Result({ result: r, owned, state }: { result: SearchResult; owned: boolean; state: SearchState }) {
