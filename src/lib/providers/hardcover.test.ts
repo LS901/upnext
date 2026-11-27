@@ -274,6 +274,37 @@ test("a search whose turn is exactly 3 s away still waits for it", async () => {
   await Promise.all(queued);
 });
 
+test("HARDCOVER_SEARCH_MAX_WAIT_MS raises the search cap: a search 5 s from its turn waits for it", async () => {
+  vi.stubEnv("HARDCOVER_SEARCH_MAX_WAIT_MS", "10000");
+  vi.useFakeTimers();
+  const fn = stub(book);
+  // Five details requests take the turns at 0 to 4 s; a search now starts at 5 s.
+  const queued = [1, 2, 3, 4, 5].map(() => getHardcoverDetails("9001"));
+  const s = settle(searchHardcover("patient"));
+  await vi.advanceTimersByTimeAsync(0);
+  expect(s.done).toBe(false);
+  await vi.advanceTimersByTimeAsync(5000);
+  expect(fn).toHaveBeenCalledTimes(6);
+  expect(sent(fn, 5).body.query).toContain("search(");
+  await Promise.all(queued);
+});
+
+test.each([[undefined], ["abc"], ["0"], ["-1"], [""]])(
+  "HARDCOVER_SEARCH_MAX_WAIT_MS=%s leaves the 3 s search cap",
+  async (value) => {
+    if (value !== undefined) vi.stubEnv("HARDCOVER_SEARCH_MAX_WAIT_MS", value);
+    vi.useFakeTimers();
+    stub(book);
+    const queued = [1, 2, 3, 4].map(() => getHardcoverDetails("9001"));
+    const late = settle(searchHardcover("late"));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(late.done).toBe(true);
+    expect(late.value).toBeInstanceOf(ProviderError);
+    await vi.advanceTimersByTimeAsync(4000);
+    await Promise.all(queued);
+  },
+);
+
 test("a details request waits its turn however long the queue", async () => {
   vi.useFakeTimers();
   const fn = stub(book);

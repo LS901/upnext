@@ -172,8 +172,11 @@ test("Hardcover down shows its notice while TMDB and IGDB results still show", a
 test("a slow Hardcover times out with its notice while TMDB and IGDB results still show", async ({ page }) => {
   // The stub answers this term only after the app's 5 s timeout. Opened by URL: the
   // search box's URL update would wait for the whole search.
-  await page.goto(`/search?q=${encodeURIComponent(unique("Kestrel hardcover-slow"))}`);
+  const term = unique("Kestrel hardcover-slow");
+  await page.goto(`/search?q=${encodeURIComponent(term)}`);
   await expect(page.getByRole("alert").filter({ hasText: "Couldn't reach Hardcover right now." })).toBeVisible(SLOW);
+  // The stub got the search, so the 5 s timeout (not the queue cap) produced the notice.
+  expect((await stubRequests("hardcover")).some((r) => r.term === term)).toBe(true);
   await expect(page.getByText("Couldn't reach TMDB right now.")).toHaveCount(0);
   await expect(page.getByText("Couldn't reach IGDB right now.")).toHaveCount(0);
   await expect(result(page, "Kestrel Morning")).toBeVisible(SLOW);

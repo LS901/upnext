@@ -51,6 +51,8 @@ export default defineConfig({
         TMDB_API_BASE_URL: `${STUB}/tmdb`,
         IGDB_API_BASE_URL: `${STUB}/igdb`,
         HARDCOVER_API_URL: `${STUB}/hardcover`,
+        // e2e workers share one limiter, so searches wait longer than the production 3 s cap.
+        HARDCOVER_SEARCH_MAX_WAIT_MS: "30000",
         TWITCH_TOKEN_URL: `${STUB}/twitch/token`,
       },
     },

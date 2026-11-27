@@ -9,6 +9,12 @@ const REQUEST_TIMEOUT_MS = 5000;
 /** A search gives up rather than wait longer than this for its turn. */
 const SEARCH_MAX_WAIT_MS = 3000;
 
+/** Test-only override (e2e workers share one limiter); read per call like the other env vars. */
+function searchMaxWaitMs(): number {
+  const n = Number(process.env.HARDCOVER_SEARCH_MAX_WAIT_MS);
+  return Number.isFinite(n) && n > 0 ? n : SEARCH_MAX_WAIT_MS;
+}
+
 type Json = Record<string, unknown>;
 
 // ---- Limiter: requests start at least 1 second apart -------------------------
@@ -125,7 +131,7 @@ export async function searchHardcover(query: string): Promise<SearchResult[]> {
   // A search gives up rather than queue behind Add imports and the refresh for long.
   const data = await hardcoverQuery(
     `{ search(query: "${escapeLiteral(query)}", query_type: "book", per_page: 10) { results } }`,
-    SEARCH_MAX_WAIT_MS,
+    searchMaxWaitMs(),
   );
   const hits = obj(obj(data.search)?.results)?.hits;
   const out: SearchResult[] = [];

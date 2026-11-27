@@ -14,7 +14,7 @@ what's next, and what you've finished. Installable web app (PWA).
 - Local DB: `npx supabase start` / `npx supabase db reset` (applies migrations + seed)
 - DB types: `npm run db:types` regenerates `src/lib/supabase/database.types.ts`; run it after every migration
 - Lint: `npm run lint` · Types: `npm run typecheck` · Tests: `npm test` · E2E: `npm run e2e`
-- Providers: `npm run providers:check` checks the TMDB and IGDB credentials in `.env.local`; `npm run refresh` runs the catalogue refresh on a running `npm run dev` (needs `CRON_SECRET`). Node 22.6 or later.
+- Providers: `npm run providers:check` checks the TMDB, IGDB and Hardcover credentials in `.env.local`; `npm run refresh` runs the catalogue refresh on a running `npm run dev` (needs `CRON_SECRET`). Node 22.6 or later.
 
 ## Check command (definition of done)
 `npm run check` = `npm run lint && npm run typecheck && npm test`
