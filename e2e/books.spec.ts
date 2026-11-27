@@ -31,7 +31,7 @@ const test = base.extend<object, { account: Account }>({
 test.describe.configure({ mode: "default" });
 
 // Adding a book imports it from Hardcover, whose requests are spaced a second apart
-// and shared with the other specs running at once, so allow for the wait.
+// and shared with the other specs running at once, so allow for the wait (the shared 1 s Hardcover spacing).
 const SLOW = { timeout: 30_000 };
 
 // Cover URLs point at the real image CDNs; never let the browser fetch them.
@@ -90,7 +90,7 @@ test("a book result offers print and audiobook, and only print when there's no a
   await search(page, unique("Lantern"));
 
   const tide = result(page, "The Lantern Tide");
-  await expect(tide).toContainText("Book");
+  await expect(tide).toContainText("Book", SLOW);
   await expect(tide).toContainText("2018");
   await expect(tide.getByRole("button", { name: "Add", exact: true })).toBeVisible();
   await expect(tide.getByRole("button", { name: "Add audiobook" })).toBeVisible();
@@ -106,7 +106,7 @@ test("print and audiobook are added separately, each with its own in-library sta
 
   const tide = result(page, "The Lantern Tide");
   await tide.getByRole("button", { name: "Add", exact: true }).click();
-  await expect(page).toHaveURL(/added=1/);
+  await expect(page).toHaveURL(/added=1/, SLOW);
   await expect(tide.getByRole("button", { name: "In your library", exact: true })).toBeDisabled(SLOW);
   await expect(tide.getByRole("button", { name: "Add audiobook" })).toBeEnabled();
   await expect(tide.getByRole("button", { name: "Audiobook in your library" })).toHaveCount(0);
@@ -137,7 +137,7 @@ test("with Books hidden, Hardcover isn't asked", async ({ page }) => {
   await page.goto("/search");
   const term = unique("Kestrel");
   await search(page, term);
-  await expect(result(page, "The Lantern Tide")).toBeVisible();
+  await expect(result(page, "The Lantern Tide")).toBeVisible(SLOW);
 
   await page.getByRole("checkbox", { name: "Books" }).check();
   await expect(page).toHaveURL(/[?&]exclude=book/);
@@ -147,7 +147,7 @@ test("with Books hidden, Hardcover isn't asked", async ({ page }) => {
   // A fresh term, searched with Books already hidden, never reaches Hardcover.
   const hidden = unique("Kestrel");
   await page.goto(`/search?exclude=book&q=${encodeURIComponent(hidden)}`);
-  await expect(result(page, "Kestrel Morning")).toBeVisible();
+  await expect(result(page, "Kestrel Morning")).toBeVisible(SLOW);
   const seen = (await stubRequests()).filter((r) => r.term === hidden).map((r) => r.provider);
   expect(seen.sort()).toEqual(["igdb", "tmdb"]);
   expect((await stubRequests("hardcover")).filter((r) => r.term === hidden)).toEqual([]);
@@ -155,14 +155,14 @@ test("with Books hidden, Hardcover isn't asked", async ({ page }) => {
   // The log works: the same search with Books shown does reach Hardcover.
   const shown = unique("Kestrel");
   await page.goto(`/search?q=${encodeURIComponent(shown)}`);
-  await expect(result(page, "The Lantern Tide")).toBeVisible();
+  await expect(result(page, "The Lantern Tide")).toBeVisible(SLOW);
   expect((await stubRequests("hardcover")).filter((r) => r.term === shown)).toHaveLength(1);
 });
 
 test("Hardcover down shows its notice while TMDB and IGDB results still show", async ({ page }) => {
   await page.goto("/search");
   await search(page, unique("Kestrel hardcover-down"));
-  await expect(page.getByRole("alert").filter({ hasText: "Couldn't reach Hardcover right now." })).toBeVisible();
+  await expect(page.getByRole("alert").filter({ hasText: "Couldn't reach Hardcover right now." })).toBeVisible(SLOW);
   await expect(page.getByText("Couldn't reach TMDB right now.")).toHaveCount(0);
   await expect(result(page, "Kestrel Morning")).toBeVisible();
   await expect(result(page, "Clockwork Lighthouse")).toBeVisible();
