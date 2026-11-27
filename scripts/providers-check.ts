@@ -1,4 +1,4 @@
-// `npm run providers:check`: checks the TMDB and IGDB credentials in
+// `npm run providers:check`: checks the TMDB, IGDB and Hardcover credentials in
 // .env.local with one search each. Prints only "ok" or "failed" with the HTTP
 // status, never a key or a response body.
 //
@@ -57,8 +57,28 @@ async function checkIgdb(): Promise<string> {
   return res.ok ? "ok" : failed(res);
 }
 
+async function checkHardcover(): Promise<string> {
+  const token = env("HARDCOVER_API_TOKEN").trim().replace(/^Bearer\s+/i, "");
+  const res = await fetch(env("HARDCOVER_API_URL") || "https://api.hardcover.app/v1/graphql", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+      "User-Agent": "upnext (https://github.com/LS901/upnext)",
+    },
+    body: JSON.stringify({ query: '{ search(query: "lantern", query_type: "book", per_page: 1) { results } }' }),
+  });
+  if (!res.ok) return failed(res);
+  try {
+    const body = (await res.json()) as { errors?: unknown[] };
+    return Array.isArray(body.errors) && body.errors.length > 0 ? "failed (bad response)" : "ok";
+  } catch {
+    return "failed (bad response)";
+  }
+}
+
 let allOk = true;
-for (const [name, check] of [["TMDB", checkTmdb], ["IGDB", checkIgdb]] as const) {
+for (const [name, check] of [["TMDB", checkTmdb], ["IGDB", checkIgdb], ["Hardcover", checkHardcover]] as const) {
   const result = await check().catch(() => "failed (network)");
   if (result !== "ok") allOk = false;
   console.log(`${name}: ${result}`);

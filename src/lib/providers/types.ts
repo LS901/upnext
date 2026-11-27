@@ -8,6 +8,8 @@ export type SearchResult = {
   title: string;
   year: number | null;
   imageUrl: string | null;
+  /** Books only: the book has an audio edition. */
+  hasAudiobook?: boolean;
 };
 
 export type SeasonDetails = {
@@ -33,6 +35,21 @@ export type TimeToBeat = {
   count: number | null;
 };
 
+export type BookDetails = {
+  pageCount: number | null;
+  audioMinutes: number | null;
+  hasAudiobook: boolean;
+  narrators: string[];
+  series: {
+    providerId: string;
+    name: string;
+    primaryBooksCount: number | null;
+    isCompleted: boolean | null;
+    position: number | null;
+    positionLabel: string | null;
+  } | null;
+};
+
 export type ItemDetails = {
   provider: Provider;
   mediaType: MediaType;
@@ -47,6 +64,8 @@ export type ItemDetails = {
   /** The time-to-beat request failed, so timeToBeat is unknown rather than absent (always false for TMDB). */
   timeToBeatUnavailable: boolean;
   seasons: SeasonDetails[] | null;
+  /** Books only; null for every other media type. */
+  book: BookDetails | null;
 };
 
 export class ProviderError extends Error {

@@ -87,6 +87,7 @@ test("details normalise the score and attach time to beat", async () => {
     timeToBeat: { hastilyS: 36000, normallyS: 54000, completelyS: null, count: 42 },
     timeToBeatUnavailable: false,
     seasons: null,
+    book: null,
   });
   const bodies = igdbCalls(fn).map((c) => String(c[1]?.body));
   expect(bodies.some((b) => b.includes("where game_id = 5001;"))).toBe(true);

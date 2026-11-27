@@ -189,5 +189,6 @@ export async function getTmdbDetails(
     timeToBeat: null,
     timeToBeatUnavailable: false,
     seasons,
+    book: null,
   };
 }

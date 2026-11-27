@@ -236,5 +236,6 @@ export async function getIgdbDetails(id: string): Promise<ItemDetails> {
     timeToBeat,
     timeToBeatUnavailable: beats === null,
     seasons: null,
+    book: null,
   };
 }

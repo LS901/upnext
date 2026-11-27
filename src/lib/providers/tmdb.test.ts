@@ -80,6 +80,7 @@ test("movie details normalise score to 0-100 and a missing runtime to null", asy
     timeToBeat: null,
     timeToBeatUnavailable: false,
     seasons: null,
+    book: null,
   });
 });
 

@@ -1,0 +1,47 @@
+{
+  "data": {
+    "search": {
+      "results": {
+        "found": 3,
+        "hits": [
+          {
+            "document": {
+              "id": 9001,
+              "title": "The Glass Orchard",
+              "release_year": 2014,
+              "image": { "color": "#aaaaaa", "height": 500, "id": 1, "url": "https://assets.hardcover.app/edition/9001/cover-a.jpg", "width": 333 },
+              "has_audiobook": true,
+              "pages": 320,
+              "rating": 4.1,
+              "ratings_count": 120,
+              "series_names": ["Orchard Cycle"],
+              "description": "INVENTED DESCRIPTION MUST NEVER BE MAPPED"
+            }
+          },
+          {
+            "document": {
+              "id": 9002,
+              "title": "Quiet Harbour",
+              "release_year": null,
+              "image": null,
+              "has_audiobook": false,
+              "pages": null,
+              "rating": null,
+              "ratings_count": 0,
+              "series_names": [],
+              "description": "INVENTED DESCRIPTION MUST NEVER BE MAPPED"
+            }
+          },
+          {
+            "document": {
+              "id": 9003,
+              "title": "",
+              "image": {},
+              "has_audiobook": false
+            }
+          }
+        ]
+      }
+    }
+  }
+}

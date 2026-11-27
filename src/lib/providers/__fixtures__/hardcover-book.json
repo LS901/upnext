@@ -1,0 +1,25 @@
+{
+  "data": {
+    "books_by_pk": {
+      "id": 9001,
+      "title": "The Glass Orchard",
+      "pages": 320,
+      "rating": 4.2,
+      "ratings_count": 1234,
+      "release_date": "2014-06-01",
+      "image": { "url": "https://assets.hardcover.app/edition/9001/cover-a.jpg" },
+      "default_audio_edition": {
+        "audio_seconds": 58253,
+        "contributions": [
+          { "author": { "name": "Ada Example" }, "contributor_role": { "slug": "author" } },
+          { "author": { "name": "Ben Voice" }, "contributor_role": { "slug": "narrator" } },
+          { "author": { "name": "Cora Voice" }, "contributor_role": { "slug": "narrator" } }
+        ]
+      },
+      "book_series": [
+        { "position": 21, "details": "21", "featured": false, "series": { "id": 700, "name": "Orchard Universe", "primary_books_count": 30, "is_completed": null } },
+        { "position": 1, "details": "1", "featured": true, "series": { "id": 800, "name": "Orchard Cycle", "primary_books_count": 6, "is_completed": true } }
+      ]
+    }
+  }
+}
