@@ -17,7 +17,7 @@ import { ProviderError, type MediaType, type Provider, type SearchResult } from 
 import { createClient } from "@/lib/supabase/server";
 import { addItem } from "./actions";
 import { PROVIDER_TYPES, providersToAsk, summarise, type Answer, type Outcome } from "./outcome";
-import { parseSearch, type SearchState } from "./params";
+import { parseSearch, pickerHref, type SearchState } from "./params";
 import { SearchForm } from "./search-form";
 import { logProviderFailure, PROVIDER_NAMES } from "./shared";
 
@@ -227,7 +227,7 @@ function Result({
               <>
                 {owned && <OwnedButton label="In your library" />}
                 {r.mediaType === "show" ? (
-                  <Link href={`/search/show/${r.providerId}`} className={buttonVariants({ variant: "secondary" })}>
+                  <Link href={pickerHref(r.providerId, state)} className={buttonVariants({ variant: "secondary" })}>
                     Choose seasons
                   </Link>
                 ) : (

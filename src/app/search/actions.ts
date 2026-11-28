@@ -7,7 +7,7 @@ import { ProviderError, type MediaType, type Provider } from "@/lib/providers/ty
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
 import { text, texts } from "@/app/form-data";
-import { parseSearch, searchHref } from "./params";
+import { parseSearch, pickerHref, searchHref } from "./params";
 import type { BookVersion } from "@/lib/library/in-library";
 import { logProviderFailure, PROVIDER_ID } from "./shared";
 
@@ -64,13 +64,13 @@ export async function addSeasons(formData: FormData) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
-  const picker = `/search/show/${tmdbId}`;
+  const search = parseSearch({ q: text(formData, "q"), exclude: texts(formData, "exclude") });
   const chosen = new Set(
     texts(formData, "season")
       .filter((s) => SEASON_NUMBER.test(s))
       .map(Number),
   );
-  if (!chosen.size) redirect(picker);
+  if (!chosen.size) redirect(pickerHref(tmdbId, search));
 
   await addEntries(
     "tmdb",
@@ -79,9 +79,9 @@ export async function addSeasons(formData: FormData) {
     user.id,
     // Numbers the catalogue doesn't hold are ignored.
     (imported) => imported.seasons.filter((s) => chosen.has(s.number)).map((s) => ({ season_id: s.id })),
-    `${picker}?failed=tmdb`,
+    pickerHref(tmdbId, search, { failed: "tmdb" }),
   );
-  redirect(`${picker}?added=1`);
+  redirect(searchHref(search, { added: "1" }));
 }
 
 // Imports the item, then inserts the entries as the user (RLS applies,

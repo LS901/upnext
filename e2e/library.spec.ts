@@ -105,7 +105,8 @@ test("add a movie and two seasons, then finish a season", async ({ page }) => {
   await page.getByRole("checkbox", { name: "Season 1 · 8 episodes · 2021", exact: true }).check();
   await page.getByRole("checkbox", { name: "Season 2 · 8 episodes · 2022", exact: true }).check();
   await page.getByRole("button", { name: "Add seasons" }).click();
-  await expect(page).toHaveURL("/search/show/9101?added=1");
+  // The picker returns to the search it came from, with the Games filter kept.
+  await expect(page).toHaveURL((url) => url.pathname === "/search" && url.searchParams.get("added") === "1" && url.searchParams.get("q") === "Kestrel" && url.searchParams.getAll("exclude").join() === "game");
 
   await page.goto("/library");
   await expect(page).toHaveTitle("My library · upnext");
@@ -185,7 +186,7 @@ test("a show with only specials reads No seasons yet", async ({ page }) => {
   await page.goto("/search/show/9102");
   await page.getByRole("checkbox", { name: "Specials", exact: true }).check();
   await page.getByRole("button", { name: "Add seasons" }).click();
-  await expect(page).toHaveURL("/search/show/9102?added=1");
+  await expect(page).toHaveURL("/search?added=1");
 
   await page.goto("/library");
   // A show's progress line shows on its row in a status group, so pause the season.
@@ -203,7 +204,8 @@ test("a double-click on Remove removes the entry once, with no error page", asyn
   await page.goto("/search/show/9101");
   await page.getByRole("checkbox", { name: label, exact: true }).check();
   await page.getByRole("button", { name: "Add seasons" }).click();
-  await expect(page).toHaveURL("/search/show/9101?added=1");
+  // The picker returns to the search it came from, with the Games filter kept.
+  await expect(page).toHaveURL((url) => url.pathname === "/search" && url.searchParams.get("added") === "1" && url.searchParams.get("q") === "Kestrel" && url.searchParams.getAll("exclude").join() === "game");
 
   await page.goto("/library");
   const title = "Harbour of Glass · Season 3";

@@ -10,6 +10,7 @@ import { ProviderError, type ShowSeasons } from "@/lib/providers/types";
 import { createClient } from "@/lib/supabase/server";
 import { addSeasons } from "../../actions";
 import { seasonLabel } from "../../season-label";
+import { parseSearch } from "../../params";
 import { logProviderFailure, PROVIDER_ID, PROVIDER_NAMES } from "../../shared";
 
 // The metadata and the page share one session check and one TMDB request per render.
@@ -46,7 +47,9 @@ async function SeasonPicker({ params, searchParams }: PageProps<"/search/show/[t
 
   const { tmdbId } = await params;
   if (!PROVIDER_ID.test(tmdbId)) notFound();
-  const addFailed = [(await searchParams).failed].flat()[0] === "tmdb";
+  const query = await searchParams;
+  const addFailed = [query.failed].flat()[0] === "tmdb";
+  const search = parseSearch(query);
 
   // One summary request: season numbers, episode counts and air dates only,
   // no synopses or episode titles (INV-004).
@@ -97,6 +100,10 @@ async function SeasonPicker({ params, searchParams }: PageProps<"/search/show/[t
           <Card>
             <CardContent className="gap-6">
               <input type="hidden" name="tmdbId" value={tmdbId} />
+              <input type="hidden" name="q" value={search.q} />
+              {search.exclude.map((type) => (
+                <input key={type} type="hidden" name="exclude" value={type} />
+              ))}
               {list}
               <Button type="submit" className="self-start">
                 Add seasons

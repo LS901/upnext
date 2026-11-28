@@ -148,7 +148,7 @@ test("addSeasons adds the chosen seasons, skipping ones already added and unknow
   insert.mockResolvedValueOnce({ error: null }).mockResolvedValueOnce(pgError("23505"));
 
   await expect(addSeasons(form({ tmdbId: "9101", season: ["0", "2", "2", "7", "x"] }))).rejects.toThrow(
-    "redirect:/search/show/9101?added=1",
+    "redirect:/search?added=1",
   );
   expect(importItem).toHaveBeenCalledWith("tmdb", "show", "9101");
   expect(insert.mock.calls.map(([row]) => row.season_id)).toEqual(["s0", "s2"]);
