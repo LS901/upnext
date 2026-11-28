@@ -121,6 +121,7 @@ describe("books in My library", () => {
         kind: "item",
         entryId: entry.print,
         status: "backlog",
+        playCount: 0,
         mediaType: "book",
         version: "print",
         title: "Invented Standalone Book",

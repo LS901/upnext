@@ -147,6 +147,27 @@ test("add a movie and two seasons, then finish a season", async ({ page }) => {
   await expect(row(group(page, "Finished"), "Harbour of Glass")).toContainText("1 of 3 seasons finished");
 });
 
+test("Watched again counts an extra play once, on movies and on seasons", async ({ page }) => {
+  // The first test left the movie in Up next and season 1 of the show Finished.
+  await page.goto("/library");
+  await queued(queue(page, "Movies"), "Kestrel Morning").getByRole("combobox", { name: "Status" }).selectOption("Finished");
+  const movie = row(group(page, "Finished"), "Kestrel Morning");
+  // A fresh finish is one play: no line yet.
+  await expect(movie).not.toContainText("times");
+  await movie.getByRole("button", { name: "Watched again" }).click();
+  await expect(movie).toContainText("Watched 2 times");
+  await page.reload();
+  await expect(row(group(page, "Finished"), "Kestrel Morning")).toContainText("Watched 2 times");
+
+  // Only Finished rows have the button; a season has its own.
+  const show = row(group(page, "Finished"), "Harbour of Glass");
+  await expect(seasonRow(show, "Season 1 · 8 episodes · 2021").getByRole("button", { name: "Watched again" })).toBeVisible();
+  await expect(seasonRow(show, "Season 1 · 8 episodes · 2021")).not.toContainText("times");
+  await seasonRow(show, "Season 1 · 8 episodes · 2021").getByRole("button", { name: "Watched again" }).click();
+  await expect(seasonRow(show, "Season 1 · 8 episodes · 2021")).toContainText("Watched 2 times");
+  await expect(queue(page, "TV").getByRole("button", { name: "Watched again" })).toHaveCount(0);
+});
+
 test("a game shows its time to beat, and Remove takes it out", async ({ page, account }) => {
   await page.goto("/search");
   await search(page, "Clockwork");
@@ -204,8 +225,8 @@ test("a double-click on Remove removes the entry once, with no error page", asyn
   await page.goto("/search/show/9101");
   await page.getByRole("checkbox", { name: label, exact: true }).check();
   await page.getByRole("button", { name: "Add seasons" }).click();
-  // The picker returns to the search it came from, with the Games filter kept.
-  await expect(page).toHaveURL((url) => url.pathname === "/search" && url.searchParams.get("added") === "1" && url.searchParams.get("q") === "Kestrel" && url.searchParams.getAll("exclude").join() === "game");
+  // Opened directly, with no search to return to.
+  await expect(page).toHaveURL("/search?added=1");
 
   await page.goto("/library");
   const title = "Harbour of Glass · Season 3";

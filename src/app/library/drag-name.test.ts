@@ -6,6 +6,7 @@ const row = (version: ItemRow["version"]): ItemRow => ({
   kind: "item",
   entryId: "e",
   status: "backlog",
+  playCount: 0,
   mediaType: "book",
   version,
   title: "The Lantern Tide",

@@ -14,6 +14,7 @@ const item = (id: string, status: ItemRow["status"], minutes: number | null): It
   kind: "item",
   entryId: id,
   status,
+  playCount: 0,
   mediaType: "movie",
   version: null,
   title: id,
@@ -28,6 +29,7 @@ const item = (id: string, status: ItemRow["status"], minutes: number | null): It
 const season = (id: string, status: SeasonRow["status"], runtimeMinutes: number | null): SeasonRow => ({
   entryId: id,
   status,
+  playCount: 0,
   number: 1,
   episodeCount: null,
   airDate: null,

@@ -24,6 +24,8 @@ export type ItemRow = Score & {
   kind: "item";
   entryId: string;
   status: EntryStatus;
+  /** Extra plays: 0 until played again (Finished itself is one play). */
+  playCount: number;
   mediaType: "movie" | "game" | "book";
   version: "print" | "audio" | null;
   title: string;
@@ -39,6 +41,7 @@ export type ItemRow = Score & {
 export type SeasonRow = {
   entryId: string;
   status: EntryStatus;
+  playCount: number;
   number: number;
   episodeCount: number | null;
   airDate: string | null;
@@ -104,7 +107,7 @@ export async function getMyLibrary(supabase: Client, userId: string): Promise<Li
     supabase
       .from("library_entries")
       .select(
-        `id, status, up_next_position,
+        `id, status, play_count, up_next_position,
          book_version,
          item:items(id, provider, media_type, title, image_ref, runtime_minutes, ttb_normally_s, score, score_count,
            page_count, audio_minutes, narrators, series_position, series_position_label,
@@ -130,7 +133,7 @@ export async function getMyLibrary(supabase: Client, userId: string): Promise<Li
       const i = e.item;
       const mediaType = i.media_type;
       if (mediaType === "show") continue; // the schema never lets an item entry be a show
-      const row = itemRow(e.id, e.status, e.book_version, { ...i, media_type: mediaType });
+      const row = itemRow(e.id, e.status, e.play_count, e.book_version, { ...i, media_type: mediaType });
       if (i.media_type === "book" && i.series) {
         seriesBooks.push({
           seriesId: i.series.id,
@@ -169,6 +172,7 @@ export async function getMyLibrary(supabase: Client, userId: string): Promise<Li
       const seasonRow: SeasonRow = {
         entryId: e.id,
         status: e.status,
+        playCount: e.play_count,
         number: s.season_number,
         episodeCount: s.episode_count,
         airDate: s.air_date,
@@ -264,7 +268,13 @@ type CatalogueItem = {
   narrators: string | null;
 };
 
-function itemRow(entryId: string, status: EntryStatus, bookVersion: BookVersion | null, i: CatalogueItem): ItemRow {
+function itemRow(
+  entryId: string,
+  status: EntryStatus,
+  playCount: number,
+  bookVersion: BookVersion | null,
+  i: CatalogueItem,
+): ItemRow {
   // A book's version is the entry's own (a book entry always has one), never
   // `has_audiobook`, which is unknown (null) once a book's data is purged.
   const version = i.media_type === "book" ? (bookVersion ?? "print") : null;
@@ -280,6 +290,7 @@ function itemRow(entryId: string, status: EntryStatus, bookVersion: BookVersion 
     kind: "item",
     entryId,
     status,
+    playCount,
     mediaType: i.media_type,
     version,
     title: i.title,
@@ -400,5 +411,23 @@ export async function setEntryStatus(
  */
 export async function deleteEntry(supabase: Client, userId: string, entryId: string): Promise<void> {
   const { error } = await supabase.from("library_entries").delete().eq("id", entryId).eq("user_id", userId);
+  if (error) throw error;
+}
+
+/**
+ * Counts one more play of a Finished entry of the user's. `expected` is the
+ * count the page showed: the update only matches that count, so a repeat (a
+ * double-click, a stale page) finds no row and changes nothing, which is
+ * success, as with Remove. Another user's entry, or one that isn't Finished,
+ * is never changed (INV-001), and says nothing either way. finished_at stays.
+ */
+export async function playEntryAgain(supabase: Client, userId: string, entryId: string, expected: number): Promise<void> {
+  const { error } = await supabase
+    .from("library_entries")
+    .update({ play_count: expected + 1 })
+    .eq("id", entryId)
+    .eq("user_id", userId)
+    .eq("play_count", expected)
+    .eq("status", "finished");
   if (error) throw error;
 }

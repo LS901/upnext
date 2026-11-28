@@ -5,7 +5,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { text, texts } from "@/app/form-data";
 import { getCurrentUser } from "@/lib/auth/current-user";
-import { deleteEntry, setEntryStatus } from "@/lib/library/queries";
+import { deleteEntry, playEntryAgain, setEntryStatus } from "@/lib/library/queries";
 import { isEntryStatus } from "@/lib/library/status";
 import { placeInUpNext } from "@/lib/library/up-next";
 import { HIDDEN_COOKIE, hiddenFromShown } from "@/lib/library/up-next-order";
@@ -37,6 +37,21 @@ export async function removeEntry(formData: FormData) {
   if (!user) redirect("/login");
 
   await deleteEntry(await createClient(), user.id, entryId);
+  refresh();
+}
+
+/** "Watched again" and its kin. `expected` is the count the page showed; a repeat changes nothing. */
+export async function playAgain(formData: FormData) {
+  const entryId = text(formData, "entryId");
+  const expected = Number(text(formData, "expected"));
+  if (!UUID.test(entryId) || !Number.isSafeInteger(expected) || expected < 0) {
+    throw new Error("Not a play that can be counted.");
+  }
+
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+
+  await playEntryAgain(await createClient(), user.id, entryId, expected);
   refresh();
 }
 

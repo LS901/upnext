@@ -14,6 +14,7 @@ import { TYPE_LABELS } from "@/lib/format/type-labels";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { bookMeta } from "@/lib/format/book";
 import { formatDuration } from "@/lib/format/duration";
+import { playAgainLabel, playCountLine } from "@/lib/format/plays";
 import { formatScore } from "@/lib/format/score";
 import {
   getMyLibrary,
@@ -37,7 +38,7 @@ import {
   type QueueType,
 } from "@/lib/library/up-next-order";
 import { createClient } from "@/lib/supabase/server";
-import { placeUpNext, removeEntry, setStatus } from "./actions";
+import { placeUpNext, playAgain, removeEntry, setStatus } from "./actions";
 import { QueueVisibility } from "./queue-visibility";
 import { SortableQueue } from "./sortable-queue";
 import { StatusSelect } from "./status-select";
@@ -238,8 +239,14 @@ function Item({ item }: { item: ItemRow }) {
       <div className="min-w-0 flex-1 basis-32">
         <h3 className="font-medium break-words">{item.title}</h3>
         <p className={muted}>{itemMeta(item)}</p>
+        <PlayCount line={playCountLine(item.mediaType, item.version, item.playCount)} />
       </div>
-      <EntryControls entryId={item.entryId} status={item.status} />
+      <EntryControls
+        entryId={item.entryId}
+        status={item.status}
+        playCount={item.playCount}
+        again={playAgainLabel(item.mediaType, item.version)}
+      />
     </li>
   );
 }
@@ -299,8 +306,14 @@ function SeriesBook({ book }: { book: SeriesBookRow }) {
       <div className="min-w-0 flex-1 basis-32">
         <h4 className="break-words">{book.position === null ? book.title : `#${book.position} ${book.title}`}</h4>
         <p className={muted}>{bookMeta(book)}</p>
+        <PlayCount line={playCountLine("book", book.version, book.playCount)} />
       </div>
-      <EntryControls entryId={book.entryId} status={book.status} />
+      <EntryControls
+        entryId={book.entryId}
+        status={book.status}
+        playCount={book.playCount}
+        again={playAgainLabel("book", book.version)}
+      />
     </li>
   );
 }
@@ -311,16 +324,45 @@ function Season({ season }: { season: SeasonRow }) {
       <div className="min-w-0 flex-1 basis-32">
         <h4 className="break-words">{seasonLabel(season)}</h4>
         <p className={muted}>Time to finish: {formatDuration(season.runtimeMinutes)}</p>
+        <PlayCount line={playCountLine("show", null, season.playCount)} />
       </div>
-      <EntryControls entryId={season.entryId} status={season.status} />
+      <EntryControls
+        entryId={season.entryId}
+        status={season.status}
+        playCount={season.playCount}
+        again={playAgainLabel("show", null)}
+      />
     </li>
   );
 }
 
-function EntryControls({ entryId, status }: { entryId: string; status: EntryStatus }) {
+function PlayCount({ line }: { line: string | null }) {
+  return line && <p className={muted}>{line}</p>;
+}
+
+// The play-again button shows only on a Finished row. It names the count this
+// page showed, so a repeated click counts once.
+function EntryControls({
+  entryId,
+  status,
+  playCount,
+  again,
+}: {
+  entryId: string;
+  status: EntryStatus;
+  playCount: number;
+  again: string;
+}) {
   return (
     <div className="flex flex-wrap items-center gap-2">
       <StatusChip status={status} />
+      {status === "finished" && (
+        <form action={playAgain}>
+          <input type="hidden" name="entryId" value={entryId} />
+          <input type="hidden" name="expected" value={playCount} />
+          <SubmitButton>{again}</SubmitButton>
+        </form>
+      )}
       <form action={setStatus}>
         <input type="hidden" name="entryId" value={entryId} />
         <StatusSelect status={status} />
