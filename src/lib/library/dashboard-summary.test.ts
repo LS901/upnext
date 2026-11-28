@@ -44,6 +44,7 @@ const show = (seasons: SeasonRow[]): ShowRow => ({
   scoreCount: null,
   progress: { finished: 0, total: 0 },
   seasons,
+  allSeasons: [],
 });
 const queuedSeason = (id: string, runtimeMinutes: number | null): QueuedSeasonRow => ({
   ...season(id, "backlog", runtimeMinutes),

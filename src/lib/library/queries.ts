@@ -1,5 +1,6 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { seasonLabel } from "@/app/search/season-label";
 import { igdbImageUrl } from "@/lib/providers/igdb";
 import { tmdbImageUrl } from "@/lib/providers/tmdb";
 import type { Provider } from "@/lib/providers/types";
@@ -56,6 +57,8 @@ export type ShowRow = Score & {
   imageUrl: string | null;
   progress: { finished: number; total: number };
   seasons: SeasonRow[];
+  /** Every season counted (specials left out), whether added or not, for the Progress control. */
+  allSeasons: { seasonId: string; number: number; label: string; excluded: boolean }[];
 };
 
 /** A book under its series: `position` is its label ("2", "2.5"), or null when unknown. */
@@ -71,6 +74,8 @@ export type SeriesRow = Score & {
   title: string;
   progress: { read: number; total: number };
   books: SeriesBookRow[];
+  /** The series' main-line books in `items` (the only ones that count), for the Progress control. */
+  allBooks: { itemId: string; label: string; excluded: boolean }[];
 };
 
 export type LibraryGroup = { status: EntryStatus; label: string; rows: (ItemRow | ShowRow | SeriesRow)[] };
@@ -158,6 +163,7 @@ export async function getMyLibrary(supabase: Client, userId: string): Promise<Li
               scoreCount: null,
               progress: { read: 0, total: 0 },
               books: [],
+              allBooks: [],
             },
             primaryBooksCount: i.series.primary_books_count,
           };
@@ -204,6 +210,7 @@ export async function getMyLibrary(supabase: Client, userId: string): Promise<Li
           scoreCount: s.show.score_count,
           progress: { finished: 0, total: 0 },
           seasons: [],
+          allSeasons: [],
         };
         shows.set(show.showId, show);
       }
@@ -325,6 +332,15 @@ async function addSeriesProgress(
       .range(from, to),
   );
   const excluded = new Set(exclusions.map((x) => x.item_id));
+  const catalogue = await fetchAllIn([...series.keys()], (ids, from, to) =>
+    supabase
+      .from("items")
+      .select("id, title, series_id, series_position, series_position_label")
+      .in("series_id", ids)
+      .eq("media_type", "book")
+      .order("id")
+      .range(from, to),
+  );
   const all: SeriesBook[] = [
     ...books.map((b) => ({ ...b, excluded: excluded.has(b.itemId) })),
     ...exclusions.flatMap((x) =>
@@ -340,6 +356,22 @@ async function addSeriesProgress(
     bySeries.set(b.seriesId, list);
   }
   for (const [id, s] of series) s.row.progress = seriesProgress(s.primaryBooksCount, bySeries.get(id) ?? []);
+
+  // The control lists the main-line books, the only ones whose exclusion changes the count.
+  const mainLine = catalogue
+    .flatMap((b) =>
+      b.series_id && b.series_position !== null && Number.isInteger(b.series_position)
+        ? [{ ...b, seriesId: b.series_id, position: b.series_position }]
+        : [],
+    )
+    .sort((x, y) => x.position - y.position || x.title.localeCompare(y.title));
+  for (const b of mainLine) {
+    series.get(b.seriesId)?.row.allBooks.push({
+      itemId: b.id,
+      label: `#${b.series_position_label ?? b.position} ${b.title}`,
+      excluded: excluded.has(b.id),
+    });
+  }
 }
 
 // Every season of each show counts, not only the ones the user added, minus
@@ -355,7 +387,10 @@ async function addProgress(
   // seasons past one page.
   const [seasons, exclusions] = await Promise.all([
     fetchAllIn([...shows.keys()], (ids, from, to) =>
-      supabase.from("seasons").select("id, show_id, season_number").in("show_id", ids).order("id").range(from, to),
+      supabase
+        .from("seasons")
+        .select("id, show_id, season_number, episode_count, air_date")
+        .in("show_id", ids).order("id").range(from, to),
     ),
     // All of the user's exclusions; only those on these shows' seasons match below.
     fetchAll((from, to) =>
@@ -377,6 +412,16 @@ async function addProgress(
   }
   for (const show of shows.values()) {
     show.progress = showProgress(byShow.get(show.showId) ?? [], finishedSeasonIds, excluded);
+  }
+  // The control's list: every season counted (specials left out), in order.
+  for (const s of [...seasons].sort((x, y) => x.season_number - y.season_number)) {
+    if (s.season_number < 1) continue;
+    shows.get(s.show_id)?.allSeasons.push({
+      seasonId: s.id,
+      number: s.season_number,
+      label: seasonLabel({ number: s.season_number, episodeCount: s.episode_count, airDate: s.air_date }),
+      excluded: excluded.has(s.id),
+    });
   }
 }
 

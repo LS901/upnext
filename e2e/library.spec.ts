@@ -68,6 +68,14 @@ function seasonRow(show: Locator, label: string) {
   return show.getByRole("listitem").filter({ has: show.page().getByRole("heading", { level: 4, name: label, exact: true }) });
 }
 
+/** Opens a row's "Progress" disclosure if it isn't open already. */
+async function openProgress(rowLocator: Locator) {
+  const details = rowLocator.locator("details").first();
+  if (!(await details.evaluate((el) => (el as HTMLDetailsElement).open))) {
+    await details.getByText("Progress", { exact: true }).click();
+  }
+}
+
 async function userId(username: string): Promise<string> {
   const { data, error } = await adminClient().from("profiles").select("id").eq("username", username).single();
   if (error) throw error;
@@ -166,6 +174,37 @@ test("Watched again counts an extra play once, on movies and on seasons", async 
   await seasonRow(show, "Season 1 · 8 episodes · 2021").getByRole("button", { name: "Watched again" }).click();
   await expect(seasonRow(show, "Season 1 · 8 episodes · 2021")).toContainText("Watched 2 times");
   await expect(queue(page, "TV").getByRole("button", { name: "Watched again" })).toHaveCount(0);
+});
+
+test("Progress lets a show leave a season out of its count, and a repeat save changes nothing", async ({ page }) => {
+  // Season 1 of the show is Finished: 1 of 3 (season 3 counts though it isn't added).
+  await page.goto("/library");
+  const show = row(group(page, "Finished"), "Harbour of Glass");
+  await expect(show).toContainText("1 of 3 seasons finished");
+  // Closed until opened; specials aren't offered.
+  await openProgress(show);
+  await expect(show.getByRole("checkbox", { name: /Count this season/ })).toHaveCount(3);
+  await expect(show.getByRole("checkbox", { name: /Specials/ })).toHaveCount(0);
+  await show.getByRole("checkbox", { name: /Season 3/ }).uncheck();
+  await show.getByRole("button", { name: "Save" }).click();
+  await expect(show).toContainText("1 of 2 seasons finished");
+
+  // Open again, it remembers the unticked season; saving the same form again is a no-op.
+  await page.reload();
+  const again = row(group(page, "Finished"), "Harbour of Glass");
+  await openProgress(again);
+  await expect(again.getByRole("checkbox", { name: /Season 3/ })).not.toBeChecked();
+  await expect(again.getByRole("checkbox", { name: /Season 2/ })).toBeChecked();
+  await again.getByRole("button", { name: "Save" }).click();
+  await expect(again).toContainText("1 of 2 seasons finished");
+
+  // Ticking it again puts the count back.
+  await page.reload();
+  const last = row(group(page, "Finished"), "Harbour of Glass");
+  await openProgress(last);
+  await last.getByRole("checkbox", { name: /Season 3/ }).check();
+  await last.getByRole("button", { name: "Save" }).click();
+  await expect(last).toContainText("1 of 3 seasons finished");
 });
 
 test("a game shows its time to beat, and Remove takes it out", async ({ page, account }) => {

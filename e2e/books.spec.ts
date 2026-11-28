@@ -225,4 +225,21 @@ test("print and audiobook queue under Books, and a started book sits under its s
   await expect(series("Finished")).toContainText("Audiobook · 8 h 20 min");
   await expect(series("In progress")).toContainText("Series · 1 of 4 read");
   await expect(queued).toHaveCount(0);
+
+  // Progress: leave the book out of the count (the series' total drops by one,
+  // and with it the book's read), then put it back. A repeat save changes nothing.
+  const finishedSeries = series("Finished");
+  await finishedSeries.getByText("Progress", { exact: true }).click();
+  const box = finishedSeries.getByRole("checkbox", { name: /Count this book.*#2 Glasswing Signal/ });
+  await expect(box).toBeChecked();
+  await box.uncheck();
+  await finishedSeries.getByRole("button", { name: "Save" }).click();
+  await expect(finishedSeries).toContainText("Series · 0 of 3 read");
+  await page.reload();
+  await expect(series("Finished")).toContainText("Series · 0 of 3 read");
+  await series("Finished").getByText("Progress", { exact: true }).click();
+  await expect(series("Finished").getByRole("checkbox", { name: /#2 Glasswing Signal/ })).not.toBeChecked();
+  await series("Finished").getByRole("checkbox", { name: /#2 Glasswing Signal/ }).check();
+  await series("Finished").getByRole("button", { name: "Save" }).click();
+  await expect(series("Finished")).toContainText("Series · 1 of 4 read");
 });

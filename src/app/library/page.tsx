@@ -38,7 +38,7 @@ import {
   type QueueType,
 } from "@/lib/library/up-next-order";
 import { createClient } from "@/lib/supabase/server";
-import { placeUpNext, playAgain, removeEntry, setStatus } from "./actions";
+import { placeUpNext, playAgain, removeEntry, setBookExclusions, setSeasonExclusions, setStatus } from "./actions";
 import { QueueVisibility } from "./queue-visibility";
 import { SortableQueue } from "./sortable-queue";
 import { StatusSelect } from "./status-select";
@@ -266,6 +266,14 @@ function Show({ show }: { show: ShowRow }) {
           {total > 0 && <Progress aria-hidden="true" value={(finished / total) * 100} className="mt-2 max-w-48" />}
         </div>
       </div>
+      {show.allSeasons.length > 0 && (
+        <CountControl
+          action={setSeasonExclusions}
+          hidden={{ name: "showId", value: show.showId }}
+          noun="season"
+          items={show.allSeasons.map((s) => ({ id: s.seasonId, label: s.label, counted: !s.excluded }))}
+        />
+      )}
       <ul className="mt-2 flex flex-col divide-y divide-border sm:pl-24">
         {show.seasons.map((season) => (
           <Season key={season.entryId} season={season} />
@@ -291,6 +299,14 @@ function Series({ series }: { series: SeriesRow }) {
           {total > 0 && <Progress aria-hidden="true" value={Math.min(100, (read / total) * 100)} className="mt-2 max-w-48" />}
         </div>
       </div>
+      {series.allBooks.length > 0 && (
+        <CountControl
+          action={setBookExclusions}
+          hidden={{ name: "seriesId", value: series.seriesId }}
+          noun="book"
+          items={series.allBooks.map((b) => ({ id: b.itemId, label: b.label, counted: !b.excluded }))}
+        />
+      )}
       <ul className="mt-2 flex flex-col divide-y divide-border sm:pl-24">
         {series.books.map((book) => (
           <SeriesBook key={book.entryId} book={book} />
@@ -333,6 +349,49 @@ function Season({ season }: { season: SeasonRow }) {
         again={playAgainLabel("show", null)}
       />
     </li>
+  );
+}
+
+// "Progress": which seasons or books count toward the row's progress. Native
+// controls only, so it works without JavaScript; Save sets the exclusions to
+// exactly the unticked ones (a repeat changes nothing). Each box's label names
+// its own item, so a screen reader hears which one it is.
+function CountControl({
+  action,
+  hidden,
+  noun,
+  items,
+}: {
+  action: (formData: FormData) => Promise<void>;
+  hidden: { name: string; value: string };
+  noun: "season" | "book";
+  items: { id: string; label: string; counted: boolean }[];
+}) {
+  return (
+    <details className="mt-2 sm:pl-24">
+      <summary className="w-fit cursor-pointer rounded text-sm text-muted-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+        Progress
+      </summary>
+      <form action={action} className="mt-2 flex flex-col gap-2">
+        <input type="hidden" name={hidden.name} value={hidden.value} />
+        <ul className="flex flex-col gap-1">
+          {items.map((item) => (
+            <li key={item.id}>
+              <label className="flex items-start gap-2 text-sm break-words">
+                <input type="checkbox" name="counted" value={item.id} defaultChecked={item.counted} className="mt-1" />
+                <span>
+                  <span className="sr-only">Count this {noun}: </span>
+                  {item.label}
+                </span>
+              </label>
+            </li>
+          ))}
+        </ul>
+        <div>
+          <SubmitButton>Save</SubmitButton>
+        </div>
+      </form>
+    </details>
   );
 }
 

@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { text, texts } from "@/app/form-data";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { setBookExclusions as saveBookExclusions, setSeasonExclusions as saveSeasonExclusions } from "@/lib/library/exclusions";
 import { deleteEntry, playEntryAgain, setEntryStatus } from "@/lib/library/queries";
 import { isEntryStatus } from "@/lib/library/status";
 import { placeInUpNext } from "@/lib/library/up-next";
@@ -52,6 +53,36 @@ export async function playAgain(formData: FormData) {
   if (!user) redirect("/login");
 
   await playEntryAgain(await createClient(), user.id, entryId, expected);
+  refresh();
+}
+
+/**
+ * The "Progress" control on a show row: `counted` holds the ticked seasons, and
+ * the user's exclusions for the show become exactly the rest. A repeat saves
+ * the same rows. Ids that aren't the show's seasons are ignored.
+ */
+export async function setSeasonExclusions(formData: FormData) {
+  const showId = text(formData, "showId");
+  const counted = texts(formData, "counted");
+  if (!UUID.test(showId) || !counted.every((id) => UUID.test(id))) throw new Error("Not a progress change that can be made.");
+
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+
+  await saveSeasonExclusions(await createClient(), user.id, showId, counted);
+  refresh();
+}
+
+/** The same for a series row's books. */
+export async function setBookExclusions(formData: FormData) {
+  const seriesId = text(formData, "seriesId");
+  const counted = texts(formData, "counted");
+  if (!UUID.test(seriesId) || !counted.every((id) => UUID.test(id))) throw new Error("Not a progress change that can be made.");
+
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+
+  await saveBookExclusions(await createClient(), user.id, seriesId, counted);
   refresh();
 }
 
