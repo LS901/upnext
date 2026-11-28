@@ -129,6 +129,7 @@ describe("books in My library", () => {
         minutes: null,
         pages: 320,
         narrators: null,
+        lengthNote: null,
         providerName: "hardcover",
         score: 84,
         scoreCount: 1234,

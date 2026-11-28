@@ -22,6 +22,7 @@ const item = (id: string, status: ItemRow["status"], minutes: number | null): It
   minutes,
   pages: null,
   narrators: null,
+  lengthNote: null,
   providerName: "tmdb",
   score: null,
   scoreCount: null,
@@ -56,6 +57,12 @@ const queuedSeason = (id: string, runtimeMinutes: number | null): QueuedSeasonRo
 });
 
 describe("summarise", () => {
+  test("an Other entry counts as without a time, never as time", () => {
+    const other: ItemRow = { ...item("o1", "backlog", null), mediaType: "other", lengthNote: "24 episodes", providerName: "manual" };
+    const view: LibraryView = { upNext: { movie: [], show: [], game: [], book: [], other: [other] }, groups: [] };
+    expect(summarise(view)).toMatchObject({ backlog: 1, backlogMinutes: 0, backlogUnknownTime: 1 });
+  });
+
   test("counts entries, backlog minutes and unknown times", () => {
     const view: LibraryView = {
       upNext: {
@@ -63,6 +70,7 @@ describe("summarise", () => {
         show: [queuedSeason("s1", 60), queuedSeason("s2", 40)],
         game: [],
         book: [],
+        other: [],
       },
       groups: [
         { status: "in_progress", label: "In progress", rows: [item("p1", "in_progress", 90), show([season("ps", "in_progress", 50)])] },
@@ -73,7 +81,7 @@ describe("summarise", () => {
   });
 
   test("a queued season counts as backlog", () => {
-    const view: LibraryView = { upNext: { movie: [], show: [queuedSeason("qs", null)], game: [], book: [] }, groups: [] };
+    const view: LibraryView = { upNext: { movie: [], show: [queuedSeason("qs", null)], game: [], book: [], other: [] }, groups: [] };
     expect(summarise(view)).toEqual({ backlog: 1, backlogMinutes: 0, backlogUnknownTime: 1, backlogPages: 0, inProgress: 0, finished: 0 });
   });
 });
@@ -99,6 +107,7 @@ describe("summarise with books", () => {
           book("a1", "audio", { minutes: 600 }),
           book("a2", "audio", { minutes: null }),
         ],
+        other: [],
       },
       groups: [],
     };
@@ -113,7 +122,7 @@ describe("summarise with books", () => {
   });
 
   test("a print book with no page count never counts as unknown", () => {
-    const view: LibraryView = { upNext: { movie: [], show: [], game: [], book: [book("p", "print", { pages: null })] }, groups: [] };
+    const view: LibraryView = { upNext: { movie: [], show: [], game: [], book: [book("p", "print", { pages: null })], other: [] }, groups: [] };
     expect(summarise(view)).toEqual({
       backlog: 1,
       backlogMinutes: 0,

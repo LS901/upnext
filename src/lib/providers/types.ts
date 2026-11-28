@@ -1,5 +1,5 @@
-export type Provider = "tmdb" | "igdb" | "hardcover";
-export type MediaType = "movie" | "show" | "game" | "book";
+export type Provider = "tmdb" | "igdb" | "hardcover" | "manual";
+export type MediaType = "movie" | "show" | "game" | "book" | "other";
 
 export type SearchResult = {
   provider: Provider;

@@ -22,18 +22,18 @@ describe("which queues are hidden", () => {
   });
 
   test("the ticked boxes are what's shown; the rest is hidden", () => {
-    expect(hiddenFromShown(["movie", "show", "game", "book"])).toBe("");
-    expect(hiddenFromShown(["movie", "show", "game"])).toBe("book");
-    expect(hiddenFromShown(["show"])).toBe("movie,game,book");
-    expect(hiddenFromShown(["show", "nonsense"])).toBe("movie,game,book");
-    expect(hiddenFromShown([])).toBe("movie,show,game,book");
+    expect(hiddenFromShown(["movie", "show", "game", "book", "other"])).toBe("");
+    expect(hiddenFromShown(["movie", "show", "game", "other"])).toBe("book");
+    expect(hiddenFromShown(["show"])).toBe("movie,game,book,other");
+    expect(hiddenFromShown(["show", "nonsense"])).toBe("movie,game,book,other");
+    expect(hiddenFromShown([])).toBe("movie,show,game,book,other");
   });
 });
 
 describe("queue types", () => {
-  test("My library shows Movies, TV, Games, then Books", () => {
-    expect(QUEUE_TYPES).toEqual(["movie", "show", "game", "book"]);
-    expect(QUEUE_TYPES.map((type) => QUEUE_LABELS[type])).toEqual(["Movies", "TV", "Games", "Books"]);
+  test("My library shows Movies, TV, Games, Books, then Other", () => {
+    expect(QUEUE_TYPES).toEqual(["movie", "show", "game", "book", "other"]);
+    expect(QUEUE_TYPES.map((type) => QUEUE_LABELS[type])).toEqual(["Movies", "TV", "Games", "Books", "Other"]);
   });
 });
 

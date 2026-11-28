@@ -27,13 +27,15 @@ export type ItemRow = Score & {
   status: EntryStatus;
   /** Extra plays: 0 until played again (Finished itself is one play). */
   playCount: number;
-  mediaType: "movie" | "game" | "book";
+  mediaType: "movie" | "game" | "book" | "other";
   version: "print" | "audio" | null;
   title: string;
   imageUrl: string | null;
   minutes: number | null;
   pages: number | null;
   narrators: string | null;
+  /** Other only: the length the user typed ("24 episodes"), else null. */
+  lengthNote: string | null;
   /** For the score label ("Hardcover rating 4.2/5" for a book). */
   providerName: Provider;
 };
@@ -95,6 +97,7 @@ export type UpNextRow = ItemRow | QueuedSeasonRow;
 export type LibraryView = { upNext: Record<QueueType, UpNextRow[]>; groups: LibraryGroup[] };
 
 export function imageUrl(provider: Provider, ref: string | null): string | null {
+  if (provider === "manual") return null; // an own entry has no image (a link would reach a stranger's host)
   if (provider === "hardcover") return ref; // the ref is already the full cover URL
   return provider === "tmdb" ? tmdbImageUrl(ref) : igdbImageUrl(ref);
 }
@@ -115,7 +118,7 @@ export async function getMyLibrary(supabase: Client, userId: string): Promise<Li
         `id, status, play_count, up_next_position,
          book_version,
          item:items(id, provider, media_type, title, image_ref, runtime_minutes, ttb_normally_s, score, score_count,
-           page_count, audio_minutes, narrators, series_position, series_position_label,
+           page_count, audio_minutes, narrators, length_note, series_position, series_position_label,
            series:book_series(id, name, primary_books_count)),
          season:seasons(id, season_number, episode_count, air_date, runtime_minutes,
            show:items(id, provider, title, image_ref, score, score_count))`,
@@ -263,7 +266,7 @@ type BookVersion = Database["public"]["Enums"]["book_version"];
 type CatalogueItem = {
   id: string;
   provider: Provider;
-  media_type: "movie" | "game" | "book";
+  media_type: "movie" | "game" | "book" | "other";
   title: string;
   image_ref: string | null;
   runtime_minutes: number | null;
@@ -273,6 +276,7 @@ type CatalogueItem = {
   page_count: number | null;
   audio_minutes: number | null;
   narrators: string | null;
+  length_note: string | null;
 };
 
 function itemRow(
@@ -305,6 +309,7 @@ function itemRow(
     minutes,
     pages: version === "print" ? i.page_count : null,
     narrators: version === "audio" ? i.narrators : null,
+    lengthNote: i.media_type === "other" ? i.length_note : null,
     providerName: i.provider,
     score: i.score,
     scoreCount: i.score_count,
@@ -449,14 +454,27 @@ export async function setEntryStatus(
 }
 
 /**
- * Deletes one of the user's entries. Idempotent: when no row goes, the entry
+ * Deletes one of the user's entries (and, for Other, its item). Idempotent: when no row goes, the entry
  * is already gone (a double-click on Remove), which is success. The filter on
  * the user, and RLS, mean another user's entry is never deleted (INV-001),
  * and the same quiet success tells the caller nothing about it.
  */
 export async function deleteEntry(supabase: Client, userId: string, entryId: string): Promise<void> {
-  const { error } = await supabase.from("library_entries").delete().eq("id", entryId).eq("user_id", userId);
+  const { data, error } = await supabase
+    .from("library_entries")
+    .delete()
+    .eq("id", entryId)
+    .eq("user_id", userId)
+    .select("item_id, item_media_type");
   if (error) throw error;
+  // An Other entry is the user's own item, so removing the entry removes the item
+  // (the entry first: the foreign key restricts). Never a catalogue item. If
+  // anything else still points at it (23503), it stays.
+  for (const entry of data) {
+    if (entry.item_media_type !== "other" || !entry.item_id) continue;
+    const removed = await supabase.from("items").delete().eq("id", entry.item_id).eq("owner_id", userId);
+    if (removed.error && removed.error.code !== "23503") throw removed.error;
+  }
 }
 
 /**

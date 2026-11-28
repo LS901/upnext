@@ -15,15 +15,16 @@ import { searchIgdb } from "@/lib/providers/igdb";
 import { searchTmdb } from "@/lib/providers/tmdb";
 import { ProviderError, type MediaType, type Provider, type SearchResult } from "@/lib/providers/types";
 import { createClient } from "@/lib/supabase/server";
-import { addItem } from "./actions";
+import { addItem, addOwnEntry } from "./actions";
 import { PROVIDER_TYPES, providersToAsk, summarise, type Answer, type Outcome } from "./outcome";
 import { parseSearch, pickerHref, type SearchState } from "./params";
 import { SearchForm } from "./search-form";
-import { logProviderFailure, PROVIDER_NAMES } from "./shared";
+import { logProviderFailure, OWN_LENGTH_MAX, OWN_TITLE_MAX, PROVIDER_NAMES } from "./shared";
 
 export const metadata: Metadata = { title: "Search" };
 
-const HIDE_LABELS: Record<MediaType, string> = { movie: "Movies", show: "TV", game: "Games", book: "Books" };
+// No box for Other: a search never asks a provider for it.
+const HIDE_LABELS: Record<Exclude<MediaType, "other">, string> = { movie: "Movies", show: "TV", game: "Games", book: "Books" };
 
 export default function SearchPage({ searchParams }: PageProps<"/search">) {
   return (
@@ -41,6 +42,7 @@ const SEARCHES: Record<Provider, (q: string) => Promise<SearchResult[]>> = {
   tmdb: searchTmdb,
   igdb: searchIgdb,
   hardcover: searchHardcover,
+  manual: async () => [],
 };
 
 // Queries only the providers whose types aren't hidden (none when every type
@@ -89,6 +91,8 @@ async function SearchContent({ searchParams }: Pick<PageProps<"/search">, "searc
   const addFailed = [params.failed].flat()[0];
   if (addFailed === "tmdb" || addFailed === "igdb" || addFailed === "hardcover") failed.add(addFailed);
 
+  const ownError = [params.error].flat()[0] === "own-entry";
+
   return (
     <div className="mt-6 grid gap-8 md:grid-cols-[1fr_10rem]">
       <div className="flex flex-col gap-6">
@@ -98,6 +102,8 @@ async function SearchContent({ searchParams }: Pick<PageProps<"/search">, "searc
         <p role="status" className="sr-only">
           {outcome && !outcome.everythingHidden && (outcome.results.length ? resultCount(outcome.results.length) : "No results.")}
         </p>
+
+        <OwnEntryForm state={state} error={ownError} />
 
         {[...failed].map((provider) => (
           <p key={provider} role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-foreground">
@@ -150,6 +156,54 @@ async function SearchContent({ searchParams }: Pick<PageProps<"/search">, "searc
         </div>
       </aside>
     </div>
+  );
+}
+
+// "Add your own": an entry that isn't from a provider (Other). A native form inside
+// a <details>, so it stays quiet and works without JavaScript. The form is open
+// again after a refusal, with the message beside it.
+function OwnEntryForm({ state, error }: { state: SearchState; error: boolean }) {
+  const field =
+    "block h-11 w-full rounded-md border border-input bg-secondary px-3 text-foreground placeholder:text-muted-foreground lg:h-10";
+  return (
+    <details open={error || undefined} className="rounded-lg border border-border px-4 py-3">
+      <summary className="inline-flex min-h-11 w-fit cursor-pointer items-center rounded text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring lg:min-h-0">
+        Add your own
+      </summary>
+      <form action={addOwnEntry} className="mt-3 flex flex-col gap-3">
+        <input type="hidden" name="q" value={state.q} />
+        {state.exclude.map((type) => (
+          <input key={type} type="hidden" name="exclude" value={type} />
+        ))}
+        {error && (
+          <p role="alert" className="text-sm text-destructive">
+            Give it a title of up to {OWN_TITLE_MAX} characters.
+          </p>
+        )}
+        <div className="flex flex-col gap-1 text-sm">
+          <label htmlFor="own-title">Title</label>
+          <input id="own-title" type="text" name="title" required autoComplete="off" className={field} />
+        </div>
+        <div className="flex flex-col gap-1 text-sm">
+          <label htmlFor="own-length">Length (optional)</label>
+          <input
+            id="own-length"
+            type="text"
+            name="lengthNote"
+            autoComplete="off"
+            placeholder="for example 24 episodes"
+            aria-describedby="own-length-hint"
+            className={field}
+          />
+          <p id="own-length-hint" className="text-muted-foreground">
+            Up to {OWN_LENGTH_MAX} characters.
+          </p>
+        </div>
+        <div>
+          <Button type="submit">Add your own</Button>
+        </div>
+      </form>
+    </details>
   );
 }
 

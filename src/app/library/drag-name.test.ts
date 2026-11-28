@@ -14,6 +14,7 @@ const row = (version: ItemRow["version"]): ItemRow => ({
   minutes: null,
   pages: null,
   narrators: null,
+  lengthNote: null,
   providerName: "hardcover",
   score: null,
   scoreCount: null,

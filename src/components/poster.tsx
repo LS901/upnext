@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { BookOpen, Film, Gamepad2, Tv } from "lucide-react";
+import { BookOpen, Film, Gamepad2, Shapes, Tv } from "lucide-react";
 import type { MediaType } from "@/lib/providers/types";
 import { cn } from "@/lib/utils";
 
@@ -11,7 +11,7 @@ const DIMENSIONS: Record<Size, { width: number; height: number }> = {
   lg: { width: 120, height: 180 },
 };
 
-const ICONS = { movie: Film, show: Tv, game: Gamepad2, book: BookOpen } as const;
+const ICONS = { movie: Film, show: Tv, game: Gamepad2, book: BookOpen, other: Shapes } as const;
 
 function initials(title: string): string {
   return title

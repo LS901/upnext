@@ -225,6 +225,8 @@ function Group({ group }: { group: LibraryGroup }) {
 
 function itemMeta(item: ItemRow): string {
   if (item.mediaType === "book") return bookMeta(item);
+  // Other has no time, no score: its label, then the length the user typed.
+  if (item.mediaType === "other") return item.lengthNote ? `${TYPE_LABELS.other} · ${item.lengthNote}` : TYPE_LABELS.other;
   const time =
     item.mediaType === "game"
       ? `Time to beat: ${formatDuration(item.minutes)} (story)`

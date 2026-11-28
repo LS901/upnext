@@ -50,6 +50,7 @@ export async function refreshStaleItems(
   const { data: stale, error } = await admin
     .from("items")
     .select("id, provider, media_type, provider_id")
+    .neq("provider", "manual") // a user's own entry has no provider to ask
     .lt("refreshed_at", cutoff)
     .or(`refresh_attempted_at.is.null,refresh_attempted_at.lt."${cutoff}"`)
     .order("refresh_attempted_at", { ascending: true, nullsFirst: true })
@@ -94,6 +95,7 @@ async function purgeStaleProviderData(admin: Admin): Promise<number> {
     const { data: batch, error } = await admin
       .from("items")
       .select("id")
+      .neq("provider", "manual")
       .lt("refreshed_at", cutoff)
       .is("provider_data_purged_at", null)
       .limit(BATCH);
@@ -138,7 +140,8 @@ async function purgeStaleProviderData(admin: Admin): Promise<number> {
 /**
  * Deletes items imported more than PRUNE_AFTER_DAYS ago that nobody tracks:
  * no library entry on the item or any of its seasons, and no progress
- * exclusion on its seasons. The seasons go with the item (cascade). If someone
+ * exclusion on its seasons. A manual item with an entry counts as tracked, so
+ * it stays like any other. The seasons go with the item (cascade). If someone
  * starts tracking it meanwhile, the restrict foreign keys refuse the delete
  * (23503) and it is skipped.
  */

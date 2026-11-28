@@ -1,5 +1,6 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { importItem, type ImportedItem } from "@/lib/catalogue/import";
@@ -9,7 +10,7 @@ import type { Database } from "@/lib/supabase/database.types";
 import { text, texts } from "@/app/form-data";
 import { parseSearch, pickerHref, searchHref } from "./params";
 import type { BookVersion } from "@/lib/library/in-library";
-import { logProviderFailure, PROVIDER_ID } from "./shared";
+import { logProviderFailure, OWN_LENGTH_MAX, OWN_TITLE_MAX, PROVIDER_ID } from "./shared";
 
 type NewEntry = Pick<
   Database["public"]["Tables"]["library_entries"]["Insert"],
@@ -81,6 +82,51 @@ export async function addSeasons(formData: FormData) {
     (imported) => imported.seasons.filter((s) => chosen.has(s.number)).map((s) => ({ season_id: s.id })),
     pickerHref(tmdbId, search, { failed: "tmdb" }),
   );
+  redirect(searchHref(search, { added: "1" }));
+}
+
+// Counted in characters (code points), as the database counts the length note.
+const chars = (value: string) => Array.from(value).length;
+
+// Adds the user's own entry (Other) to their Up next: a manual item owned by the
+// user, then a Backlog entry on it, both through the user's own client so RLS
+// applies (INV-001, INV-002). Nothing is sent to a provider, and nothing from the
+// form but the title and the length note is read. Invalid input goes back to the
+// search with a message and the search kept.
+export async function addOwnEntry(formData: FormData) {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+
+  const search = parseSearch({ q: text(formData, "q"), exclude: texts(formData, "exclude") });
+  const title = text(formData, "title").trim();
+  const lengthNote = text(formData, "lengthNote").trim();
+  if (!title || chars(title) > OWN_TITLE_MAX || chars(lengthNote) > OWN_LENGTH_MAX) {
+    redirect(searchHref(search, { error: "own-entry" }));
+  }
+
+  const supabase = await createClient();
+  const { data: item, error } = await supabase
+    .from("items")
+    .insert({
+      provider: "manual",
+      media_type: "other",
+      provider_id: randomUUID(),
+      title,
+      length_note: lengthNote || null,
+      owner_id: user.id,
+    })
+    .select("id")
+    .single();
+  if (error) throw new Error(`Couldn't add to the library: ${error.message}`, { cause: error });
+
+  const { error: entryError } = await supabase
+    .from("library_entries")
+    .insert({ item_id: item.id, item_media_type: "other", user_id: user.id, status: "backlog" });
+  if (entryError) {
+    // Don't leave an item with no entry behind.
+    await supabase.from("items").delete().eq("id", item.id).eq("owner_id", user.id);
+    throw new Error(`Couldn't add to the library: ${entryError.message}`, { cause: entryError });
+  }
   redirect(searchHref(search, { added: "1" }));
 }
 
