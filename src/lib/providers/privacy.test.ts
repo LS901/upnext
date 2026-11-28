@@ -98,7 +98,7 @@ const ALLOWED_HEADERS = new Set(["authorization", "client-id", "accept", "conten
 
 const IGDB_BODIES = new Set([
   'search "lantern"; fields name,first_release_date,cover.image_id; limit 10;',
-  "fields name,first_release_date,cover.image_id,total_rating,total_rating_count; where id = 5001; limit 1;",
+  "fields name,first_release_date,cover.image_id,total_rating,total_rating_count,genres.name; where id = 5001; limit 1;",
   "fields hastily,normally,completely,count; where game_id = 5001;",
 ]);
 

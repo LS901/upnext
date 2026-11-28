@@ -9,6 +9,12 @@
 //   only after HARDCOVER_SLOW_MS, past the app's 5 s request timeout;
 //   "nothing" → all providers return no results.
 //
+// Recommendations: TMDB discover and IGDB games by genre answer with fixtures.
+// The genre lists hold a stub genre named "recs-down" whose discover requests
+// fail (TMDB 503, IGDB 500), and a Hardcover search for "recs-down" (a book
+// genre search) answers 503. A test gives the library that genre to make every
+// recommendation request fail. Discover requests carry no search term.
+//
 // GET /__requests lists every TMDB, IGDB and Twitch request received, with its
 // search term, so a test can check which calls the app made. Hardcover's are
 // listed apart, at /__requests?provider=hardcover, so the specs that count the
@@ -31,6 +37,15 @@ const tmdbShows = load("tmdb-shows.json") as Record<string, Json>;
 const tmdbSeasons = load("tmdb-seasons.json") as Record<string, Record<string, Json>>;
 const igdbGames = load("igdb-games.json") as { id: number }[];
 const igdbTimeToBeats = load("igdb-time-to-beats.json") as { game_id: number }[];
+type Genre = { id: number; name: string };
+const tmdbGenres = load("tmdb-genres.json") as Record<"movie" | "tv", { genres: Genre[] }>;
+const tmdbDiscover = load("tmdb-discover.json") as Record<"movie" | "tv", Json>;
+const igdbGenres = load("igdb-genres.json") as Genre[];
+
+/** The stub genre whose recommendation requests fail, and its ids. */
+const RECS_DOWN = "recs-down";
+const TMDB_RECS_DOWN = String(tmdbGenres.movie.genres.find((g) => g.name === RECS_DOWN)?.id);
+const IGDB_RECS_DOWN = String(igdbGenres.find((g) => g.name === RECS_DOWN)?.id);
 
 const hardcoverSearch = load("hardcover-search.json");
 const hardcoverBooks = load("hardcover-books.json") as Record<string, Json>;
@@ -60,7 +75,14 @@ function tmdb(path: string, url: URL, res: ServerResponse) {
   }
   requests.push({ provider: "tmdb", path });
 
-  let m = path.match(/^\/movie\/(\d+)$/);
+  let m = path.match(/^\/genre\/(movie|tv)\/list$/);
+  if (m) return send(res, 200, tmdbGenres[m[1] as "movie" | "tv"]);
+  m = path.match(/^\/discover\/(movie|tv)$/);
+  if (m) {
+    if (url.searchParams.get("with_genres") === TMDB_RECS_DOWN) return send(res, 503, { status_message: "stub outage" });
+    return send(res, 200, tmdbDiscover[m[1] as "movie" | "tv"]);
+  }
+  m = path.match(/^\/movie\/(\d+)$/);
   if (m) return tmdbMovies[m[1]] ? send(res, 200, tmdbMovies[m[1]]) : send(res, 404, {});
   m = path.match(/^\/tv\/(\d+)$/);
   if (m) return tmdbShows[m[1]] ? send(res, 200, tmdbShows[m[1]]) : send(res, 404, {});
@@ -83,6 +105,12 @@ function igdb(path: string, body: string, res: ServerResponse) {
   }
   requests.push({ provider: "igdb", path });
 
+  if (path === "/genres") return send(res, 200, igdbGenres);
+  const genre = body.match(/where genres = \((\d+)\)/)?.[1];
+  if (path === "/games" && genre) {
+    if (genre === IGDB_RECS_DOWN) return send(res, 500, { message: "stub outage" });
+    return send(res, 200, igdbGames);
+  }
   const id = Number(body.match(/where (?:game_)?id = (\d+)/)?.[1]);
   if (path === "/games") return send(res, 200, igdbGames.filter((g) => g.id === id));
   if (path === "/game_time_to_beats") return send(res, 200, igdbTimeToBeats.filter((t) => t.game_id === id));
@@ -100,7 +128,7 @@ function hardcover(body: string, res: ServerResponse) {
   if (query.includes("search(")) {
     const term = query.match(/search\(query: "((?:[^"\\]|\\.)*)"/)?.[1] ?? "";
     requests.push({ provider: "hardcover", path: "/graphql", term });
-    if (term.includes("hardcover-down")) return send(res, 503, { error: "stub outage" });
+    if (term.includes("hardcover-down") || term === RECS_DOWN) return send(res, 503, { error: "stub outage" });
     if (term.includes("hardcover-slow")) {
       // The app gives up first; answer anyway unless it has already hung up.
       setTimeout(() => {

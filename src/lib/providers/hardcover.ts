@@ -133,6 +133,36 @@ export async function searchHardcover(query: string): Promise<SearchResult[]> {
     `{ search(query: "${escapeLiteral(query)}", query_type: "book", per_page: 10) { results } }`,
     searchMaxWaitMs(),
   );
+  return searchResults(data);
+}
+
+/**
+ * The books Hardcover readers save most in one genre (at most 20): a search on
+ * the book index's `genres` field only (its top 5 genres per book), exact, by
+ * `users_count`, an aggregate count. Hardcover's search takes no filter but the
+ * query, so this is its by-genre query (docs.hardcover.app, "Searching"). It
+ * takes the search path, so it gives up rather than queue behind imports.
+ */
+export async function discoverHardcover(genre: string): Promise<SearchResult[]> {
+  const data = await hardcoverQuery(
+    `{ search(query: "${escapeLiteral(genre)}", query_type: "book", per_page: 20, fields: "genres", weights: "1", typos: "0", sort: "users_count:desc") { results } }`,
+    searchMaxWaitMs(),
+  );
+  return searchResults(data);
+}
+
+/** Hardcover keeps at most this many genres per book, as its search index does. */
+const MAX_BOOK_GENRES = 5;
+
+/** The book's "Genre" tags from `cached_tags` (an aggregate of readers' tags), once each, first 5. */
+function genreTags(v: unknown): string[] {
+  const list = obj(v)?.Genre;
+  if (!Array.isArray(list)) return [];
+  const names = list.map((t) => str(obj(t)?.tag));
+  return [...new Set(names.filter((n): n is string => n !== null))].slice(0, MAX_BOOK_GENRES);
+}
+
+function searchResults(data: Json): SearchResult[] {
   const hits = obj(obj(data.search)?.results)?.hits;
   const out: SearchResult[] = [];
   if (!Array.isArray(hits)) return out;
@@ -195,7 +225,7 @@ function narratorsOf(edition: Json | null): string[] {
 export async function getHardcoverDetails(id: string): Promise<ItemDetails> {
   if (!/^\d+$/.test(id)) throw new ProviderError("hardcover", null, "hardcover id must be numeric");
   const data = await hardcoverQuery(
-    `{ books_by_pk(id: ${id}) { id title pages rating ratings_count release_date image { url } ` +
+    `{ books_by_pk(id: ${id}) { id title pages rating ratings_count release_date image { url } cached_tags ` +
       `default_audio_edition { audio_seconds contributions { author { name } contributor_role { slug } } } ` +
       `book_series { position details featured series { id name primary_books_count is_completed } } } }`,
   );
@@ -230,5 +260,6 @@ export async function getHardcoverDetails(id: string): Promise<ItemDetails> {
       narrators: narratorsOf(edition),
       series: pickSeries(b.book_series),
     },
+    genres: genreTags(b.cached_tags),
   };
 }

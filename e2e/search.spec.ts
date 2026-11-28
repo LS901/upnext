@@ -178,7 +178,8 @@ test("search shows both providers and hides excluded types", async ({ page }) =>
   await expect(nav.getByRole("link", { name: "Search" })).toHaveAttribute("href", "/search");
   await expect(nav.getByRole("link", { name: "My library" })).toHaveAttribute("href", "/library");
 
-  await search(page, unique("Kestrel"));
+  const term = unique("Kestrel");
+  await search(page, term);
   await expect(result(page, "Kestrel Morning")).toContainText("Movie");
   await expect(result(page, "Kestrel Morning")).toContainText("2019");
   await expect(result(page, "Kestrel Morning").locator("img")).toHaveAttribute(
@@ -188,7 +189,7 @@ test("search shows both providers and hides excluded types", async ({ page }) =>
   await expect(result(page, "Harbour of Glass")).toContainText("TV");
   await expect(result(page, "Harbour of Glass").getByRole("link", { name: "Choose seasons" })).toHaveAttribute(
     "href",
-    "/search/show/9101",
+    `/search/show/9101?q=${encodeURIComponent(term).replace(/%20/g, "+")}`,
   );
   await expect(result(page, "Clockwork Lighthouse")).toContainText("Game");
   await expect(page.getByText("Invented Person")).toHaveCount(0);
@@ -281,7 +282,7 @@ test("INV-004: the season picker shows no synopses", async ({ page }) => {
   await search(page, unique("Harbour"));
   await result(page, "Harbour of Glass").getByRole("link", { name: "Choose seasons" }).click();
 
-  await expect(page).toHaveURL("/search/show/9101");
+  await expect(page).toHaveURL(/^http:\/\/localhost:3100\/search\/show\/9101\?q=Harbour\+/);
   await expect(page.getByRole("heading", { level: 1, name: "Harbour of Glass" })).toBeVisible();
   await expect(page).toHaveTitle("Harbour of Glass · upnext");
   for (const label of [
@@ -316,7 +317,9 @@ test("a show with only specials shows them and adds them", async ({ page, accoun
   await specials.check();
   await page.getByRole("button", { name: "Add seasons" }).click();
 
-  await expect(page).toHaveURL("/search/show/9102?added=1");
+  // Opened directly, with no search to return to: back to an empty search.
+  await expect(page).toHaveURL("/search?added=1");
+  await page.goto("/search/show/9102");
   await expect(specials).toBeChecked();
   await expect(specials).toBeDisabled();
   // Every season is in the library, so there's nothing left to add.
@@ -341,4 +344,39 @@ test("a show with only specials shows them and adds them", async ({ page, accoun
   await page.goto(`/search?q=${encodeURIComponent(unique("Saltmarsh"))}`);
   await expect(result(page, "Saltmarsh Specials").getByRole("button", { name: "In your library" })).toBeVisible();
   await expect(result(page, "Saltmarsh Specials").getByRole("link", { name: "Choose seasons" })).toBeVisible();
+});
+
+test("the season picker returns to your search", async ({ page }) => {
+  const term = unique("Harbour");
+  await page.goto("/search");
+  await page.getByRole("checkbox", { name: "Games" }).check();
+  await search(page, term);
+  await result(page, "Harbour of Glass").getByRole("link", { name: "Choose seasons" }).click();
+  await page.getByRole("checkbox", { name: "Season 1 · 8 episodes · 2021", exact: true }).check();
+  await page.getByRole("button", { name: "Add seasons" }).click();
+
+  await expect(page).toHaveURL((url) => {
+    return (
+      url.pathname === "/search" &&
+      url.searchParams.get("q") === term &&
+      url.searchParams.getAll("exclude").join() === "game" &&
+      url.searchParams.get("added") === "1"
+    );
+  });
+  await expect(result(page, "Harbour of Glass").getByRole("button", { name: "In your library" })).toBeVisible();
+});
+
+test("a season picker with nothing ticked keeps your search", async ({ page }) => {
+  const term = unique("Harbour");
+  await page.goto("/search");
+  await page.getByRole("checkbox", { name: "Games" }).check();
+  await search(page, term);
+  await result(page, "Harbour of Glass").getByRole("link", { name: "Choose seasons" }).click();
+  await page.getByRole("button", { name: "Add seasons" }).click();
+  await expect(page).toHaveURL(
+    (url) =>
+      url.pathname === "/search/show/9101" &&
+      url.searchParams.get("q") === term &&
+      url.searchParams.getAll("exclude").join() === "game",
+  );
 });

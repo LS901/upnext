@@ -1,0 +1,9 @@
+{
+  "page": 1,
+  "results": [
+    { "id": 9301, "title": "Hollow Bell", "release_date": "2017-10-27", "poster_path": "/hollow-bell.jpg", "overview": "INVENTED OVERVIEW MUST NEVER BE MAPPED" },
+    { "id": 9302, "title": "Undated Fright", "release_date": "", "poster_path": null },
+    { "id": 9303, "title": "" }
+  ],
+  "total_results": 3
+}

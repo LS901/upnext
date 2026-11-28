@@ -2,31 +2,17 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Suspense } from "react";
+import { Suspense, type ReactNode } from "react";
 import { ArrowDown, ArrowUp, ArrowUpToLine, type LucideIcon } from "lucide-react";
-import { Poster } from "@/components/poster";
-import { dragName, queuedTitle } from "./drag-name";
+import { TypeTabs } from "@/components/type-tabs";
+import { dragName } from "./drag-name";
 import { StatusChip } from "@/components/status-chip";
 import { Card } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
-import { seasonDetails, seasonLabel } from "@/app/search/season-label";
-import { TYPE_LABELS } from "@/lib/format/type-labels";
 import { getCurrentUser } from "@/lib/auth/current-user";
-import { bookMeta } from "@/lib/format/book";
-import { formatDuration } from "@/lib/format/duration";
-import { formatScore } from "@/lib/format/score";
-import {
-  getMyLibrary,
-  type ItemRow,
-  type LibraryGroup,
-  type LibraryView,
-  type SeasonRow,
-  type SeriesBookRow,
-  type SeriesRow,
-  type ShowRow,
-  type UpNextRow,
-} from "@/lib/library/queries";
+import { NOTE_MAX, getMyNotes } from "@/lib/library/notes";
+import { getMyLibrary, type LibraryView, type UpNextRow } from "@/lib/library/queries";
 import type { EntryStatus } from "@/lib/library/status";
+import { filterView, parseTabType, tabCounts, type TabType } from "@/lib/library/type-filter";
 import {
   HIDDEN_COOKIE,
   parseHidden,
@@ -36,44 +22,62 @@ import {
   type Direction,
   type QueueType,
 } from "@/lib/library/up-next-order";
+import { getListMemberships, getMyLists, type ListSummary } from "@/lib/lists";
 import { createClient } from "@/lib/supabase/server";
-import { placeUpNext, removeEntry, setStatus } from "./actions";
+import { addToList } from "../lists/actions";
+import { placeUpNext, playAgain, removeEntry, saveNote, setBookExclusions, setSeasonExclusions, setStatus } from "./actions";
 import { QueueVisibility } from "./queue-visibility";
+import { Group, muted, QueuedSummary, queuedRef, type EntryRef, type RowControls } from "./rows";
 import { SortableQueue } from "./sortable-queue";
 import { StatusSelect } from "./status-select";
 import { SubmitButton } from "./submit-button";
 
 export const metadata: Metadata = { title: "My library" };
 
-const muted = "text-sm text-muted-foreground break-words";
-
-export default function LibraryPage() {
+export default function LibraryPage({ searchParams }: PageProps<"/library">) {
   return (
     <main className="mx-auto w-full max-w-4xl min-w-0 flex-1 px-4 py-10 sm:px-6">
       <h1 className="text-3xl font-semibold tracking-tight">My library</h1>
       {/* Reads the session, so it renders at request time. */}
       <Suspense>
-        <Library />
+        <Library searchParams={searchParams} />
       </Suspense>
     </main>
   );
 }
 
-async function Library() {
+async function Library({ searchParams }: Pick<PageProps<"/library">, "searchParams">) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
-  const { upNext, groups } = await getMyLibrary(await createClient(), user.id);
+  const type = parseTabType((await searchParams).type);
+  const supabase = await createClient();
+  const [full, notes, lists] = await Promise.all([
+    getMyLibrary(supabase, user.id),
+    getMyNotes(supabase, user.id),
+    getMyLists(supabase, user.id),
+  ]);
+  const memberships = await getListMemberships(
+    supabase,
+    lists.map((l) => l.id),
+  );
+  const controls = ownerControls({ notes, lists, memberships });
+  const counts = tabCounts(full);
+  const { upNext, groups } = filterView(full, type);
   const hidden = parseHidden((await cookies()).get(HIDDEN_COOKIE)?.value);
-  if (!groups.length && QUEUE_TYPES.every((type) => !upNext[type].length)) {
+  const tabs = <TypeTabs current={type} counts={counts} hrefFor={(t) => (t === "all" ? "/library" : `/library?type=${t}`)} />;
+  if (!groups.length && QUEUE_TYPES.every((t) => !upNext[t].length)) {
     return (
-      <p className="mt-6 rounded-xl border border-dashed border-border px-4 py-10 text-center text-muted-foreground">
-        Nothing here yet.{" "}
-        <Link href="/search" className="inline-flex min-h-11 items-center text-accent-text underline lg:min-h-0">
-          Search
-        </Link>{" "}
-        to add something.
-      </p>
+      <div className="mt-6 flex flex-col gap-6">
+        {tabs}
+        <p className="rounded-xl border border-dashed border-border px-4 py-10 text-center text-muted-foreground">
+          Nothing here yet.{" "}
+          <Link href="/search" className="inline-flex min-h-11 items-center text-accent-text underline lg:min-h-0">
+            Search
+          </Link>{" "}
+          to add something.
+        </p>
+      </div>
     );
   }
   // What you're on comes first, so a long Up next never buries it.
@@ -81,12 +85,13 @@ async function Library() {
   const rest = groups.filter((g) => g.status !== "in_progress");
   return (
     <div className="mt-6 flex flex-col gap-10">
+      {tabs}
       {inProgress.map((group) => (
-        <Group key={group.status} group={group} />
+        <Group key={group.status} group={group} controls={controls} />
       ))}
-      <UpNext upNext={upNext} hidden={hidden} />
+      <UpNext upNext={upNext} hidden={hidden} only={type} controls={controls} />
       {rest.map((group) => (
-        <Group key={group.status} group={group} />
+        <Group key={group.status} group={group} controls={controls} />
       ))}
     </div>
   );
@@ -94,24 +99,35 @@ async function Library() {
 
 // One queue per media type, each in the user's order (owner said, 2026-11-26),
 // holding everything not started yet (owner said, 2026-11-27).
-function UpNext({ upNext, hidden }: { upNext: LibraryView["upNext"]; hidden: QueueType[] }) {
+// On a type tab the Show boxes are gone and that type's queue always shows.
+function UpNext({
+  upNext,
+  hidden,
+  only,
+  controls,
+}: {
+  upNext: LibraryView["upNext"];
+  hidden: QueueType[];
+  only: TabType;
+  controls: Owner;
+}) {
   const counts = Object.fromEntries(QUEUE_TYPES.map((type) => [type, upNext[type].length])) as Record<QueueType, number>;
   return (
     <section aria-labelledby="up-next">
       <h2 id="up-next" className="text-2xl font-semibold tracking-tight">
         Up next
       </h2>
-      <QueueVisibility hidden={hidden} counts={counts} />
+      {only === "all" && <QueueVisibility hidden={hidden} counts={counts} />}
       <div className="mt-4 flex flex-col gap-4">
-        {QUEUE_TYPES.filter((type) => !hidden.includes(type)).map((type) => (
-          <Queue key={type} type={type} rows={upNext[type]} />
+        {QUEUE_TYPES.filter((type) => (only === "all" ? !hidden.includes(type) : type === only)).map((type) => (
+          <Queue key={type} type={type} rows={upNext[type]} controls={controls} />
         ))}
       </div>
     </section>
   );
 }
 
-function Queue({ type, rows }: { type: QueueType; rows: UpNextRow[] }) {
+function Queue({ type, rows, controls }: { type: QueueType; rows: UpNextRow[]; controls: Owner }) {
   const id = `queue-${type}`;
   const label = QUEUE_LABELS[type];
   const order = rows.map((r) => r.entryId);
@@ -127,7 +143,7 @@ function Queue({ type, rows }: { type: QueueType; rows: UpNextRow[] }) {
             items={rows.map((row) => ({
               entryId: row.entryId,
               title: dragName(row),
-              row: <QueuedRow row={row} order={order} />,
+              row: <QueuedRow row={row} order={order} controls={controls} />,
             }))}
           />
         ) : (
@@ -138,18 +154,10 @@ function Queue({ type, rows }: { type: QueueType; rows: UpNextRow[] }) {
   );
 }
 
-function QueuedRow({ row, order }: { row: UpNextRow; order: string[] }) {
-  const season = row.kind === "season";
-  const meta = season
-    ? [...seasonDetails(row), `Time to finish: ${formatDuration(row.runtimeMinutes)}`, formatScore(row.score, row.scoreCount)]
-    : [itemMeta(row)];
+function QueuedRow({ row, order, controls }: { row: UpNextRow; order: string[]; controls: Owner }) {
   return (
     <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-3">
-      <Poster url={row.imageUrl} title={queuedTitle(row)} size="md" mediaType={season ? "show" : row.mediaType} />
-      <div className="min-w-0 flex-1 basis-32">
-        <h4 className="font-medium break-words">{queuedTitle(row)}</h4>
-        <p className={muted}>{meta.join(" · ")}</p>
-      </div>
+      <QueuedSummary row={row} />
       <div className="flex w-full flex-wrap items-center gap-2">
         <form action={setStatus}>
           <input type="hidden" name="entryId" value={row.entryId} />
@@ -168,6 +176,7 @@ function QueuedRow({ row, order }: { row: UpNextRow; order: string[] }) {
           <SubmitButton>Remove</SubmitButton>
         </form>
       </div>
+      {controls.extras(queuedRef(row))}
     </div>
   );
 }
@@ -198,129 +207,72 @@ function MoveButton(props: {
   );
 }
 
-function Group({ group }: { group: LibraryGroup }) {
-  const id = `status-${group.status}`;
+// "Progress": which seasons or books count toward the row's progress. Native
+// controls only, so it works without JavaScript; Save sets the exclusions to
+// exactly the unticked ones (a repeat changes nothing). Each box's label names
+// its own item, so a screen reader hears which one it is.
+function CountControl({
+  action,
+  hidden,
+  noun,
+  items,
+}: {
+  action: (formData: FormData) => Promise<void>;
+  hidden: { name: string; value: string };
+  noun: "season" | "book";
+  items: { id: string; label: string; counted: boolean }[];
+}) {
   return (
-    <section aria-labelledby={id}>
-      <Card className="min-w-0 gap-3" size="sm">
-        <h2 id={id} className="px-(--card-spacing) text-xl font-semibold">
-          {group.label}
-        </h2>
-        <ul className="flex flex-col divide-y divide-border px-(--card-spacing)">
-          {group.rows.map((row) =>
-            row.kind === "item" ? (
-              <Item key={row.entryId} item={row} />
-            ) : row.kind === "show" ? (
-              <Show key={row.showId} show={row} />
-            ) : (
-              <Series key={row.seriesId} series={row} />
-            ),
-          )}
+    <details className="mt-2 sm:pl-24">
+      <summary className="w-fit cursor-pointer rounded text-sm text-muted-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+        Progress
+      </summary>
+      <form action={action} className="mt-2 flex flex-col gap-2">
+        <input type="hidden" name={hidden.name} value={hidden.value} />
+        <ul className="flex flex-col gap-1">
+          {items.map((item) => (
+            <li key={item.id}>
+              <label className="flex items-start gap-2 text-sm break-words">
+                <input type="checkbox" name="counted" value={item.id} defaultChecked={item.counted} className="mt-1" />
+                <span>
+                  <span className="sr-only">Count this {noun}: </span>
+                  {item.label}
+                </span>
+              </label>
+            </li>
+          ))}
         </ul>
-      </Card>
-    </section>
-  );
-}
-
-function itemMeta(item: ItemRow): string {
-  if (item.mediaType === "book") return bookMeta(item);
-  const time =
-    item.mediaType === "game"
-      ? `Time to beat: ${formatDuration(item.minutes)} (story)`
-      : `Time to finish: ${formatDuration(item.minutes)}`;
-  return [TYPE_LABELS[item.mediaType], time, formatScore(item.score, item.scoreCount, item.providerName)].join(" · ");
-}
-
-function Item({ item }: { item: ItemRow }) {
-  return (
-    <li className="flex flex-wrap items-center gap-x-4 gap-y-3 py-3">
-      <Poster url={item.imageUrl} title={item.title} size="md" mediaType={item.mediaType} />
-      <div className="min-w-0 flex-1 basis-32">
-        <h3 className="font-medium break-words">{item.title}</h3>
-        <p className={muted}>{itemMeta(item)}</p>
-      </div>
-      <EntryControls entryId={item.entryId} status={item.status} />
-    </li>
-  );
-}
-
-// The show's progress counts all its seasons; the rows are only the user's
-// seasons in this group's status. Never a season synopsis (INV-004).
-function Show({ show }: { show: ShowRow }) {
-  const { finished, total } = show.progress;
-  const progress = total ? `${finished} of ${total} seasons finished` : "No seasons yet";
-  return (
-    <li className="py-3">
-      <div className="flex items-center gap-4">
-        <Poster url={show.imageUrl} title={show.title} size="md" mediaType="show" />
-        <div className="min-w-0 flex-1">
-          <h3 className="font-medium break-words">{show.title}</h3>
-          <p className={muted}>{[TYPE_LABELS.show, progress, formatScore(show.score, show.scoreCount)].join(" · ")}</p>
-          {total > 0 && <Progress aria-hidden="true" value={(finished / total) * 100} className="mt-2 max-w-48" />}
+        <div>
+          <SubmitButton>Save</SubmitButton>
         </div>
-      </div>
-      <ul className="mt-2 flex flex-col divide-y divide-border sm:pl-24">
-        {show.seasons.map((season) => (
-          <Season key={season.entryId} season={season} />
-        ))}
-      </ul>
-    </li>
+      </form>
+    </details>
   );
 }
 
-// Like a show: the series' progress counts all the user's books in it, in any
-// status; the rows are only the user's books in this group's status. A series
-// has no score of its own, so its line carries none.
-function Series({ series }: { series: SeriesRow }) {
-  const { read, total } = series.progress;
-  const meta = total ? `Series · ${read} of ${total} read` : "Series";
-  return (
-    <li className="py-3">
-      <div className="flex items-center gap-4">
-        <Poster url={series.books[0]?.imageUrl ?? null} title={series.title} size="md" mediaType="book" />
-        <div className="min-w-0 flex-1">
-          <h3 className="font-medium break-words">{series.title}</h3>
-          <p className={muted}>{meta}</p>
-          {total > 0 && <Progress aria-hidden="true" value={Math.min(100, (read / total) * 100)} className="mt-2 max-w-48" />}
-        </div>
-      </div>
-      <ul className="mt-2 flex flex-col divide-y divide-border sm:pl-24">
-        {series.books.map((book) => (
-          <SeriesBook key={book.entryId} book={book} />
-        ))}
-      </ul>
-    </li>
-  );
-}
-
-function SeriesBook({ book }: { book: SeriesBookRow }) {
-  return (
-    <li className="flex flex-wrap items-center gap-x-4 gap-y-3 py-2">
-      <div className="min-w-0 flex-1 basis-32">
-        <h4 className="break-words">{book.position === null ? book.title : `#${book.position} ${book.title}`}</h4>
-        <p className={muted}>{bookMeta(book)}</p>
-      </div>
-      <EntryControls entryId={book.entryId} status={book.status} />
-    </li>
-  );
-}
-
-function Season({ season }: { season: SeasonRow }) {
-  return (
-    <li className="flex flex-wrap items-center gap-x-4 gap-y-3 py-2">
-      <div className="min-w-0 flex-1 basis-32">
-        <h4 className="break-words">{seasonLabel(season)}</h4>
-        <p className={muted}>Time to finish: {formatDuration(season.runtimeMinutes)}</p>
-      </div>
-      <EntryControls entryId={season.entryId} status={season.status} />
-    </li>
-  );
-}
-
-function EntryControls({ entryId, status }: { entryId: string; status: EntryStatus }) {
+// The play-again button shows only on a Finished row. It names the count this
+// page showed, so a repeated click counts once.
+function EntryControls({
+  entryId,
+  status,
+  playCount,
+  again,
+}: {
+  entryId: string;
+  status: EntryStatus;
+  playCount: number;
+  again: string;
+}) {
   return (
     <div className="flex flex-wrap items-center gap-2">
       <StatusChip status={status} />
+      {status === "finished" && (
+        <form action={playAgain}>
+          <input type="hidden" name="entryId" value={entryId} />
+          <input type="hidden" name="expected" value={playCount} />
+          <SubmitButton>{again}</SubmitButton>
+        </form>
+      )}
       <form action={setStatus}>
         <input type="hidden" name="entryId" value={entryId} />
         <StatusSelect status={status} />
@@ -329,6 +281,108 @@ function EntryControls({ entryId, status }: { entryId: string; status: EntryStat
         <input type="hidden" name="entryId" value={entryId} />
         <SubmitButton>Remove</SubmitButton>
       </form>
+    </div>
+  );
+}
+
+/** My library's controls: the row's own, plus its note and its lists. Only ever the owner's (INV-002). */
+type Owner = RowControls & { extras: (entry: EntryRef) => ReactNode };
+
+function ownerControls({
+  notes,
+  lists,
+  memberships,
+}: {
+  notes: Map<string, string>;
+  lists: ListSummary[];
+  memberships: Map<string, string[]>;
+}): Owner {
+  const extras = (entry: EntryRef) => (
+    <EntryExtras entry={entry} note={notes.get(entry.entryId) ?? ""} lists={lists} on={memberships.get(entry.entryId) ?? []} />
+  );
+  return {
+    entry: (entry) => (
+      <>
+        <EntryControls entryId={entry.entryId} status={entry.status} playCount={entry.playCount} again={entry.again} />
+        {extras(entry)}
+      </>
+    ),
+    showCount: (show) =>
+      show.allSeasons.length > 0 && (
+        <CountControl
+          action={setSeasonExclusions}
+          hidden={{ name: "showId", value: show.showId }}
+          noun="season"
+          items={show.allSeasons.map((s) => ({ id: s.seasonId, label: s.label, counted: !s.excluded }))}
+        />
+      ),
+    seriesCount: (series) =>
+      series.allBooks.length > 0 && (
+        <CountControl
+          action={setBookExclusions}
+          hidden={{ name: "seriesId", value: series.seriesId }}
+          noun="book"
+          items={series.allBooks.map((b) => ({ id: b.itemId, label: b.label, counted: !b.excluded }))}
+        />
+      ),
+    extras,
+  };
+}
+
+// Under each entry: the lists it's on, the Add to list select and its private
+// note. Native controls only, so all of it works without JavaScript.
+function EntryExtras({ entry, note, lists, on }: { entry: EntryRef; note: string; lists: ListSummary[]; on: string[] }) {
+  const onNames = lists.filter((l) => on.includes(l.id)).map((l) => l.name);
+  const offered = lists.filter((l) => !on.includes(l.id));
+  const noteId = `note-${entry.entryId}`;
+  const listId = `add-${entry.entryId}`;
+  return (
+    <div className="flex w-full min-w-0 flex-col gap-2">
+      {onNames.length > 0 && <p className={muted}>On {onNames.join(", ")}</p>}
+      {offered.length > 0 && (
+        <form action={addToList} className="flex min-w-0 flex-wrap items-center gap-2">
+          <input type="hidden" name="entryId" value={entry.entryId} />
+          <label htmlFor={listId} className="sr-only">
+            Add {entry.name} to a list
+          </label>
+          <select
+            id={listId}
+            name="listId"
+            required
+            className="h-11 w-full min-w-0 rounded-md border border-input bg-secondary px-3 text-sm text-foreground sm:w-64 lg:h-10"
+          >
+            {offered.map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.name}
+              </option>
+            ))}
+          </select>
+          <SubmitButton>Add to list</SubmitButton>
+        </form>
+      )}
+      <details>
+        <summary className="w-fit cursor-pointer rounded text-sm text-muted-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+          Note
+        </summary>
+        <form action={saveNote} className="mt-2 flex flex-col gap-2">
+          <input type="hidden" name="entryId" value={entry.entryId} />
+          <label htmlFor={noteId} className="sr-only">
+            Note for {entry.name}
+          </label>
+          <textarea
+            id={noteId}
+            name="body"
+            rows={3}
+            maxLength={NOTE_MAX}
+            defaultValue={note}
+            className="w-full min-w-0 rounded-md border border-input bg-secondary px-3 py-2 text-sm text-foreground"
+          />
+          <p className="text-xs text-muted-foreground">Only you can see your notes. Save it empty to delete it.</p>
+          <div>
+            <SubmitButton>Save note</SubmitButton>
+          </div>
+        </form>
+      </details>
     </div>
   );
 }

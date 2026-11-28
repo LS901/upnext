@@ -1,1 +1,1 @@
-{ "id": 9001, "title": "The Lantern Orchard", "poster_path": "/lantern.jpg", "release_date": "2019-06-14", "vote_average": 7.25, "vote_count": 1234 }
+{ "id": 9001, "title": "The Lantern Orchard", "poster_path": "/lantern.jpg", "release_date": "2019-06-14", "vote_average": 7.25, "vote_count": 1234, "genres": [{ "id": 27, "name": "Horror" }, { "id": 53, "name": "Thriller" }, { "id": 99, "name": "" }, { "id": 27, "name": "Horror" }] }

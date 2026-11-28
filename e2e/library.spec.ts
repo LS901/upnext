@@ -68,6 +68,14 @@ function seasonRow(show: Locator, label: string) {
   return show.getByRole("listitem").filter({ has: show.page().getByRole("heading", { level: 4, name: label, exact: true }) });
 }
 
+/** Opens a row's "Progress" disclosure if it isn't open already. */
+async function openProgress(rowLocator: Locator) {
+  const details = rowLocator.locator("details").first();
+  if (!(await details.evaluate((el) => (el as HTMLDetailsElement).open))) {
+    await details.getByText("Progress", { exact: true }).click();
+  }
+}
+
 async function userId(username: string): Promise<string> {
   const { data, error } = await adminClient().from("profiles").select("id").eq("username", username).single();
   if (error) throw error;
@@ -105,7 +113,8 @@ test("add a movie and two seasons, then finish a season", async ({ page }) => {
   await page.getByRole("checkbox", { name: "Season 1 · 8 episodes · 2021", exact: true }).check();
   await page.getByRole("checkbox", { name: "Season 2 · 8 episodes · 2022", exact: true }).check();
   await page.getByRole("button", { name: "Add seasons" }).click();
-  await expect(page).toHaveURL("/search/show/9101?added=1");
+  // The picker returns to the search it came from, with the Games filter kept.
+  await expect(page).toHaveURL((url) => url.pathname === "/search" && url.searchParams.get("added") === "1" && url.searchParams.get("q") === "Kestrel" && url.searchParams.getAll("exclude").join() === "game");
 
   await page.goto("/library");
   await expect(page).toHaveTitle("My library · upnext");
@@ -144,6 +153,58 @@ test("add a movie and two seasons, then finish a season", async ({ page }) => {
   // It sticks after a reload.
   await page.reload();
   await expect(row(group(page, "Finished"), "Harbour of Glass")).toContainText("1 of 3 seasons finished");
+});
+
+test("Watched again counts an extra play once, on movies and on seasons", async ({ page }) => {
+  // The first test left the movie in Up next and season 1 of the show Finished.
+  await page.goto("/library");
+  await queued(queue(page, "Movies"), "Kestrel Morning").getByRole("combobox", { name: "Status" }).selectOption("Finished");
+  const movie = row(group(page, "Finished"), "Kestrel Morning");
+  // A fresh finish is one play: no line yet.
+  await expect(movie).not.toContainText("times");
+  await movie.getByRole("button", { name: "Watched again" }).click();
+  await expect(movie).toContainText("Watched 2 times");
+  await page.reload();
+  await expect(row(group(page, "Finished"), "Kestrel Morning")).toContainText("Watched 2 times");
+
+  // Only Finished rows have the button; a season has its own.
+  const show = row(group(page, "Finished"), "Harbour of Glass");
+  await expect(seasonRow(show, "Season 1 · 8 episodes · 2021").getByRole("button", { name: "Watched again" })).toBeVisible();
+  await expect(seasonRow(show, "Season 1 · 8 episodes · 2021")).not.toContainText("times");
+  await seasonRow(show, "Season 1 · 8 episodes · 2021").getByRole("button", { name: "Watched again" }).click();
+  await expect(seasonRow(show, "Season 1 · 8 episodes · 2021")).toContainText("Watched 2 times");
+  await expect(queue(page, "TV").getByRole("button", { name: "Watched again" })).toHaveCount(0);
+});
+
+test("Progress lets a show leave a season out of its count, and a repeat save changes nothing", async ({ page }) => {
+  // Season 1 of the show is Finished: 1 of 3 (season 3 counts though it isn't added).
+  await page.goto("/library");
+  const show = row(group(page, "Finished"), "Harbour of Glass");
+  await expect(show).toContainText("1 of 3 seasons finished");
+  // Closed until opened; specials aren't offered.
+  await openProgress(show);
+  await expect(show.getByRole("checkbox", { name: /Count this season/ })).toHaveCount(3);
+  await expect(show.getByRole("checkbox", { name: /Specials/ })).toHaveCount(0);
+  await show.getByRole("checkbox", { name: /Season 3/ }).uncheck();
+  await show.getByRole("button", { name: "Save" }).click();
+  await expect(show).toContainText("1 of 2 seasons finished");
+
+  // Open again, it remembers the unticked season; saving the same form again is a no-op.
+  await page.reload();
+  const again = row(group(page, "Finished"), "Harbour of Glass");
+  await openProgress(again);
+  await expect(again.getByRole("checkbox", { name: /Season 3/ })).not.toBeChecked();
+  await expect(again.getByRole("checkbox", { name: /Season 2/ })).toBeChecked();
+  await again.getByRole("button", { name: "Save" }).click();
+  await expect(again).toContainText("1 of 2 seasons finished");
+
+  // Ticking it again puts the count back.
+  await page.reload();
+  const last = row(group(page, "Finished"), "Harbour of Glass");
+  await openProgress(last);
+  await last.getByRole("checkbox", { name: /Season 3/ }).check();
+  await last.getByRole("button", { name: "Save" }).click();
+  await expect(last).toContainText("1 of 3 seasons finished");
 });
 
 test("a game shows its time to beat, and Remove takes it out", async ({ page, account }) => {
@@ -185,7 +246,7 @@ test("a show with only specials reads No seasons yet", async ({ page }) => {
   await page.goto("/search/show/9102");
   await page.getByRole("checkbox", { name: "Specials", exact: true }).check();
   await page.getByRole("button", { name: "Add seasons" }).click();
-  await expect(page).toHaveURL("/search/show/9102?added=1");
+  await expect(page).toHaveURL("/search?added=1");
 
   await page.goto("/library");
   // A show's progress line shows on its row in a status group, so pause the season.
@@ -203,7 +264,8 @@ test("a double-click on Remove removes the entry once, with no error page", asyn
   await page.goto("/search/show/9101");
   await page.getByRole("checkbox", { name: label, exact: true }).check();
   await page.getByRole("button", { name: "Add seasons" }).click();
-  await expect(page).toHaveURL("/search/show/9101?added=1");
+  // Opened directly, with no search to return to.
+  await expect(page).toHaveURL("/search?added=1");
 
   await page.goto("/library");
   const title = "Harbour of Glass · Season 3";
@@ -254,4 +316,52 @@ test("a very long title wraps and never scrolls the page sideways at 390px", asy
   await expect(page.getByRole("list", { name: "Movies up next" }).getByRole("heading", { level: 4, name: title })).toBeVisible();
   const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
   expect(scrollWidth).toBeLessThanOrEqual(390);
+});
+
+test("type tabs show one type, fall back to All, and an empty type says so", async ({ page, account }) => {
+  const admin = adminClient();
+  const title = `Tabletop Lantern ${randomInt(1000, 9999)}`;
+  const { data: item, error } = await admin
+    .from("items")
+    .insert({ provider: "igdb", media_type: "game", provider_id: String(randomInt(10_000_000, 99_999_999)), title })
+    .select("id")
+    .single();
+  if (error) throw error;
+  const { error: entryError } = await admin
+    .from("library_entries")
+    .insert({ user_id: await userId(account.username), item_id: item.id, item_media_type: "game" });
+  if (entryError) throw entryError;
+
+  // A type tab lists only that type, with the count and aria-current on its tab.
+  await page.goto("/library?type=game");
+  const tabs = page.getByRole("navigation", { name: "Type" });
+  await expect(tabs.getByRole("link", { name: /^Games \(1\)$/ })).toHaveAttribute("aria-current", "page");
+  await expect(tabs.getByRole("link", { name: /^All \(\d+\)$/ })).not.toHaveAttribute("aria-current", "page");
+  await expect(queued(queue(page, "Games"), title)).toBeVisible();
+  await expect(page.getByRole("list", { name: "Movies up next" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { level: 3, name: "Kestrel Morning" })).toHaveCount(0);
+  // The Show boxes are for All only.
+  await expect(page.getByRole("group", { name: /Show/ })).toHaveCount(0);
+
+  // The tabs are links: following one lands on its type.
+  await tabs.getByRole("link", { name: /^TV \(/ }).click();
+  await expect(page).toHaveURL("/library?type=show");
+  await expect(page.getByRole("heading", { level: 3, name: "Harbour of Glass" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 3, name: title })).toHaveCount(0);
+  await tabs.getByRole("link", { name: /^All \(/ }).click();
+  await expect(page).toHaveURL("/library");
+  await expect(tabs.getByRole("link", { name: /^All \(/ })).toHaveAttribute("aria-current", "page");
+
+  // An unknown type is All.
+  await page.goto("/library?type=nope");
+  await expect(tabs.getByRole("link", { name: /^All \(/ })).toHaveAttribute("aria-current", "page");
+  await expect(queued(queue(page, "Games"), title)).toBeVisible();
+  await expect(queue(page, "Movies")).toBeVisible();
+
+  // A type with nothing in it: an empty state with a way to search, never an error.
+  await page.goto("/library?type=book");
+  await expect(tabs.getByRole("link", { name: "Books (0)" })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByText("Nothing here yet.")).toBeVisible();
+  await expect(page.getByRole("main").getByRole("link", { name: "Search", exact: true })).toHaveAttribute("href", "/search");
+  await expect(page.getByText("Something went wrong")).toHaveCount(0);
 });

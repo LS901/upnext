@@ -1,5 +1,5 @@
 import "server-only";
-import { ProviderError, type ItemDetails, type SearchResult, type TimeToBeat } from "./types";
+import { ProviderError, type Genre, type ItemDetails, type SearchResult, type TimeToBeat } from "./types";
 
 const DEFAULT_BASE_URL = "https://api.igdb.com/v4";
 const DEFAULT_TOKEN_URL = "https://id.twitch.tv/oauth2/token";
@@ -168,11 +168,8 @@ const escapeLiteral = (s: string) => s.replace(/\\/g, "\\\\").replace(/"/g, '\\"
 
 // ---- Public API --------------------------------------------------------------
 
-export async function searchIgdb(query: string): Promise<SearchResult[]> {
-  const rows = await igdbPost(
-    "/games",
-    `search "${escapeLiteral(query)}"; fields name,first_release_date,cover.image_id; limit 10;`,
-  );
+/** A search or discover row as a result; a row with no name or id is dropped. */
+function toResults(rows: Json[]): SearchResult[] {
   const out: SearchResult[] = [];
   for (const g of rows) {
     const title = str(g.name);
@@ -190,6 +187,40 @@ export async function searchIgdb(query: string): Promise<SearchResult[]> {
   return out;
 }
 
+export async function searchIgdb(query: string): Promise<SearchResult[]> {
+  const rows = await igdbPost(
+    "/games",
+    `search "${escapeLiteral(query)}"; fields name,first_release_date,cover.image_id; limit 10;`,
+  );
+  return toResults(rows);
+}
+
+/** IGDB's genre list (its `genres` endpoint; themes are a separate thing and aren't used). */
+export async function getIgdbGenres(): Promise<Genre[]> {
+  const rows = await igdbPost("/genres", "fields name; limit 500;");
+  return rows.flatMap((g) => {
+    const name = str(g.name);
+    return g.id != null && name !== null ? [{ id: String(g.id), name }] : [];
+  });
+}
+
+/** The games in one genre with the most ratings (at most 20). The request carries only the genre id (INV-006). */
+export async function discoverIgdb(genreId: string): Promise<SearchResult[]> {
+  if (!/^\d+$/.test(genreId)) throw new ProviderError("igdb", null, "igdb genre id must be numeric");
+  const rows = await igdbPost(
+    "/games",
+    `fields name,first_release_date,cover.image_id; where genres = (${genreId}); sort total_rating_count desc; limit 20;`,
+  );
+  return toResults(rows);
+}
+
+/** The genre names of a game, once each; `genres` holds objects with a name. */
+function genreNames(v: unknown): string[] {
+  const list = Array.isArray(v) ? v : [];
+  const names = list.map((g) => (g && typeof g === "object" ? str((g as Json).name) : null));
+  return [...new Set(names.filter((n): n is string => n !== null))];
+}
+
 export async function getIgdbDetails(id: string): Promise<ItemDetails> {
   if (!/^\d+$/.test(id)) throw new ProviderError("igdb", null, "igdb id must be numeric");
 
@@ -198,7 +229,7 @@ export async function getIgdbDetails(id: string): Promise<ItemDetails> {
   const [games, beats] = await Promise.all([
     igdbPost(
       "/games",
-      `fields name,first_release_date,cover.image_id,total_rating,total_rating_count; where id = ${id}; limit 1;`,
+      `fields name,first_release_date,cover.image_id,total_rating,total_rating_count,genres.name; where id = ${id}; limit 1;`,
     ),
     igdbPost("/game_time_to_beats", `fields hastily,normally,completely,count; where game_id = ${id};`).catch(
       (err: unknown) => {
@@ -237,5 +268,6 @@ export async function getIgdbDetails(id: string): Promise<ItemDetails> {
     timeToBeatUnavailable: beats === null,
     seasons: null,
     book: null,
+    genres: genreNames(g.genres),
   };
 }

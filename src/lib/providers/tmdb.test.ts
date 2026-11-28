@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { getTmdbDetails, getTmdbShowSeasons, searchTmdb, tmdbImageUrl } from "./tmdb";
+import { discoverTmdb, getTmdbDetails, getTmdbGenres, getTmdbShowSeasons, searchTmdb, tmdbImageUrl } from "./tmdb";
 import { ProviderError } from "./types";
 import search from "./__fixtures__/tmdb-search.json";
 import movie from "./__fixtures__/tmdb-movie.json";
@@ -9,6 +9,10 @@ import tv from "./__fixtures__/tmdb-tv.json";
 import season0 from "./__fixtures__/tmdb-season-0.json";
 import season1 from "./__fixtures__/tmdb-season-1.json";
 import season2 from "./__fixtures__/tmdb-season-2.json";
+import genresMovie from "./__fixtures__/tmdb-genres-movie.json";
+import genresTv from "./__fixtures__/tmdb-genres-tv.json";
+import discoverMovie from "./__fixtures__/tmdb-discover-movie.json";
+import discoverTv from "./__fixtures__/tmdb-discover-tv.json";
 
 vi.mock("server-only", () => ({}));
 
@@ -81,6 +85,7 @@ test("movie details normalise score to 0-100 and a missing runtime to null", asy
     timeToBeatUnavailable: false,
     seasons: null,
     book: null,
+    genres: ["Horror", "Thriller"],
   });
 });
 
@@ -256,4 +261,55 @@ test("tmdbImageUrl builds the URL, with a size, or null", () => {
   expect(tmdbImageUrl("/a.jpg")).toBe("https://image.tmdb.org/t/p/w342/a.jpg");
   expect(tmdbImageUrl("/a.jpg", "w92")).toBe("https://image.tmdb.org/t/p/w92/a.jpg");
   expect(tmdbImageUrl(null)).toBeNull();
+});
+
+// ---- Genres and recommendations ----------------------------------------------
+
+test("show details carry the show's genre names", async () => {
+  stubFetch(SHOW_ROUTES);
+  expect((await getTmdbDetails("show", "9002")).genres).toEqual(["Comedy", "Drama"]);
+});
+
+test("details with no genres give an empty list", async () => {
+  stubFetch({ "/movie/9005": movieOdd });
+  expect((await getTmdbDetails("movie", "9005")).genres).toEqual([]);
+});
+
+test("the genre lists map ids and names, one list per type, dropping unnamed ones", async () => {
+  const fn = stubFetch({ "/genre/movie/list": genresMovie, "/genre/tv/list": genresTv });
+  expect(await getTmdbGenres("movie")).toEqual([
+    { id: "27", name: "Horror" },
+    { id: "35", name: "Comedy" },
+    { id: "18", name: "Drama" },
+  ]);
+  expect(await getTmdbGenres("show")).toEqual([
+    { id: "35", name: "Comedy" },
+    { id: "10765", name: "Sci-Fi & Fantasy" },
+  ]);
+  expect(fn.mock.calls.map((c) => new URL(String(c[0])).pathname)).toEqual(["/3/genre/movie/list", "/3/genre/tv/list"]);
+});
+
+test("discover asks for one genre by popularity, and maps movies like a search", async () => {
+  const fn = stubFetch({ "/discover/movie": discoverMovie });
+  const results = await discoverTmdb("movie", "27");
+  expect(results).toEqual([
+    { provider: "tmdb", providerId: "9301", mediaType: "movie", title: "Hollow Bell", year: 2017, imageUrl: "https://image.tmdb.org/t/p/w342/hollow-bell.jpg" },
+    { provider: "tmdb", providerId: "9302", mediaType: "movie", title: "Undated Fright", year: null, imageUrl: null },
+  ]);
+  const url = new URL(String(fn.mock.calls[0][0]));
+  expect(Object.fromEntries(url.searchParams)).toEqual({ with_genres: "27", sort_by: "popularity.desc", include_adult: "false" });
+});
+
+test("discover for TV maps shows", async () => {
+  const fn = stubFetch({ "/discover/tv": discoverTv });
+  expect(await discoverTmdb("show", "35")).toEqual([
+    { provider: "tmdb", providerId: "9401", mediaType: "show", title: "Brass Neighbours", year: 2020, imageUrl: "https://image.tmdb.org/t/p/w342/brass.jpg" },
+    { provider: "tmdb", providerId: "9402", mediaType: "show", title: "Quiet Rooms", year: null, imageUrl: null },
+  ]);
+  expect(new URL(String(fn.mock.calls[0][0])).pathname).toBe("/3/discover/tv");
+});
+
+test("a failing discover throws ProviderError with its status", async () => {
+  vi.stubGlobal("fetch", vi.fn(async () => json({}, 503)));
+  await expect(discoverTmdb("movie", "27")).rejects.toMatchObject({ name: "ProviderError", provider: "tmdb", status: 503 });
 });

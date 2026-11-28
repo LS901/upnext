@@ -79,14 +79,14 @@ isOneToOne: false
                   ]
                 },"items": {
                   Row: {
-                    "audio_minutes": number | null,"created_at": string,"has_audiobook": boolean | null,"id": string,"image_ref": string | null,"media_type": Database["public"]['Enums']["media_type"],"narrators": string | null,"page_count": number | null,"provider": Database["public"]['Enums']["provider"],"provider_data_purged_at": string | null,"provider_id": string,"refresh_attempted_at": string | null,"refreshed_at": string,"release_date": string | null,"runtime_minutes": number | null,"score": number | null,"score_count": number | null,"series_id": string | null,"series_position": number | null,"series_position_label": string | null,"title": string,"ttb_completely_s": number | null,"ttb_count": number | null,"ttb_hastily_s": number | null,"ttb_normally_s": number | null,"updated_at": string
+                    "audio_minutes": number | null,"created_at": string,"genres": (string)[],"has_audiobook": boolean | null,"id": string,"image_ref": string | null,"length_note": string | null,"media_type": Database["public"]['Enums']["media_type"],"narrators": string | null,"owner_id": string | null,"page_count": number | null,"provider": Database["public"]['Enums']["provider"],"provider_data_purged_at": string | null,"provider_id": string,"refresh_attempted_at": string | null,"refreshed_at": string,"release_date": string | null,"runtime_minutes": number | null,"score": number | null,"score_count": number | null,"series_id": string | null,"series_position": number | null,"series_position_label": string | null,"title": string,"ttb_completely_s": number | null,"ttb_count": number | null,"ttb_hastily_s": number | null,"ttb_normally_s": number | null,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "audio_minutes"?: number | null,"created_at"?: string,"has_audiobook"?: boolean | null,"id"?: string,"image_ref"?: string | null,"media_type": Database["public"]['Enums']["media_type"],"narrators"?: string | null,"page_count"?: number | null,"provider": Database["public"]['Enums']["provider"],"provider_data_purged_at"?: string | null,"provider_id": string,"refresh_attempted_at"?: string | null,"refreshed_at"?: string,"release_date"?: string | null,"runtime_minutes"?: number | null,"score"?: number | null,"score_count"?: number | null,"series_id"?: string | null,"series_position"?: number | null,"series_position_label"?: string | null,"title": string,"ttb_completely_s"?: number | null,"ttb_count"?: number | null,"ttb_hastily_s"?: number | null,"ttb_normally_s"?: number | null,"updated_at"?: string
+                    "audio_minutes"?: number | null,"created_at"?: string,"genres"?: (string)[],"has_audiobook"?: boolean | null,"id"?: string,"image_ref"?: string | null,"length_note"?: string | null,"media_type": Database["public"]['Enums']["media_type"],"narrators"?: string | null,"owner_id"?: string | null,"page_count"?: number | null,"provider": Database["public"]['Enums']["provider"],"provider_data_purged_at"?: string | null,"provider_id": string,"refresh_attempted_at"?: string | null,"refreshed_at"?: string,"release_date"?: string | null,"runtime_minutes"?: number | null,"score"?: number | null,"score_count"?: number | null,"series_id"?: string | null,"series_position"?: number | null,"series_position_label"?: string | null,"title": string,"ttb_completely_s"?: number | null,"ttb_count"?: number | null,"ttb_hastily_s"?: number | null,"ttb_normally_s"?: number | null,"updated_at"?: string
                   }
                   Update: {
-                    "audio_minutes"?: number | null,"created_at"?: string,"has_audiobook"?: boolean | null,"id"?: string,"image_ref"?: string | null,"media_type"?: Database["public"]['Enums']["media_type"],"narrators"?: string | null,"page_count"?: number | null,"provider"?: Database["public"]['Enums']["provider"],"provider_data_purged_at"?: string | null,"provider_id"?: string,"refresh_attempted_at"?: string | null,"refreshed_at"?: string,"release_date"?: string | null,"runtime_minutes"?: number | null,"score"?: number | null,"score_count"?: number | null,"series_id"?: string | null,"series_position"?: number | null,"series_position_label"?: string | null,"title"?: string,"ttb_completely_s"?: number | null,"ttb_count"?: number | null,"ttb_hastily_s"?: number | null,"ttb_normally_s"?: number | null,"updated_at"?: string
+                    "audio_minutes"?: number | null,"created_at"?: string,"genres"?: (string)[],"has_audiobook"?: boolean | null,"id"?: string,"image_ref"?: string | null,"length_note"?: string | null,"media_type"?: Database["public"]['Enums']["media_type"],"narrators"?: string | null,"owner_id"?: string | null,"page_count"?: number | null,"provider"?: Database["public"]['Enums']["provider"],"provider_data_purged_at"?: string | null,"provider_id"?: string,"refresh_attempted_at"?: string | null,"refreshed_at"?: string,"release_date"?: string | null,"runtime_minutes"?: number | null,"score"?: number | null,"score_count"?: number | null,"series_id"?: string | null,"series_position"?: number | null,"series_position_label"?: string | null,"title"?: string,"ttb_completely_s"?: number | null,"ttb_count"?: number | null,"ttb_hastily_s"?: number | null,"ttb_normally_s"?: number | null,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -122,6 +122,46 @@ isOneToOne: false
       referencedRelation: "seasons"
       referencedColumns: ["id"]
     }
+                  ]
+                },"list_entries": {
+                  Row: {
+                    "created_at": string,"entry_id": string,"list_id": string,"position": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"entry_id": string,"list_id": string,"position": number
+                  }
+                  Update: {
+                    "created_at"?: string,"entry_id"?: string,"list_id"?: string,"position"?: number
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "list_entries_entry_id_fkey"
+      columns: ["entry_id"]
+isOneToOne: false
+      referencedRelation: "library_entries"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "list_entries_list_id_fkey"
+      columns: ["list_id"]
+isOneToOne: false
+      referencedRelation: "lists"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"lists": {
+                  Row: {
+                    "created_at": string,"id": string,"is_private": boolean,"name": string,"updated_at": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"id"?: string,"is_private"?: boolean,"name": string,"updated_at"?: string,"user_id"?: string
+                  }
+                  Update: {
+                    "created_at"?: string,"id"?: string,"is_private"?: boolean,"name"?: string,"updated_at"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    
                   ]
                 },"profiles": {
                   Row: {
@@ -177,6 +217,20 @@ isOneToOne: false
       referencedColumns: ["id","media_type"]
     }
                   ]
+                },"user_genre_pins": {
+                  Row: {
+                    "created_at": string,"genre": string,"media_type": Database["public"]['Enums']["media_type"],"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"genre": string,"media_type": Database["public"]['Enums']["media_type"],"user_id"?: string
+                  }
+                  Update: {
+                    "created_at"?: string,"genre"?: string,"media_type"?: Database["public"]['Enums']["media_type"],"user_id"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
                 }
           }
           Views: {
@@ -191,7 +245,7 @@ isOneToOne: false
                            }
           }
           Enums: {
-            "book_version": "print"|"audio","entry_status": "backlog"|"in_progress"|"finished"|"paused"|"dropped","media_type": "movie"|"show"|"game"|"book","provider": "tmdb"|"igdb"|"hardcover"
+            "book_version": "print"|"audio","entry_status": "backlog"|"in_progress"|"finished"|"paused"|"dropped","media_type": "movie"|"show"|"game"|"book"|"other","provider": "tmdb"|"igdb"|"hardcover"|"manual"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -311,7 +365,7 @@ export const Constants = {
           }
         },"public": {
           Enums: {
-            "book_version": ["print", "audio"],"entry_status": ["backlog", "in_progress", "finished", "paused", "dropped"],"media_type": ["movie", "show", "game", "book"],"provider": ["tmdb", "igdb", "hardcover"]
+            "book_version": ["print", "audio"],"entry_status": ["backlog", "in_progress", "finished", "paused", "dropped"],"media_type": ["movie", "show", "game", "book", "other"],"provider": ["tmdb", "igdb", "hardcover", "manual"]
           }
         }
 } as const

@@ -1,3 +1,3 @@
 [
-  { "id": 5001, "name": "Lantern Keep", "first_release_date": 1577836800, "cover": { "id": 1, "image_id": "co1abc" }, "total_rating": 81.456, "total_rating_count": 120 }
+  { "id": 5001, "name": "Lantern Keep", "first_release_date": 1577836800, "cover": { "id": 1, "image_id": "co1abc" }, "total_rating": 81.456, "total_rating_count": 120, "genres": [{ "id": 31, "name": "Adventure" }, { "id": 12, "name": "Role-playing (RPG)" }, { "id": 5 }] }
 ]

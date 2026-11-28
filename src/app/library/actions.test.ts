@@ -114,7 +114,7 @@ test("showing and hiding queues is remembered in a cookie of hidden types", asyn
   await setUpNextVisibility(data);
   expect(cookieStore.set).toHaveBeenCalledExactlyOnceWith(
     "upnext-hidden",
-    "movie,game,book",
+    "movie,game,book,other",
     // Secure only in production: the local dev server is plain http.
     expect.objectContaining({ httpOnly: true, sameSite: "lax", path: "/", secure: false }),
   );

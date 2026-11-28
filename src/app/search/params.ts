@@ -24,11 +24,20 @@ export function parseSearch(params: RawParams): SearchState {
 }
 
 /** The search page URL for a state, plus any extra params (such as `added=1`). */
-export function searchHref({ q, exclude }: SearchState, extra: Record<string, string> = {}): string {
+export function searchHref(state: SearchState, extra: Record<string, string> = {}): string {
+  return hrefWith("/search", state, extra);
+}
+
+/** A season picker URL that carries the search state, so the picker can return to it. */
+export function pickerHref(tmdbId: string, state: SearchState, extra: Record<string, string> = {}): string {
+  return hrefWith(`/search/show/${tmdbId}`, state, extra);
+}
+
+function hrefWith(path: string, { q, exclude }: SearchState, extra: Record<string, string>): string {
   const params = new URLSearchParams();
   if (q) params.set("q", q);
   for (const type of exclude) params.append("exclude", type);
   for (const [key, value] of Object.entries(extra)) params.set(key, value);
   const query = params.toString();
-  return query ? `/search?${query}` : "/search";
+  return query ? `${path}?${query}` : path;
 }

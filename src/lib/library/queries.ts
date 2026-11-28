@@ -1,5 +1,6 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { seasonLabel } from "@/app/search/season-label";
 import { igdbImageUrl } from "@/lib/providers/igdb";
 import { tmdbImageUrl } from "@/lib/providers/tmdb";
 import type { Provider } from "@/lib/providers/types";
@@ -24,13 +25,17 @@ export type ItemRow = Score & {
   kind: "item";
   entryId: string;
   status: EntryStatus;
-  mediaType: "movie" | "game" | "book";
+  /** Extra plays: 0 until played again (Finished itself is one play). */
+  playCount: number;
+  mediaType: "movie" | "game" | "book" | "other";
   version: "print" | "audio" | null;
   title: string;
   imageUrl: string | null;
   minutes: number | null;
   pages: number | null;
   narrators: string | null;
+  /** Other only: the length the user typed ("24 episodes"), else null. */
+  lengthNote: string | null;
   /** For the score label ("Hardcover rating 4.2/5" for a book). */
   providerName: Provider;
 };
@@ -39,6 +44,7 @@ export type ItemRow = Score & {
 export type SeasonRow = {
   entryId: string;
   status: EntryStatus;
+  playCount: number;
   number: number;
   episodeCount: number | null;
   airDate: string | null;
@@ -53,6 +59,8 @@ export type ShowRow = Score & {
   imageUrl: string | null;
   progress: { finished: number; total: number };
   seasons: SeasonRow[];
+  /** Every season counted (specials left out), whether added or not, for the Progress control. */
+  allSeasons: { seasonId: string; number: number; label: string; excluded: boolean }[];
 };
 
 /** A book under its series: `position` is its label ("2", "2.5"), or null when unknown. */
@@ -68,6 +76,8 @@ export type SeriesRow = Score & {
   title: string;
   progress: { read: number; total: number };
   books: SeriesBookRow[];
+  /** The series' main-line books in `items` (the only ones that count), for the Progress control. */
+  allBooks: { itemId: string; label: string; excluded: boolean }[];
 };
 
 export type LibraryGroup = { status: EntryStatus; label: string; rows: (ItemRow | ShowRow | SeriesRow)[] };
@@ -87,6 +97,7 @@ export type UpNextRow = ItemRow | QueuedSeasonRow;
 export type LibraryView = { upNext: Record<QueueType, UpNextRow[]>; groups: LibraryGroup[] };
 
 export function imageUrl(provider: Provider, ref: string | null): string | null {
+  if (provider === "manual") return null; // an own entry has no image (a link would reach a stranger's host)
   if (provider === "hardcover") return ref; // the ref is already the full cover URL
   return provider === "tmdb" ? tmdbImageUrl(ref) : igdbImageUrl(ref);
 }
@@ -97,17 +108,23 @@ const storyMinutes = (seconds: number | null) => (seconds === null ? null : seco
 /**
  * The signed-in user's library. Pass the user's own client: it can read other
  * users' public entries and exclusions too, so every query is filtered to `userId`.
+ * With `exclusions: false` (a public profile) the user's exclusions are never
+ * read: progress then counts every season and main-line book.
  */
-export async function getMyLibrary(supabase: Client, userId: string): Promise<LibraryView> {
+export async function getMyLibrary(
+  supabase: Client,
+  userId: string,
+  { exclusions = true }: { exclusions?: boolean } = {},
+): Promise<LibraryView> {
   // Paged: a library can hold more entries than PostgREST returns at once.
   const entries = await fetchAll((from, to) =>
     supabase
       .from("library_entries")
       .select(
-        `id, status, up_next_position,
+        `id, status, play_count, up_next_position,
          book_version,
          item:items(id, provider, media_type, title, image_ref, runtime_minutes, ttb_normally_s, score, score_count,
-           page_count, audio_minutes, narrators, series_position, series_position_label,
+           page_count, audio_minutes, narrators, length_note, series_position, series_position_label,
            series:book_series(id, name, primary_books_count)),
          season:seasons(id, season_number, episode_count, air_date, runtime_minutes,
            show:items(id, provider, title, image_ref, score, score_count))`,
@@ -130,7 +147,7 @@ export async function getMyLibrary(supabase: Client, userId: string): Promise<Li
       const i = e.item;
       const mediaType = i.media_type;
       if (mediaType === "show") continue; // the schema never lets an item entry be a show
-      const row = itemRow(e.id, e.status, e.book_version, { ...i, media_type: mediaType });
+      const row = itemRow(e.id, e.status, e.play_count, e.book_version, { ...i, media_type: mediaType });
       if (i.media_type === "book" && i.series) {
         seriesBooks.push({
           seriesId: i.series.id,
@@ -155,6 +172,7 @@ export async function getMyLibrary(supabase: Client, userId: string): Promise<Li
               scoreCount: null,
               progress: { read: 0, total: 0 },
               books: [],
+              allBooks: [],
             },
             primaryBooksCount: i.series.primary_books_count,
           };
@@ -169,6 +187,7 @@ export async function getMyLibrary(supabase: Client, userId: string): Promise<Li
       const seasonRow: SeasonRow = {
         entryId: e.id,
         status: e.status,
+        playCount: e.play_count,
         number: s.season_number,
         episodeCount: s.episode_count,
         airDate: s.air_date,
@@ -200,6 +219,7 @@ export async function getMyLibrary(supabase: Client, userId: string): Promise<Li
           scoreCount: s.show.score_count,
           progress: { finished: 0, total: 0 },
           seasons: [],
+          allSeasons: [],
         };
         shows.set(show.showId, show);
       }
@@ -211,8 +231,8 @@ export async function getMyLibrary(supabase: Client, userId: string): Promise<Li
     entries.flatMap((e) => (e.season && e.status === "finished" ? [e.season.id] : [])),
   );
   await Promise.all([
-    addProgress(supabase, userId, shows, finishedSeasonIds),
-    addSeriesProgress(supabase, userId, series, seriesBooks),
+    addProgress(supabase, userId, shows, finishedSeasonIds, exclusions),
+    addSeriesProgress(supabase, userId, series, seriesBooks, exclusions),
   ]);
 
   // By title; a book's print entry before its audio one.
@@ -252,7 +272,7 @@ type BookVersion = Database["public"]["Enums"]["book_version"];
 type CatalogueItem = {
   id: string;
   provider: Provider;
-  media_type: "movie" | "game" | "book";
+  media_type: "movie" | "game" | "book" | "other";
   title: string;
   image_ref: string | null;
   runtime_minutes: number | null;
@@ -262,9 +282,16 @@ type CatalogueItem = {
   page_count: number | null;
   audio_minutes: number | null;
   narrators: string | null;
+  length_note: string | null;
 };
 
-function itemRow(entryId: string, status: EntryStatus, bookVersion: BookVersion | null, i: CatalogueItem): ItemRow {
+function itemRow(
+  entryId: string,
+  status: EntryStatus,
+  playCount: number,
+  bookVersion: BookVersion | null,
+  i: CatalogueItem,
+): ItemRow {
   // A book's version is the entry's own (a book entry always has one), never
   // `has_audiobook`, which is unknown (null) once a book's data is purged.
   const version = i.media_type === "book" ? (bookVersion ?? "print") : null;
@@ -280,6 +307,7 @@ function itemRow(entryId: string, status: EntryStatus, bookVersion: BookVersion 
     kind: "item",
     entryId,
     status,
+    playCount,
     mediaType: i.media_type,
     version,
     title: i.title,
@@ -287,6 +315,7 @@ function itemRow(entryId: string, status: EntryStatus, bookVersion: BookVersion 
     minutes,
     pages: version === "print" ? i.page_count : null,
     narrators: version === "audio" ? i.narrators : null,
+    lengthNote: i.media_type === "other" ? i.length_note : null,
     providerName: i.provider,
     score: i.score,
     scoreCount: i.score_count,
@@ -302,18 +331,30 @@ async function addSeriesProgress(
   userId: string,
   series: Map<string, { row: SeriesRow; primaryBooksCount: number | null }>,
   books: SeriesBook[],
+  readExclusions: boolean,
 ): Promise<void> {
   if (!series.size) return;
   // All of the user's exclusions, paged; only those on these series' books match below.
-  const exclusions = await fetchAll((from, to) =>
+  const exclusions = readExclusions
+    ? await fetchAll((from, to) =>
+        supabase
+          .from("book_exclusions")
+          .select("item_id, item:items(series_id, series_position)")
+          .eq("user_id", userId)
+          .order("item_id")
+          .range(from, to),
+      )
+    : [];
+  const excluded = new Set(exclusions.map((x) => x.item_id));
+  const catalogue = await fetchAllIn([...series.keys()], (ids, from, to) =>
     supabase
-      .from("book_exclusions")
-      .select("item_id, item:items(series_id, series_position)")
-      .eq("user_id", userId)
-      .order("item_id")
+      .from("items")
+      .select("id, title, series_id, series_position, series_position_label")
+      .in("series_id", ids)
+      .eq("media_type", "book")
+      .order("id")
       .range(from, to),
   );
-  const excluded = new Set(exclusions.map((x) => x.item_id));
   const all: SeriesBook[] = [
     ...books.map((b) => ({ ...b, excluded: excluded.has(b.itemId) })),
     ...exclusions.flatMap((x) =>
@@ -329,6 +370,22 @@ async function addSeriesProgress(
     bySeries.set(b.seriesId, list);
   }
   for (const [id, s] of series) s.row.progress = seriesProgress(s.primaryBooksCount, bySeries.get(id) ?? []);
+
+  // The control lists the main-line books, the only ones whose exclusion changes the count.
+  const mainLine = catalogue
+    .flatMap((b) =>
+      b.series_id && b.series_position !== null && Number.isInteger(b.series_position)
+        ? [{ ...b, seriesId: b.series_id, position: b.series_position }]
+        : [],
+    )
+    .sort((x, y) => x.position - y.position || x.title.localeCompare(y.title));
+  for (const b of mainLine) {
+    series.get(b.seriesId)?.row.allBooks.push({
+      itemId: b.id,
+      label: `#${b.series_position_label ?? b.position} ${b.title}`,
+      excluded: excluded.has(b.id),
+    });
+  }
 }
 
 // Every season of each show counts, not only the ones the user added, minus
@@ -338,23 +395,29 @@ async function addProgress(
   userId: string,
   shows: Map<string, ShowRow>,
   finishedSeasonIds: Set<string>,
+  readExclusions: boolean,
 ): Promise<void> {
   if (!shows.size) return;
   // Chunked and paged, so many shows never make a URL too long or lose
   // seasons past one page.
   const [seasons, exclusions] = await Promise.all([
     fetchAllIn([...shows.keys()], (ids, from, to) =>
-      supabase.from("seasons").select("id, show_id, season_number").in("show_id", ids).order("id").range(from, to),
+      supabase
+        .from("seasons")
+        .select("id, show_id, season_number, episode_count, air_date")
+        .in("show_id", ids).order("id").range(from, to),
     ),
     // All of the user's exclusions; only those on these shows' seasons match below.
-    fetchAll((from, to) =>
-      supabase
-        .from("progress_exclusions")
-        .select("season_id")
-        .eq("user_id", userId)
-        .order("season_id")
-        .range(from, to),
-    ),
+    readExclusions
+      ? fetchAll((from, to) =>
+          supabase
+            .from("progress_exclusions")
+            .select("season_id")
+            .eq("user_id", userId)
+            .order("season_id")
+            .range(from, to),
+        )
+      : [],
   ]);
   const excluded = new Set(exclusions.map((x) => x.season_id));
 
@@ -366,6 +429,16 @@ async function addProgress(
   }
   for (const show of shows.values()) {
     show.progress = showProgress(byShow.get(show.showId) ?? [], finishedSeasonIds, excluded);
+  }
+  // The control's list: every season counted (specials left out), in order.
+  for (const s of [...seasons].sort((x, y) => x.season_number - y.season_number)) {
+    if (s.season_number < 1) continue;
+    shows.get(s.show_id)?.allSeasons.push({
+      seasonId: s.id,
+      number: s.season_number,
+      label: seasonLabel({ number: s.season_number, episodeCount: s.episode_count, airDate: s.air_date }),
+      excluded: excluded.has(s.id),
+    });
   }
 }
 
@@ -393,12 +466,43 @@ export async function setEntryStatus(
 }
 
 /**
- * Deletes one of the user's entries. Idempotent: when no row goes, the entry
+ * Deletes one of the user's entries (and, for Other, its item). Idempotent: when no row goes, the entry
  * is already gone (a double-click on Remove), which is success. The filter on
  * the user, and RLS, mean another user's entry is never deleted (INV-001),
  * and the same quiet success tells the caller nothing about it.
  */
 export async function deleteEntry(supabase: Client, userId: string, entryId: string): Promise<void> {
-  const { error } = await supabase.from("library_entries").delete().eq("id", entryId).eq("user_id", userId);
+  const { data, error } = await supabase
+    .from("library_entries")
+    .delete()
+    .eq("id", entryId)
+    .eq("user_id", userId)
+    .select("item_id, item_media_type");
+  if (error) throw error;
+  // An Other entry is the user's own item, so removing the entry removes the item
+  // (the entry first: the foreign key restricts). Never a catalogue item. If
+  // anything else still points at it (23503), it stays.
+  for (const entry of data) {
+    if (entry.item_media_type !== "other" || !entry.item_id) continue;
+    const removed = await supabase.from("items").delete().eq("id", entry.item_id).eq("owner_id", userId);
+    if (removed.error && removed.error.code !== "23503") throw removed.error;
+  }
+}
+
+/**
+ * Counts one more play of a Finished entry of the user's. `expected` is the
+ * count the page showed: the update only matches that count, so a repeat (a
+ * double-click, a stale page) finds no row and changes nothing, which is
+ * success, as with Remove. Another user's entry, or one that isn't Finished,
+ * is never changed (INV-001), and says nothing either way. finished_at stays.
+ */
+export async function playEntryAgain(supabase: Client, userId: string, entryId: string, expected: number): Promise<void> {
+  const { error } = await supabase
+    .from("library_entries")
+    .update({ play_count: expected + 1 })
+    .eq("id", entryId)
+    .eq("user_id", userId)
+    .eq("play_count", expected)
+    .eq("status", "finished");
   if (error) throw error;
 }

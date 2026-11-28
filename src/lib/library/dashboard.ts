@@ -5,6 +5,8 @@ import type { Database } from "@/lib/supabase/database.types";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { summarise, upcoming, type DashboardStats, type RadarEntry } from "./dashboard-summary";
 import { getMyLibrary, imageUrl, type LibraryView } from "./queries";
+import { filterView, type TabType } from "./type-filter";
+import type { QueueType } from "./up-next-order";
 
 type Client = SupabaseClient<Database>;
 
@@ -19,6 +21,7 @@ export type FinishedEntry = {
 };
 
 export type Dashboard = {
+  /** The whole library: the tab counts come from it. `stats` is for the chosen type only. */
   library: LibraryView;
   stats: DashboardStats;
   radar: RadarEntry[];
@@ -35,37 +38,42 @@ const SEASON_COLUMNS = `season_number, air_date, show:items(provider, title, ima
  * users' public entries too, so every query is filtered to `userId` (INV-001).
  * `today` is a YYYY-MM-DD string.
  */
-export async function getDashboard(supabase: Client, userId: string, today: string): Promise<Dashboard> {
+export async function getDashboard(supabase: Client, userId: string, today: string, tab: TabType = "all"): Promise<Dashboard> {
+  const type = tab === "all" ? undefined : tab;
   const [library, radar, recentlyFinished] = await Promise.all([
     getMyLibrary(supabase, userId),
-    getRadar(supabase, userId, today),
-    getRecentlyFinished(supabase, userId),
+    getRadar(supabase, userId, today, type),
+    getRecentlyFinished(supabase, userId, type),
   ]);
-  return { library, stats: summarise(library), radar, recentlyFinished };
+  return { library, stats: summarise(filterView(library, tab)), radar, recentlyFinished };
 }
 
-async function getRadar(supabase: Client, userId: string, today: string): Promise<RadarEntry[]> {
+/** Up next entries not out yet; with a `type`, only that type's (a season is TV). */
+export async function getRadar(supabase: Client, userId: string, today: string, type?: QueueType): Promise<RadarEntry[]> {
   const [itemEntries, seasonEntries] = await Promise.all([
-    fetchAll((from, to) =>
-      supabase
-        .from("library_entries")
-        .select(`id, book_version, item:items!inner(${ITEM_COLUMNS})`)
-        .eq("user_id", userId)
-        .eq("status", "backlog")
-        .gt("item.release_date", today)
-        .order("id")
-        .range(from, to),
-    ),
-    fetchAll((from, to) =>
-      supabase
-        .from("library_entries")
-        .select(`id, season:seasons!inner(${SEASON_COLUMNS})`)
-        .eq("user_id", userId)
-        .eq("status", "backlog")
-        .gt("season.air_date", today)
-        .order("id")
-        .range(from, to),
-    ),
+    type === "show"
+      ? []
+      : fetchAll((from, to) => {
+          const query = supabase
+            .from("library_entries")
+            .select(`id, book_version, item:items!inner(${ITEM_COLUMNS})`)
+            .eq("user_id", userId)
+            .eq("status", "backlog")
+            .gt("item.release_date", today);
+          return (type ? query.eq("item.media_type", type) : query).order("id").range(from, to);
+        }),
+    type && type !== "show"
+      ? []
+      : fetchAll((from, to) =>
+          supabase
+            .from("library_entries")
+            .select(`id, season:seasons!inner(${SEASON_COLUMNS})`)
+            .eq("user_id", userId)
+            .eq("status", "backlog")
+            .gt("season.air_date", today)
+            .order("id")
+            .range(from, to),
+        ),
   ]);
 
   const entries: RadarEntry[] = [];
@@ -95,13 +103,20 @@ async function getRadar(supabase: Client, userId: string, today: string): Promis
   return upcoming(entries, today);
 }
 
-async function getRecentlyFinished(supabase: Client, userId: string): Promise<FinishedEntry[]> {
-  const { data, error } = await supabase
+/** The latest finished entries; with a `type`, only that type's (a season is TV). */
+export async function getRecentlyFinished(supabase: Client, userId: string, type?: QueueType): Promise<FinishedEntry[]> {
+  const query = supabase
     .from("library_entries")
     .select(`id, finished_at, book_version, item:items(${ITEM_COLUMNS}), season:seasons(${SEASON_COLUMNS})`)
     .eq("user_id", userId)
     .eq("status", "finished")
-    .not("finished_at", "is", null)
+    .not("finished_at", "is", null);
+  const { data, error } = await (type === "show"
+    ? query.not("season_id", "is", null)
+    : type
+      ? query.eq("item_media_type", type)
+      : query
+  )
     .order("finished_at", { ascending: false })
     .order("id")
     .limit(RECENTLY_FINISHED_LIMIT);

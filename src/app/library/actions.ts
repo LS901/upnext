@@ -5,7 +5,9 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { text, texts } from "@/app/form-data";
 import { getCurrentUser } from "@/lib/auth/current-user";
-import { deleteEntry, setEntryStatus } from "@/lib/library/queries";
+import { setBookExclusions as saveBookExclusions, setSeasonExclusions as saveSeasonExclusions } from "@/lib/library/exclusions";
+import { NOTE_MAX, saveEntryNote } from "@/lib/library/notes";
+import { deleteEntry, playEntryAgain, setEntryStatus } from "@/lib/library/queries";
 import { isEntryStatus } from "@/lib/library/status";
 import { placeInUpNext } from "@/lib/library/up-next";
 import { HIDDEN_COOKIE, hiddenFromShown } from "@/lib/library/up-next-order";
@@ -37,6 +39,69 @@ export async function removeEntry(formData: FormData) {
   if (!user) redirect("/login");
 
   await deleteEntry(await createClient(), user.id, entryId);
+  refresh();
+}
+
+/** "Watched again" and its kin. `expected` is the count the page showed; a repeat changes nothing. */
+export async function playAgain(formData: FormData) {
+  const entryId = text(formData, "entryId");
+  const expected = Number(text(formData, "expected"));
+  if (!UUID.test(entryId) || !Number.isSafeInteger(expected) || expected < 0) {
+    throw new Error("Not a play that can be counted.");
+  }
+
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+
+  await playEntryAgain(await createClient(), user.id, entryId, expected);
+  refresh();
+}
+
+/**
+ * The "Note" box on a row: saves the user's private note on their entry
+ * (INV-002: only ever the owner reads it). An empty or blank note deletes it.
+ * The box holds 2000 characters, so a longer one is a forged request.
+ */
+export async function saveNote(formData: FormData) {
+  const entryId = text(formData, "entryId");
+  const body = text(formData, "body").trim();
+  if (!UUID.test(entryId)) throw new Error("Not a note that can be saved.");
+  if (Array.from(body).length > NOTE_MAX) throw new Error(`A note holds up to ${NOTE_MAX} characters.`);
+
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+
+  await saveEntryNote(await createClient(), user.id, entryId, body);
+  refresh();
+}
+
+/**
+ * The "Progress" control on a show row: `counted` holds the ticked seasons, and
+ * the user's exclusions for the show become exactly the rest. A repeat saves
+ * the same rows. Ids that aren't the show's seasons are ignored.
+ */
+export async function setSeasonExclusions(formData: FormData) {
+  const showId = text(formData, "showId");
+  const counted = texts(formData, "counted");
+  if (!UUID.test(showId) || !counted.every((id) => UUID.test(id))) throw new Error("Not a progress change that can be made.");
+
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+
+  await saveSeasonExclusions(await createClient(), user.id, showId, counted);
+  refresh();
+}
+
+/** The same for a series row's books. */
+export async function setBookExclusions(formData: FormData) {
+  const seriesId = text(formData, "seriesId");
+  const counted = texts(formData, "counted");
+  if (!UUID.test(seriesId) || !counted.every((id) => UUID.test(id))) throw new Error("Not a progress change that can be made.");
+
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+
+  await saveBookExclusions(await createClient(), user.id, seriesId, counted);
   refresh();
 }
 

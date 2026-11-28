@@ -8,6 +8,19 @@
       "ratings_count": 1234,
       "release_date": "2014-06-01",
       "image": { "url": "https://assets.hardcover.app/edition/9001/cover-a.jpg" },
+      "cached_tags": {
+        "Genre": [
+          { "tag": "Fantasy", "tagSlug": "fantasy", "count": 40 },
+          { "tag": "Mystery", "tagSlug": "mystery", "count": 12 },
+          { "tag": "Fantasy", "tagSlug": "fantasy", "count": 3 },
+          { "tag": "", "count": 2 },
+          { "tag": "Adventure", "count": 2 },
+          { "tag": "Romance", "count": 1 },
+          { "tag": "Horror", "count": 1 },
+          { "tag": "Science Fiction", "count": 1 }
+        ],
+        "Mood": [{ "tag": "dark", "count": 9 }]
+      },
       "default_audio_edition": {
         "audio_seconds": 58253,
         "contributions": [
