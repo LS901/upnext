@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { ArrowDown, ArrowUp, ArrowUpToLine, type LucideIcon } from "lucide-react";
 import { Poster } from "@/components/poster";
+import { TypeTabs } from "@/components/type-tabs";
 import { dragName, queuedTitle } from "./drag-name";
 import { StatusChip } from "@/components/status-chip";
 import { Card } from "@/components/ui/card";
@@ -28,6 +29,7 @@ import {
   type UpNextRow,
 } from "@/lib/library/queries";
 import type { EntryStatus } from "@/lib/library/status";
+import { filterView, parseTabType, tabCounts, type TabType } from "@/lib/library/type-filter";
 import {
   HIDDEN_COOKIE,
   parseHidden,
@@ -48,33 +50,40 @@ export const metadata: Metadata = { title: "My library" };
 
 const muted = "text-sm text-muted-foreground break-words";
 
-export default function LibraryPage() {
+export default function LibraryPage({ searchParams }: PageProps<"/library">) {
   return (
     <main className="mx-auto w-full max-w-4xl min-w-0 flex-1 px-4 py-10 sm:px-6">
       <h1 className="text-3xl font-semibold tracking-tight">My library</h1>
       {/* Reads the session, so it renders at request time. */}
       <Suspense>
-        <Library />
+        <Library searchParams={searchParams} />
       </Suspense>
     </main>
   );
 }
 
-async function Library() {
+async function Library({ searchParams }: Pick<PageProps<"/library">, "searchParams">) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
-  const { upNext, groups } = await getMyLibrary(await createClient(), user.id);
+  const type = parseTabType((await searchParams).type);
+  const full = await getMyLibrary(await createClient(), user.id);
+  const counts = tabCounts(full);
+  const { upNext, groups } = filterView(full, type);
   const hidden = parseHidden((await cookies()).get(HIDDEN_COOKIE)?.value);
-  if (!groups.length && QUEUE_TYPES.every((type) => !upNext[type].length)) {
+  const tabs = <TypeTabs current={type} counts={counts} hrefFor={(t) => (t === "all" ? "/library" : `/library?type=${t}`)} />;
+  if (!groups.length && QUEUE_TYPES.every((t) => !upNext[t].length)) {
     return (
-      <p className="mt-6 rounded-xl border border-dashed border-border px-4 py-10 text-center text-muted-foreground">
-        Nothing here yet.{" "}
-        <Link href="/search" className="inline-flex min-h-11 items-center text-accent-text underline lg:min-h-0">
-          Search
-        </Link>{" "}
-        to add something.
-      </p>
+      <div className="mt-6 flex flex-col gap-6">
+        {tabs}
+        <p className="rounded-xl border border-dashed border-border px-4 py-10 text-center text-muted-foreground">
+          Nothing here yet.{" "}
+          <Link href="/search" className="inline-flex min-h-11 items-center text-accent-text underline lg:min-h-0">
+            Search
+          </Link>{" "}
+          to add something.
+        </p>
+      </div>
     );
   }
   // What you're on comes first, so a long Up next never buries it.
@@ -82,10 +91,11 @@ async function Library() {
   const rest = groups.filter((g) => g.status !== "in_progress");
   return (
     <div className="mt-6 flex flex-col gap-10">
+      {tabs}
       {inProgress.map((group) => (
         <Group key={group.status} group={group} />
       ))}
-      <UpNext upNext={upNext} hidden={hidden} />
+      <UpNext upNext={upNext} hidden={hidden} only={type} />
       {rest.map((group) => (
         <Group key={group.status} group={group} />
       ))}
@@ -95,16 +105,17 @@ async function Library() {
 
 // One queue per media type, each in the user's order (owner said, 2026-11-26),
 // holding everything not started yet (owner said, 2026-11-27).
-function UpNext({ upNext, hidden }: { upNext: LibraryView["upNext"]; hidden: QueueType[] }) {
+// On a type tab the Show boxes are gone and that type's queue always shows.
+function UpNext({ upNext, hidden, only }: { upNext: LibraryView["upNext"]; hidden: QueueType[]; only: TabType }) {
   const counts = Object.fromEntries(QUEUE_TYPES.map((type) => [type, upNext[type].length])) as Record<QueueType, number>;
   return (
     <section aria-labelledby="up-next">
       <h2 id="up-next" className="text-2xl font-semibold tracking-tight">
         Up next
       </h2>
-      <QueueVisibility hidden={hidden} counts={counts} />
+      {only === "all" && <QueueVisibility hidden={hidden} counts={counts} />}
       <div className="mt-4 flex flex-col gap-4">
-        {QUEUE_TYPES.filter((type) => !hidden.includes(type)).map((type) => (
+        {QUEUE_TYPES.filter((type) => (only === "all" ? !hidden.includes(type) : type === only)).map((type) => (
           <Queue key={type} type={type} rows={upNext[type]} />
         ))}
       </div>

@@ -317,3 +317,51 @@ test("a very long title wraps and never scrolls the page sideways at 390px", asy
   const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
   expect(scrollWidth).toBeLessThanOrEqual(390);
 });
+
+test("type tabs show one type, fall back to All, and an empty type says so", async ({ page, account }) => {
+  const admin = adminClient();
+  const title = `Tabletop Lantern ${randomInt(1000, 9999)}`;
+  const { data: item, error } = await admin
+    .from("items")
+    .insert({ provider: "igdb", media_type: "game", provider_id: String(randomInt(10_000_000, 99_999_999)), title })
+    .select("id")
+    .single();
+  if (error) throw error;
+  const { error: entryError } = await admin
+    .from("library_entries")
+    .insert({ user_id: await userId(account.username), item_id: item.id, item_media_type: "game" });
+  if (entryError) throw entryError;
+
+  // A type tab lists only that type, with the count and aria-current on its tab.
+  await page.goto("/library?type=game");
+  const tabs = page.getByRole("navigation", { name: "Type" });
+  await expect(tabs.getByRole("link", { name: /^Games \(1\)$/ })).toHaveAttribute("aria-current", "page");
+  await expect(tabs.getByRole("link", { name: /^All \(\d+\)$/ })).not.toHaveAttribute("aria-current", "page");
+  await expect(queued(queue(page, "Games"), title)).toBeVisible();
+  await expect(page.getByRole("list", { name: "Movies up next" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { level: 3, name: "Kestrel Morning" })).toHaveCount(0);
+  // The Show boxes are for All only.
+  await expect(page.getByRole("group", { name: /Show/ })).toHaveCount(0);
+
+  // The tabs are links: following one lands on its type.
+  await tabs.getByRole("link", { name: /^TV \(/ }).click();
+  await expect(page).toHaveURL("/library?type=show");
+  await expect(page.getByRole("heading", { level: 3, name: "Harbour of Glass" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 3, name: title })).toHaveCount(0);
+  await tabs.getByRole("link", { name: /^All \(/ }).click();
+  await expect(page).toHaveURL("/library");
+  await expect(tabs.getByRole("link", { name: /^All \(/ })).toHaveAttribute("aria-current", "page");
+
+  // An unknown type is All.
+  await page.goto("/library?type=nope");
+  await expect(tabs.getByRole("link", { name: /^All \(/ })).toHaveAttribute("aria-current", "page");
+  await expect(queued(queue(page, "Games"), title)).toBeVisible();
+  await expect(queue(page, "Movies")).toBeVisible();
+
+  // A type with nothing in it: an empty state with a way to search, never an error.
+  await page.goto("/library?type=book");
+  await expect(tabs.getByRole("link", { name: "Books (0)" })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByText("Nothing here yet.")).toBeVisible();
+  await expect(page.getByRole("main").getByRole("link", { name: "Search", exact: true })).toHaveAttribute("href", "/search");
+  await expect(page.getByText("Something went wrong")).toHaveCount(0);
+});

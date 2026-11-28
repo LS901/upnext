@@ -179,6 +179,16 @@ for (const size of SIZES) {
       await scan(page);
     });
 
+    test(`my library on a type tab has no axe violations at ${size.name}`, async ({ page }) => {
+      await page.goto("/library?type=game");
+      await expect(page.getByRole("link", { name: /^Games \(\d+\)$/ })).toHaveAttribute("aria-current", "page");
+      await expect(page.getByRole("list", { name: "Games up next", exact: true })).toBeVisible();
+      await scan(page);
+      await page.goto("/library?type=book");
+      await expect(page.getByText("Nothing here yet.")).toBeVisible();
+      await scan(page);
+    });
+
     test(`credits has no axe violations at ${size.name}`, async ({ page }) => {
       await page.goto("/credits");
       await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
