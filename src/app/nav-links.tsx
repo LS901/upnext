@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Library, Search } from "lucide-react";
+import { Home, Library, List, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const links = [
   { href: "/", label: "Home", icon: Home, match: (path: string) => path === "/" },
   { href: "/search", label: "Search", icon: Search, match: (path: string) => path === "/search" || path.startsWith("/search/") },
   { href: "/library", label: "My library", icon: Library, match: (path: string) => path === "/library" },
+  { href: "/lists", label: "Lists", icon: List, match: (path: string) => path === "/lists" || path.startsWith("/lists/") },
 ];
 
 export function NavLinks() {

@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { text, texts } from "@/app/form-data";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { setBookExclusions as saveBookExclusions, setSeasonExclusions as saveSeasonExclusions } from "@/lib/library/exclusions";
+import { NOTE_MAX, saveEntryNote } from "@/lib/library/notes";
 import { deleteEntry, playEntryAgain, setEntryStatus } from "@/lib/library/queries";
 import { isEntryStatus } from "@/lib/library/status";
 import { placeInUpNext } from "@/lib/library/up-next";
@@ -53,6 +54,24 @@ export async function playAgain(formData: FormData) {
   if (!user) redirect("/login");
 
   await playEntryAgain(await createClient(), user.id, entryId, expected);
+  refresh();
+}
+
+/**
+ * The "Note" box on a row: saves the user's private note on their entry
+ * (INV-002: only ever the owner reads it). An empty or blank note deletes it.
+ * The box holds 2000 characters, so a longer one is a forged request.
+ */
+export async function saveNote(formData: FormData) {
+  const entryId = text(formData, "entryId");
+  const body = text(formData, "body").trim();
+  if (!UUID.test(entryId)) throw new Error("Not a note that can be saved.");
+  if (Array.from(body).length > NOTE_MAX) throw new Error(`A note holds up to ${NOTE_MAX} characters.`);
+
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+
+  await saveEntryNote(await createClient(), user.id, entryId, body);
   refresh();
 }
 

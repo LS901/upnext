@@ -123,6 +123,46 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"list_entries": {
+                  Row: {
+                    "created_at": string,"entry_id": string,"list_id": string,"position": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"entry_id": string,"list_id": string,"position": number
+                  }
+                  Update: {
+                    "created_at"?: string,"entry_id"?: string,"list_id"?: string,"position"?: number
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "list_entries_entry_id_fkey"
+      columns: ["entry_id"]
+isOneToOne: false
+      referencedRelation: "library_entries"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "list_entries_list_id_fkey"
+      columns: ["list_id"]
+isOneToOne: false
+      referencedRelation: "lists"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"lists": {
+                  Row: {
+                    "created_at": string,"id": string,"is_private": boolean,"name": string,"updated_at": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"id"?: string,"is_private"?: boolean,"name": string,"updated_at"?: string,"user_id"?: string
+                  }
+                  Update: {
+                    "created_at"?: string,"id"?: string,"is_private"?: boolean,"name"?: string,"updated_at"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
                 },"profiles": {
                   Row: {
                     "created_at": string,"id": string,"library_private": boolean,"username": string

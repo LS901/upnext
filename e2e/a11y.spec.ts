@@ -11,7 +11,7 @@ import { newEmail, signInByLink, usernameInHeader } from "./sign-in-helpers";
 
 const APP = "http://localhost:3100";
 
-type Account = { state: Awaited<ReturnType<BrowserContext["storageState"]>>; userId: string };
+type Account = { state: Awaited<ReturnType<BrowserContext["storageState"]>>; userId: string; username: string };
 
 const test = base.extend<object, { account: Account }>({
   account: [
@@ -25,7 +25,7 @@ const test = base.extend<object, { account: Account }>({
       await context.close();
       const { data, error } = await adminClient().from("profiles").select("id").eq("username", username).single();
       if (error) throw error;
-      await provide({ state, userId: data.id });
+      await provide({ state, userId: data.id, username });
     },
     { scope: "worker" },
   ],
@@ -47,6 +47,10 @@ const SHOW = "Thistle Gantry";
 const BUSY = "Larch Meridian";
 const FUTURE_MOVIE = "Opal Causeway";
 const FINISHED = "Sedge Almanac";
+const LIST = "Invented Quiet Evenings";
+
+// The seeded list's id, for /lists/{id}.
+let listId = "";
 
 async function seedLibrary(userId: string) {
   const admin = adminClient();
@@ -115,6 +119,14 @@ async function seedLibrary(userId: string) {
   // A pinned genre, so /settings has a Remove and an empty search has a recommendation row.
   const { error: pinError } = await admin.from("user_genre_pins").insert({ user_id: userId, media_type: "movie", genre: "Horror" });
   if (pinError) throw pinError;
+  // A public list holding two entries, so /lists, /lists/{id} and the profile have one.
+  const { data: list, error: listError } = await admin.from("lists").insert({ user_id: userId, name: LIST }).select("id").single();
+  if (listError) throw listError;
+  listId = list.id;
+  const { error: listEntriesError } = await admin.from("list_entries").insert(
+    entries.slice(0, 2).map((e, i) => ({ list_id: list.id, entry_id: e.id, position: i + 1 })),
+  );
+  if (listEntriesError) throw listEntriesError;
 }
 
 const SIZES = [
@@ -194,6 +206,24 @@ for (const size of SIZES) {
       await scan(page);
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
       expect(overflow).toBeLessThanOrEqual(0);
+    });
+
+    test(`a public profile has no axe violations at ${size.name}`, async ({ page, account }) => {
+      await page.goto(`/u/${account.username}`);
+      await expect(page.getByRole("heading", { level: 1, name: account.username })).toBeVisible();
+      await expect(page.getByRole("link", { name: LIST, exact: true })).toBeVisible();
+      await scan(page);
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      expect(overflow).toBeLessThanOrEqual(0);
+    });
+
+    test(`lists and a list have no axe violations at ${size.name}`, async ({ page }) => {
+      await page.goto("/lists");
+      await expect(page.getByRole("link", { name: LIST, exact: true })).toBeVisible();
+      await scan(page);
+      await page.goto(`/lists/${listId}`);
+      await expect(page.getByRole("heading", { level: 1, name: LIST })).toBeVisible();
+      await scan(page);
     });
 
     test(`the season picker has no axe violations at ${size.name}`, async ({ page }) => {

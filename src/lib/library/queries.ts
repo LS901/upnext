@@ -108,8 +108,14 @@ const storyMinutes = (seconds: number | null) => (seconds === null ? null : seco
 /**
  * The signed-in user's library. Pass the user's own client: it can read other
  * users' public entries and exclusions too, so every query is filtered to `userId`.
+ * With `exclusions: false` (a public profile) the user's exclusions are never
+ * read: progress then counts every season and main-line book.
  */
-export async function getMyLibrary(supabase: Client, userId: string): Promise<LibraryView> {
+export async function getMyLibrary(
+  supabase: Client,
+  userId: string,
+  { exclusions = true }: { exclusions?: boolean } = {},
+): Promise<LibraryView> {
   // Paged: a library can hold more entries than PostgREST returns at once.
   const entries = await fetchAll((from, to) =>
     supabase
@@ -225,8 +231,8 @@ export async function getMyLibrary(supabase: Client, userId: string): Promise<Li
     entries.flatMap((e) => (e.season && e.status === "finished" ? [e.season.id] : [])),
   );
   await Promise.all([
-    addProgress(supabase, userId, shows, finishedSeasonIds),
-    addSeriesProgress(supabase, userId, series, seriesBooks),
+    addProgress(supabase, userId, shows, finishedSeasonIds, exclusions),
+    addSeriesProgress(supabase, userId, series, seriesBooks, exclusions),
   ]);
 
   // By title; a book's print entry before its audio one.
@@ -325,17 +331,20 @@ async function addSeriesProgress(
   userId: string,
   series: Map<string, { row: SeriesRow; primaryBooksCount: number | null }>,
   books: SeriesBook[],
+  readExclusions: boolean,
 ): Promise<void> {
   if (!series.size) return;
   // All of the user's exclusions, paged; only those on these series' books match below.
-  const exclusions = await fetchAll((from, to) =>
-    supabase
-      .from("book_exclusions")
-      .select("item_id, item:items(series_id, series_position)")
-      .eq("user_id", userId)
-      .order("item_id")
-      .range(from, to),
-  );
+  const exclusions = readExclusions
+    ? await fetchAll((from, to) =>
+        supabase
+          .from("book_exclusions")
+          .select("item_id, item:items(series_id, series_position)")
+          .eq("user_id", userId)
+          .order("item_id")
+          .range(from, to),
+      )
+    : [];
   const excluded = new Set(exclusions.map((x) => x.item_id));
   const catalogue = await fetchAllIn([...series.keys()], (ids, from, to) =>
     supabase
@@ -386,6 +395,7 @@ async function addProgress(
   userId: string,
   shows: Map<string, ShowRow>,
   finishedSeasonIds: Set<string>,
+  readExclusions: boolean,
 ): Promise<void> {
   if (!shows.size) return;
   // Chunked and paged, so many shows never make a URL too long or lose
@@ -398,14 +408,16 @@ async function addProgress(
         .in("show_id", ids).order("id").range(from, to),
     ),
     // All of the user's exclusions; only those on these shows' seasons match below.
-    fetchAll((from, to) =>
-      supabase
-        .from("progress_exclusions")
-        .select("season_id")
-        .eq("user_id", userId)
-        .order("season_id")
-        .range(from, to),
-    ),
+    readExclusions
+      ? fetchAll((from, to) =>
+          supabase
+            .from("progress_exclusions")
+            .select("season_id")
+            .eq("user_id", userId)
+            .order("season_id")
+            .range(from, to),
+        )
+      : [],
   ]);
   const excluded = new Set(exclusions.map((x) => x.season_id));
 

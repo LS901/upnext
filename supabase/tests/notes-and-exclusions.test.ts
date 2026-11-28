@@ -219,7 +219,8 @@ describe("notes and progress exclusions", () => {
     expect(deleted.error).toBeNull();
     expect(deleted.data).toHaveLength(0);
 
-    const { data, error } = await a.client.from("progress_exclusions").select();
+    // Filtered to A: the client can read every public user's exclusions.
+    const { data, error } = await a.client.from("progress_exclusions").select().eq("user_id", a.id);
     expect(error).toBeNull();
     expect(data).toHaveLength(1);
   });
