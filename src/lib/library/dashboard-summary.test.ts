@@ -9,6 +9,7 @@ import {
   upcoming,
   type RadarEntry,
 } from "./dashboard-summary";
+import { filterView } from "./type-filter";
 
 const item = (id: string, status: ItemRow["status"], minutes: number | null): ItemRow => ({
   kind: "item",
@@ -125,6 +126,43 @@ describe("summarise with books", () => {
     const view: LibraryView = { upNext: { movie: [], show: [], game: [], book: [book("p", "print", { pages: null })], other: [] }, groups: [] };
     expect(summarise(view)).toEqual({
       backlog: 1,
+      backlogMinutes: 0,
+      backlogUnknownTime: 0,
+      backlogPages: 0,
+      inProgress: 0,
+      finished: 0,
+    });
+  });
+});
+
+describe("summarise on a type tab", () => {
+  test("a filtered view counts only that type", () => {
+    const view: LibraryView = {
+      upNext: {
+        movie: [item("m1", "backlog", 30)],
+        show: [queuedSeason("s1", 60)],
+        game: [],
+        book: [book("p1", "print", { pages: 300 }), book("a1", "audio", { minutes: 600 })],
+        other: [],
+      },
+      groups: [
+        {
+          status: "finished",
+          label: "Finished",
+          rows: [item("f1", "finished", 10), { ...book("fb", "print", {}), status: "finished" }],
+        },
+      ],
+    };
+    expect(summarise(filterView(view, "book"))).toEqual({
+      backlog: 2,
+      backlogMinutes: 600,
+      backlogUnknownTime: 0,
+      backlogPages: 300,
+      inProgress: 0,
+      finished: 1,
+    });
+    expect(summarise(filterView(view, "other"))).toEqual({
+      backlog: 0,
       backlogMinutes: 0,
       backlogUnknownTime: 0,
       backlogPages: 0,

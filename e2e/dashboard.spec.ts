@@ -267,3 +267,98 @@ test("books show on the Up next tile as pages, and in a Books Up next card, the 
   await rows(books).filter({ hasText: AUDIO }).getByRole("button", { name: "Start" }).click();
   await expect(rows(section(page, "Currently on")).filter({ hasText: `${AUDIO} · Audiobook` })).toHaveCount(1);
 });
+
+test.describe("a dashboard per type", () => {
+  const GAME_DONE = "Kestrel Pavilion";
+  const GAME_SOON = "Hollow Beacon";
+  const EXTRA = ["Plover Annex", "Quince Basin"];
+
+  test("seed a finished game, a coming game and two more queued movies", async ({ account }) => {
+    const admin = adminClient();
+    const id = () => String(randomInt(10_000_000, 99_999_999));
+    const { data: items, error } = await admin
+      .from("items")
+      .insert([
+        { provider: "igdb", media_type: "game", provider_id: id(), title: GAME_DONE },
+        { provider: "igdb", media_type: "game", provider_id: id(), title: GAME_SOON, release_date: day(12) },
+        ...EXTRA.map((title) => ({ provider: "tmdb" as const, media_type: "movie" as const, provider_id: id(), title })),
+      ])
+      .select("id, title");
+    if (error) throw error;
+    const item = Object.fromEntries(items.map((i) => [i.title, i.id]));
+    const { data: entries, error: entryError } = await admin
+      .from("library_entries")
+      .insert([
+        { user_id: account.userId, item_id: item[GAME_DONE], item_media_type: "game" as const, status: "finished" as const },
+        { user_id: account.userId, item_id: item[GAME_SOON], item_media_type: "game" as const, status: "backlog" as const },
+        ...EXTRA.map((title) => ({
+          user_id: account.userId,
+          item_id: item[title],
+          item_media_type: "movie" as const,
+          status: "backlog" as const,
+        })),
+      ])
+      .select("id, item_id");
+    if (entryError) throw entryError;
+    const done = entries.find((e) => e.item_id === item[GAME_DONE])!;
+    const { error: stampError } = await admin
+      .from("library_entries")
+      .update({ finished_at: new Date(Date.now() - 864e5 / 2).toISOString() })
+      .eq("id", done.id);
+    if (stampError) throw stampError;
+  });
+
+  test("All keeps the home page as it was, with a tab set on top", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.getByRole("link", { name: /^All \(\d+\)$/ })).toHaveAttribute("aria-current", "page");
+    await expect(page.getByRole("link", { name: /^All \(\d+\)$/ })).toHaveAttribute("href", "/");
+    await expect(page.getByRole("link", { name: /^Movies \(\d+\)$/ })).toHaveAttribute("href", "/?type=movie");
+    // The All card shows the top 3 of a queue.
+    await expect(rows(section(page, "Movies"))).toHaveCount(3);
+    await expect(rows(section(page, "Recently finished")).filter({ hasText: GAME_DONE })).toHaveCount(1);
+  });
+
+  test("a type tab shows that type's numbers, Up next top 5, radar and recently finished", async ({ page }) => {
+    await page.goto("/?type=movie");
+    await expect(page.getByRole("link", { name: /^Movies \(\d+\)$/ })).toHaveAttribute("aria-current", "page");
+    await expect(page.getByRole("link", { name: /^All \(\d+\)$/ })).not.toHaveAttribute("aria-current", "page");
+
+    const numbers = section(page, "Your numbers");
+    await expect(numbers).toContainText(/6\s*Up next/);
+    await expect(numbers).toContainText(/2\s*In progress/);
+    await expect(numbers).toContainText(/2\s*Finished/);
+
+    await expect(section(page, "Games")).toHaveCount(0);
+    await expect(section(page, "TV")).toHaveCount(0);
+    await expect(rows(section(page, "Movies"))).toHaveCount(5);
+
+    const radar = section(page, "Release radar");
+    await expect(rows(radar)).toHaveCount(1);
+    await expect(radar).toContainText(FUTURE_MOVIE);
+    await expect(radar).not.toContainText(GAME_SOON);
+    await expect(radar).not.toContainText(FUTURE_SHOW);
+
+    const finished = section(page, "Recently finished");
+    await expect(rows(finished)).toHaveCount(2);
+    await expect(finished).not.toContainText(GAME_DONE);
+
+    await page.goto("/?type=game");
+    await expect(rows(section(page, "Release radar"))).toHaveCount(1);
+    await expect(section(page, "Release radar")).toContainText(GAME_SOON);
+    await expect(rows(section(page, "Recently finished"))).toHaveCount(1);
+    await expect(section(page, "Recently finished")).toContainText(GAME_DONE);
+    await expect(section(page, "Movies")).toHaveCount(0);
+  });
+
+  test("a type with nothing says so, and an unknown type falls back to All", async ({ page }) => {
+    await page.goto("/?type=other");
+    await expect(page.getByRole("link", { name: /^Other \(0\)$/ })).toHaveAttribute("aria-current", "page");
+    await expect(page.getByText("Nothing here yet.")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Up next" })).toHaveCount(0);
+
+    await page.goto("/?type=bogus");
+    await expect(page.getByRole("link", { name: /^All \(\d+\)$/ })).toHaveAttribute("aria-current", "page");
+    await expect(page.getByText("Nothing here yet.")).toHaveCount(0);
+    await expect(section(page, "Your numbers")).toBeVisible();
+  });
+});

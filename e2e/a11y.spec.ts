@@ -158,6 +158,16 @@ for (const size of SIZES) {
       await scan(page);
     });
 
+    test(`home on a type tab has no axe violations at ${size.name}`, async ({ page }) => {
+      await page.goto("/?type=game");
+      await expect(page.getByRole("link", { name: /^Games \(\d+\)$/ })).toHaveAttribute("aria-current", "page");
+      await expect(page.getByRole("region", { name: "Games", exact: true })).toBeVisible();
+      await scan(page);
+      await page.goto("/?type=book");
+      await expect(page.getByText("Nothing here yet.")).toBeVisible();
+      await scan(page);
+    });
+
     test(`search results have no axe violations at ${size.name}`, async ({ page }) => {
       const term = `lantern ${randomBytes(3).toString("hex")}`;
       await page.goto(`/search?q=${encodeURIComponent(term)}`);
