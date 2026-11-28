@@ -1,6 +1,7 @@
 import "server-only";
 import {
   ProviderError,
+  type Genre,
   type ItemDetails,
   type SearchResult,
   type SeasonDetails,
@@ -67,25 +68,62 @@ export function tmdbImageUrl(path: string | null, size = "w342"): string | null 
   return path ? `https://image.tmdb.org/t/p/${size}${path}` : null;
 }
 
+/** A search or discover result; a movie has a title and release date, a show a name and first air date. */
+function toResult(r: Json, mediaType: "movie" | "show"): SearchResult | null {
+  const isMovie = mediaType === "movie";
+  const title = str(isMovie ? r.title : r.name);
+  if (title === null || r.id == null) return null;
+  return {
+    provider: "tmdb",
+    providerId: String(r.id),
+    mediaType,
+    title,
+    year: yearOf(str(isMovie ? r.release_date : r.first_air_date)),
+    imageUrl: tmdbImageUrl(str(r.poster_path)),
+  };
+}
+
+const resultsOf = (body: Json): Json[] => (Array.isArray(body.results) ? (body.results as Json[]) : []);
+
 export async function searchTmdb(query: string): Promise<SearchResult[]> {
   const body = await tmdbGet("/search/multi", { query, include_adult: "false" });
-  const results = Array.isArray(body.results) ? (body.results as Json[]) : [];
   const out: SearchResult[] = [];
-  for (const r of results) {
-    const isMovie = r.media_type === "movie";
-    if (!isMovie && r.media_type !== "tv") continue;
-    const title = str(isMovie ? r.title : r.name);
-    if (title === null || r.id == null) continue;
-    out.push({
-      provider: "tmdb",
-      providerId: String(r.id),
-      mediaType: isMovie ? "movie" : "show",
-      title,
-      year: yearOf(str(isMovie ? r.release_date : r.first_air_date)),
-      imageUrl: tmdbImageUrl(str(r.poster_path)),
-    });
+  for (const r of resultsOf(body)) {
+    if (r.media_type !== "movie" && r.media_type !== "tv") continue;
+    const result = toResult(r, r.media_type === "movie" ? "movie" : "show");
+    if (result) out.push(result);
   }
   return out;
+}
+
+/** The genre names of a movie or show, once each, in TMDB's order; unnamed ones are dropped. */
+function genreNames(v: unknown): string[] {
+  const list = Array.isArray(v) ? (v as Json[]) : [];
+  return [...new Set(list.map((g) => str(g?.name)).filter((n): n is string => n !== null))];
+}
+
+/** TMDB's genre list for movies or for TV (the two lists differ). */
+export async function getTmdbGenres(mediaType: "movie" | "show"): Promise<Genre[]> {
+  const body = await tmdbGet(`/genre/${mediaType === "movie" ? "movie" : "tv"}/list`);
+  const list = Array.isArray(body.genres) ? (body.genres as Json[]) : [];
+  return list.flatMap((g) => {
+    const id = int(g?.id);
+    const name = str(g?.name);
+    return id !== null && name !== null ? [{ id: String(id), name }] : [];
+  });
+}
+
+/**
+ * The most popular movies or shows in one genre (one page, at most 20). The
+ * request carries only the genre id (INV-006).
+ */
+export async function discoverTmdb(mediaType: "movie" | "show", genreId: string): Promise<SearchResult[]> {
+  const body = await tmdbGet(`/discover/${mediaType === "movie" ? "movie" : "tv"}`, {
+    with_genres: genreId,
+    sort_by: "popularity.desc",
+    include_adult: "false",
+  });
+  return resultsOf(body).flatMap((r) => toResult(r, mediaType) ?? []);
 }
 
 const MAX_SEASON_REQUESTS = 5;
@@ -190,5 +228,6 @@ export async function getTmdbDetails(
     timeToBeatUnavailable: false,
     seasons,
     book: null,
+    genres: genreNames(d.genres),
   };
 }

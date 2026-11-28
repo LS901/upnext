@@ -125,6 +125,7 @@ async function purgeStaleProviderData(admin: Admin): Promise<number> {
         audio_minutes: null,
         has_audiobook: null,
         narrators: null,
+        genres: [],
         provider_data_purged_at: new Date().toISOString(),
       })
       .in("id", ids)

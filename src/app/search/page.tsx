@@ -1,13 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
-import { Check } from "lucide-react";
-import { Poster } from "@/components/poster";
-import { Badge } from "@/components/ui/badge";
-import { Button, buttonVariants } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { TYPE_LABELS } from "@/lib/format/type-labels";
+import { Button } from "@/components/ui/button";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { bookVersionsInLibrary, inLibrary, itemKey, type BookVersion, type ItemKey } from "@/lib/library/in-library";
 import { searchHardcover } from "@/lib/providers/hardcover";
@@ -15,9 +9,11 @@ import { searchIgdb } from "@/lib/providers/igdb";
 import { searchTmdb } from "@/lib/providers/tmdb";
 import { ProviderError, type MediaType, type Provider, type SearchResult } from "@/lib/providers/types";
 import { createClient } from "@/lib/supabase/server";
-import { addItem, addOwnEntry } from "./actions";
+import { addOwnEntry } from "./actions";
 import { PROVIDER_TYPES, providersToAsk, summarise, type Answer, type Outcome } from "./outcome";
-import { parseSearch, pickerHref, type SearchState } from "./params";
+import { parseSearch, type SearchState } from "./params";
+import { Recommendations, RecommendationsSkeleton } from "./recommendations";
+import { ResultCard } from "./result-card";
 import { SearchForm } from "./search-form";
 import { logProviderFailure, OWN_LENGTH_MAX, OWN_TITLE_MAX, PROVIDER_NAMES } from "./shared";
 
@@ -95,7 +91,8 @@ async function SearchContent({ searchParams }: Pick<PageProps<"/search">, "searc
 
   return (
     <div className="mt-6 grid gap-8 md:grid-cols-[1fr_10rem]">
-      <div className="flex flex-col gap-6">
+      {/* min-w-0: a recommendation row scrolls inside itself instead of widening the column. */}
+      <div className="flex min-w-0 flex-col gap-6">
         <SearchForm q={state.q} exclude={state.exclude} />
 
         {/* Results now change without a page load, so say so to screen readers. */}
@@ -112,6 +109,12 @@ async function SearchContent({ searchParams }: Pick<PageProps<"/search">, "searc
         ))}
 
         {!outcome && <p className="text-muted-foreground">Type a title to search.</p>}
+        {/* Only for an empty box, in a boundary of their own: the search never waits on them. */}
+        {!outcome && (
+          <Suspense fallback={<RecommendationsSkeleton />}>
+            <Recommendations userId={user.id} state={state} />
+          </Suspense>
+        )}
         {outcome?.everythingHidden && (
           <p className="text-muted-foreground">Everything is hidden. Untick a type to search.</p>
         )}
@@ -121,7 +124,7 @@ async function SearchContent({ searchParams }: Pick<PageProps<"/search">, "searc
         {outcome && outcome.results.length > 0 && (
           <ul className="flex flex-col gap-3">
             {outcome.results.map((r) => (
-              <Result
+              <ResultCard
                 key={keyOf(r)}
                 result={r}
                 owned={owned.has(keyOf(r))}
@@ -209,89 +212,4 @@ function OwnEntryForm({ state, error }: { state: SearchState; error: boolean }) 
 
 function resultCount(n: number): string {
   return `${n} ${n === 1 ? "result" : "results"}.`;
-}
-
-// Stays a (disabled) button: e2e and screen readers know it by that role.
-function OwnedButton({ label }: { label: string }) {
-  return (
-    <button
-      type="button"
-      disabled
-      className="inline-flex h-11 items-center gap-1.5 rounded-md border border-input bg-secondary px-3 text-sm font-medium text-accent-text lg:h-9"
-    >
-      <Check aria-hidden="true" className="size-4" />
-      {label}
-    </button>
-  );
-}
-
-// `version` is set for books only: print, or audio.
-function AddForm({ result: r, state, label, version }: { result: SearchResult; state: SearchState; label: string; version?: BookVersion }) {
-  return (
-    <form action={addItem}>
-      <input type="hidden" name="provider" value={r.provider} />
-      <input type="hidden" name="mediaType" value={r.mediaType} />
-      <input type="hidden" name="providerId" value={r.providerId} />
-      {version && <input type="hidden" name="version" value={version} />}
-      <input type="hidden" name="q" value={state.q} />
-      {state.exclude.map((type) => (
-        <input key={type} type="hidden" name="exclude" value={type} />
-      ))}
-      <Button type="submit">{label}</Button>
-    </form>
-  );
-}
-
-function Result({
-  result: r,
-  owned,
-  versions,
-  state,
-}: {
-  result: SearchResult;
-  owned: boolean;
-  versions: ReadonlySet<BookVersion>;
-  state: SearchState;
-}) {
-  return (
-    <li>
-      <Card size="sm" className="flex-row items-center gap-4 px-4">
-        <Poster url={r.imageUrl} title={r.title} size="md" mediaType={r.mediaType} />
-        <div className="flex min-w-0 flex-1 flex-col gap-2">
-          <h2 className="text-base font-medium [overflow-wrap:anywhere]">{r.title}</h2>
-          <p className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-            <Badge variant="secondary">{TYPE_LABELS[r.mediaType]}</Badge>
-            {r.year !== null && <span className="tabular-nums">{r.year}</span>}
-          </p>
-          <div className="flex flex-wrap items-center gap-2">
-            {r.mediaType === "book" ? (
-              <>
-                {versions.has("print") ? (
-                  <OwnedButton label="In your library" />
-                ) : (
-                  <AddForm result={r} state={state} label="Add" version="print" />
-                )}
-                {versions.has("audio") ? (
-                  <OwnedButton label="Audiobook in your library" />
-                ) : (
-                  r.hasAudiobook && <AddForm result={r} state={state} label="Add audiobook" version="audio" />
-                )}
-              </>
-            ) : (
-              <>
-                {owned && <OwnedButton label="In your library" />}
-                {r.mediaType === "show" ? (
-                  <Link href={pickerHref(r.providerId, state)} className={buttonVariants({ variant: "secondary" })}>
-                    Choose seasons
-                  </Link>
-                ) : (
-                  !owned && <AddForm result={r} state={state} label="Add" />
-                )}
-              </>
-            )}
-          </div>
-        </div>
-      </Card>
-    </li>
-  );
 }

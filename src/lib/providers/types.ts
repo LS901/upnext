@@ -66,7 +66,12 @@ export type ItemDetails = {
   seasons: SeasonDetails[] | null;
   /** Books only; null for every other media type. */
   book: BookDetails | null;
+  /** The provider's genre names, most relevant first as the provider gives them; none is []. */
+  genres: string[];
 };
+
+/** A provider genre: its id (the provider's own, as text) and its name. */
+export type Genre = { id: string; name: string };
 
 export class ProviderError extends Error {
   provider: Provider;

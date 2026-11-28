@@ -1,0 +1,96 @@
+{
+  "movie": {
+    "page": 1,
+    "results": [
+      {
+        "id": 9301,
+        "title": "Hollow Bell",
+        "release_date": "2010-10-01",
+        "poster_path": "/invented-hollow-bell.jpg"
+      },
+      {
+        "id": 9302,
+        "title": "Wicker Stair",
+        "release_date": "2011-10-02",
+        "poster_path": "/invented-wicker-stair.jpg"
+      },
+      {
+        "id": 9303,
+        "title": "Lamp Black",
+        "release_date": "2012-10-03",
+        "poster_path": "/invented-lamp-black.jpg"
+      },
+      {
+        "id": 9304,
+        "title": "Cinder Well",
+        "release_date": "2013-10-04",
+        "poster_path": "/invented-cinder-well.jpg"
+      },
+      {
+        "id": 9305,
+        "title": "Moth Parlour",
+        "release_date": "2014-10-05",
+        "poster_path": "/invented-moth-parlour.jpg"
+      },
+      {
+        "id": 9306,
+        "title": "Rook Attic",
+        "release_date": "2015-10-06",
+        "poster_path": "/invented-rook-attic.jpg"
+      },
+      {
+        "id": 9307,
+        "title": "Gloam Ferry",
+        "release_date": "2016-10-07",
+        "poster_path": "/invented-gloam-ferry.jpg"
+      },
+      {
+        "id": 9308,
+        "title": "Thorn Choir",
+        "release_date": "2017-10-08",
+        "poster_path": "/invented-thorn-choir.jpg"
+      },
+      {
+        "id": 9309,
+        "title": "Ash Cradle",
+        "release_date": "2018-10-09",
+        "poster_path": "/invented-ash-cradle.jpg"
+      },
+      {
+        "id": 9310,
+        "title": "Pale Orchard",
+        "release_date": "2019-10-01",
+        "poster_path": "/invented-pale-orchard.jpg"
+      },
+      {
+        "id": 9311,
+        "title": "Vane Cellar",
+        "release_date": "2020-10-02",
+        "poster_path": "/invented-vane-cellar.jpg"
+      },
+      {
+        "id": 9312,
+        "title": "Mire Lantern",
+        "release_date": "2021-10-03",
+        "poster_path": "/invented-mire-lantern.jpg"
+      }
+    ]
+  },
+  "tv": {
+    "page": 1,
+    "results": [
+      {
+        "id": 9411,
+        "name": "Brass Neighbours",
+        "first_air_date": "2020-01-15",
+        "poster_path": "/invented-brass-neighbours.jpg"
+      },
+      {
+        "id": 9412,
+        "name": "Quiet Rooms",
+        "first_air_date": null,
+        "poster_path": null
+      }
+    ]
+  }
+}

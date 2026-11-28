@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { getHardcoverDetails, resetHardcoverLimiterForTests, searchHardcover } from "./hardcover";
+import { discoverHardcover, getHardcoverDetails, resetHardcoverLimiterForTests, searchHardcover } from "./hardcover";
 import { ProviderError } from "./types";
 import search from "./__fixtures__/hardcover-search.json";
 import book from "./__fixtures__/hardcover-book.json";
@@ -140,6 +140,7 @@ test("details map pages, audio minutes, narrators, the featured series and the x
       narrators: ["Ben Voice", "Cora Voice"],
       series: { providerId: "800", name: "Orchard Cycle", primaryBooksCount: 6, isCompleted: true, position: 1, positionLabel: "1" },
     },
+    genres: ["Fantasy", "Mystery", "Adventure", "Romance", "Horror"],
   });
   expect(sent(fn).body.query).not.toContain("description");
 });
@@ -342,4 +343,55 @@ test.each(foreignCovers)("a search result's cover %s becomes null", async (url) 
 test.each(foreignCovers)("a book's cover %s becomes null", async (url) => {
   stub(bookWithCover(url));
   expect((await getHardcoverDetails("9001")).imageRef).toBeNull();
+});
+
+// ---- Genres and recommendations ----------------------------------------------
+
+test("details ask for cached_tags and keep the first 5 Genre tags only (no moods)", async () => {
+  const fn = stub(book);
+  const d = await getHardcoverDetails("9001");
+  expect(sent(fn).body.query).toContain("cached_tags");
+  expect(d.genres).toEqual(["Fantasy", "Mystery", "Adventure", "Romance", "Horror"]);
+  expect(d.genres).not.toContain("dark");
+});
+
+test("a book with no cached_tags, or malformed ones, has no genres", async () => {
+  stub(bookOdd);
+  expect((await getHardcoverDetails("9002")).genres).toEqual([]);
+  stub({ data: { books_by_pk: { ...book.data.books_by_pk, cached_tags: { Genre: "Fantasy" } } } });
+  expect((await getHardcoverDetails("9001")).genres).toEqual([]);
+});
+
+test("discover is a search on the genres field, by readers, one top-level field", async () => {
+  const fn = stub(search);
+  const results = await discoverHardcover('Horror "quoted"');
+  expect(results.map((r) => r.title)).toEqual(["The Glass Orchard", "Quiet Harbour"]);
+  expect(results[0]).toEqual({
+    provider: "hardcover",
+    providerId: "9001",
+    mediaType: "book",
+    title: "The Glass Orchard",
+    year: 2014,
+    imageUrl: "https://assets.hardcover.app/edition/9001/cover-a.jpg",
+    hasAudiobook: true,
+  });
+  const query = sent(fn).body.query;
+  expect(query).toBe(
+    '{ search(query: "Horror \\"quoted\\"", query_type: "book", per_page: 20, fields: "genres", weights: "1", typos: "0", sort: "users_count:desc") { results } }',
+  );
+  expect(topLevelFields(query)).toBe(1);
+  expect(JSON.stringify(results)).not.toContain("INVENTED DESCRIPTION");
+});
+
+test("discover takes the search path: it gives up at once when its turn is more than 3 s away", async () => {
+  vi.useFakeTimers();
+  const fn = stub(book);
+  const queued = [1, 2, 3, 4].map(() => getHardcoverDetails("9001"));
+  const late = settle(discoverHardcover("Horror"));
+  await vi.advanceTimersByTimeAsync(0);
+  expect(late.done).toBe(true);
+  expect(late.value).toMatchObject({ name: "ProviderError", provider: "hardcover", status: null });
+  await vi.advanceTimersByTimeAsync(4000);
+  await Promise.all(queued);
+  expect(queries(fn).some((q) => q.includes("search("))).toBe(false);
 });

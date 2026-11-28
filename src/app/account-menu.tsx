@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Settings } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { signOut } from "./login/actions";
 
@@ -25,6 +26,11 @@ export async function AccountMenu() {
         </span>
         <span>{user.username}</span>
       </span>
+      {/* An icon on a phone, where the header is narrow; the word from sm. Its name is "Settings" either way. */}
+      <Link href="/settings" className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 text-accent-text underline sm:min-w-0">
+        <Settings aria-hidden="true" className="size-4 sm:hidden" />
+        <span className="sr-only sm:not-sr-only">Settings</span>
+      </Link>
       <form action={signOut}>
         <button type="submit" className="min-h-11 text-accent-text underline">
           Sign out

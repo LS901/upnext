@@ -112,6 +112,9 @@ async function seedLibrary(userId: string) {
     .update({ finished_at: new Date(Date.now() - 864e5).toISOString() })
     .eq("id", finished.id);
   if (stampError) throw stampError;
+  // A pinned genre, so /settings has a Remove and an empty search has a recommendation row.
+  const { error: pinError } = await admin.from("user_genre_pins").insert({ user_id: userId, media_type: "movie", genre: "Horror" });
+  if (pinError) throw pinError;
 }
 
 const SIZES = [
@@ -173,6 +176,24 @@ for (const size of SIZES) {
       await page.goto(`/search?q=${encodeURIComponent(term)}`);
       await expect(page.getByRole("button", { name: "Add" }).first()).toBeVisible();
       await scan(page);
+    });
+
+    test(`an empty search with recommendation rows has no axe violations at ${size.name}`, async ({ page }) => {
+      await page.goto("/search");
+      await expect(page.getByRole("region", { name: "Horror films you might like" })).toBeVisible({ timeout: 30_000 });
+      await expect(page.locator("[data-recs-loading]")).toHaveCount(0, { timeout: 30_000 });
+      await scan(page);
+      // The row scrolls inside itself; the page never scrolls sideways.
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      expect(overflow).toBeLessThanOrEqual(0);
+    });
+
+    test(`settings has no axe violations at ${size.name}`, async ({ page }) => {
+      await page.goto("/settings");
+      await expect(page.getByRole("button", { name: "Remove Horror" })).toBeVisible();
+      await scan(page);
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      expect(overflow).toBeLessThanOrEqual(0);
     });
 
     test(`the season picker has no axe violations at ${size.name}`, async ({ page }) => {

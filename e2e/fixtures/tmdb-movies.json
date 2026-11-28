@@ -7,5 +7,15 @@
     "poster_path": "/invented-kestrel-morning.jpg",
     "vote_average": 7.1,
     "vote_count": 321
+  },
+  "9302": {
+    "id": 9302,
+    "title": "Wicker Stair",
+    "release_date": "2011-10-02",
+    "runtime": 97,
+    "poster_path": "/invented-wicker-stair.jpg",
+    "vote_average": 6.4,
+    "vote_count": 88,
+    "genres": [{ "id": 27, "name": "Horror" }]
   }
 }

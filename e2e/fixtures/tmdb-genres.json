@@ -1,0 +1,16 @@
+{
+  "movie": {
+    "genres": [
+      { "id": 27, "name": "Horror" },
+      { "id": 35, "name": "Comedy" },
+      { "id": 9990, "name": "recs-down" }
+    ]
+  },
+  "tv": {
+    "genres": [
+      { "id": 35, "name": "Comedy" },
+      { "id": 18, "name": "Drama" },
+      { "id": 9990, "name": "recs-down" }
+    ]
+  }
+}

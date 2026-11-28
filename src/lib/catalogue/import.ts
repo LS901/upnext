@@ -37,6 +37,8 @@ export async function importItem(
     runtime_minutes: details.runtimeMinutes,
     score: details.score,
     score_count: details.scoreCount,
+    // The refresh re-imports through here too, so it fills (and keeps current) genres.
+    genres: details.genres,
     refreshed_at: now,
     refresh_attempted_at: now,
     provider_data_purged_at: null,

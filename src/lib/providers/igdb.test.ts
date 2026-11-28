@@ -1,11 +1,12 @@
 // @vitest-environment node
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { getIgdbDetails, igdbImageUrl, resetIgdbTokenForTests, searchIgdb } from "./igdb";
+import { discoverIgdb, getIgdbDetails, getIgdbGenres, igdbImageUrl, resetIgdbTokenForTests, searchIgdb } from "./igdb";
 import { ProviderError } from "./types";
 import search from "./__fixtures__/igdb-search.json";
 import game from "./__fixtures__/igdb-game.json";
 import gameOdd from "./__fixtures__/igdb-game-odd.json";
 import ttb from "./__fixtures__/igdb-time-to-beat.json";
+import genres from "./__fixtures__/igdb-genres.json";
 
 vi.mock("server-only", () => ({}));
 
@@ -88,6 +89,7 @@ test("details normalise the score and attach time to beat", async () => {
     timeToBeatUnavailable: false,
     seasons: null,
     book: null,
+    genres: ["Adventure", "Role-playing (RPG)"],
   });
   const bodies = igdbCalls(fn).map((c) => String(c[1]?.body));
   expect(bodies.some((b) => b.includes("where game_id = 5001;"))).toBe(true);
@@ -225,4 +227,47 @@ test("image url template", () => {
   expect(igdbImageUrl("abc")).toBe("https://images.igdb.com/igdb/image/upload/t_cover_big/abc.jpg");
   expect(igdbImageUrl("abc", "thumb")).toBe("https://images.igdb.com/igdb/image/upload/t_thumb/abc.jpg");
   expect(igdbImageUrl(null)).toBeNull();
+});
+
+// ---- Genres and recommendations ----------------------------------------------
+
+test("details ask for genres (IGDB's genres field, not themes)", async () => {
+  const fn = stubFetch({ "/games": game, "/game_time_to_beats": ttb });
+  await getIgdbDetails("5001");
+  const body = String(igdbCalls(fn).find((c) => String(c[0]).endsWith("/games"))?.[1]?.body);
+  expect(body).toContain("genres.name");
+  expect(body).not.toContain("themes");
+});
+
+test("details with no genres give an empty list", async () => {
+  stubFetch({ "/games": [{ id: 5001, name: "Bare Game" }], "/game_time_to_beats": [] });
+  expect((await getIgdbDetails("5001")).genres).toEqual([]);
+});
+
+test("the genre list maps ids and names, dropping unnamed ones", async () => {
+  const fn = stubFetch({ "/genres": genres });
+  expect(await getIgdbGenres()).toEqual([
+    { id: "9", name: "Puzzle" },
+    { id: "12", name: "Role-playing (RPG)" },
+  ]);
+  const [url, init] = igdbCalls(fn)[0];
+  expect(String(url)).toBe(`${BASE}/genres`);
+  expect(String((init as RequestInit).body)).toBe("fields name; limit 500;");
+});
+
+test("discover asks for one genre by rating count, and maps games like a search", async () => {
+  const fn = stubFetch({ "/games": search });
+  expect(await discoverIgdb("9")).toEqual([
+    { provider: "igdb", providerId: "5001", mediaType: "game", title: "Lantern Keep", year: 2020, imageUrl: "https://images.igdb.com/igdb/image/upload/t_cover_big/co1abc.jpg" },
+    { provider: "igdb", providerId: "5002", mediaType: "game", title: "Undated Game", year: null, imageUrl: null },
+  ]);
+  expect(String(igdbCalls(fn)[0][1]?.body)).toBe(
+    "fields name,first_release_date,cover.image_id; where genres = (9); sort total_rating_count desc; limit 20;",
+  );
+});
+
+test("discover refuses a non-numeric genre id before any request", async () => {
+  const fn = stubFetch({});
+  await expect(discoverIgdb("9); fields *")).rejects.toBeInstanceOf(ProviderError);
+  expect(igdbCalls(fn)).toHaveLength(0);
 });
